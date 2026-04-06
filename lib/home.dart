@@ -40,6 +40,7 @@ import 'sessoes/operacao/resultados.dart';
 import 'sessoes/estoques/controle_descargas.dart';
 import 'sessoes/bombeios/ordem_bombeio.dart';
 import 'sessoes/financeiro/conta_corrente_refinarias.dart';
+import 'sessoes/operacao/presets.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -566,7 +567,7 @@ class _HomePageState extends State<HomePage>
       {
         'id': 'registro-preset',
         'icon': Icons.device_hub,
-        'label': 'Registro Preset',
+        'label': 'Presets',
         'descricao': 'Gerenciamento de registros de preset',
         'tipo': 'registro_preset',
         'sessao_pai': 'Operação',
@@ -1116,6 +1117,7 @@ class _HomePageState extends State<HomePage>
       _mostrarMenuSuporte = false;
       _mostrarSuporte = false;
       _mostrarEstoqueProduto = false;
+      _mostrarRegistroPreset = false;
       _mostrarContaCorrenteRefinarias = false;
       _voltarParaTanquesApoCACL = false;
       _resetarTodasFlagsGestaoFrota();
@@ -2423,14 +2425,8 @@ class _HomePageState extends State<HomePage>
       }
 
       if (_mostrarRegistroPreset) {
-        return _buildPaginaPadronizada(
-          titulo: 'Registro Preset',
-          conteudo: const Center(
-            child: Text(
-              'Indisponível no plano contratado.',
-              style: TextStyle(fontSize: 18, color: Color(0xFF0D47A1)),
-            ),
-          ),
+        return PresetsPage(
+          key: UniqueKey(),
           onVoltar: () {
             setState(() {
               _mostrarRegistroPreset = false;
