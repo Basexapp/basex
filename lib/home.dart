@@ -113,6 +113,7 @@ class _HomePageState extends State<HomePage>
   bool _mostrarTempDensMedia = false;
   bool _mostrarEstoqueProduto = false;
   bool _mostrarResultadoMensal = false;
+  bool _mostrarRegistroPreset = false;
   bool _mostrarCardsFilial = false;
   bool _mostrarContaCorrenteRefinarias = false;
   bool _voltarParaTanquesApoCACL = false; // ← RASTREIA SE VEIO DE TANQUES
@@ -561,6 +562,15 @@ class _HomePageState extends State<HomePage>
         'tipo': 'resultados',
         'sessao_pai': 'Operação',
         'favorito': false,
+      },
+      {
+        'id': 'registro-preset',
+        'icon': Icons.device_hub,
+        'label': 'Registro Preset',
+        'descricao': 'Gerenciamento de registros de preset',
+        'tipo': 'registro_preset',
+        'sessao_pai': 'Operação',
+        'icon_inverted': true,
       },
     ];
 
@@ -1810,7 +1820,7 @@ class _HomePageState extends State<HomePage>
             Icon(Icons.do_not_disturb, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 30), // Aumente este espaçamento
             const Text(
-              'Seção não disponível no plano contratado.',
+              'Indisponível no plano contratado.',
               style: TextStyle(
                 fontSize: 24,
                 color: Colors.grey,
@@ -2412,6 +2422,24 @@ class _HomePageState extends State<HomePage>
         );
       }
 
+      if (_mostrarRegistroPreset) {
+        return _buildPaginaPadronizada(
+          titulo: 'Registro Preset',
+          conteudo: const Center(
+            child: Text(
+              'Indisponível no plano contratado.',
+              style: TextStyle(fontSize: 18, color: Color(0xFF0D47A1)),
+            ),
+          ),
+          onVoltar: () {
+            setState(() {
+              _mostrarRegistroPreset = false;
+              _mostrarFilhosDaSessao('Operação');
+            });
+          },
+        );
+      }
+
       if (_sessaoAtual == 'Perdas e Sobras') {
         return _buildFilhosSessaoPage();
       }
@@ -2664,6 +2692,7 @@ class _HomePageState extends State<HomePage>
                       _mostrarFiltroMovimentacoes ||
                       _mostrarCardsFilial ||
                       _mostrarSuporte ||
+                      _mostrarRegistroPreset ||
                       _sessaoAtual == 'Perdas e Sobras'))
                 IconButton(
                   icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
@@ -2841,7 +2870,7 @@ class _HomePageState extends State<HomePage>
             titulo: 'Tabela de Preços - Refinaria',
             conteudo: const Center(
               child: Text(
-                'Seção não disponível no plano contratado.',
+                'Indisponível no plano contratado.',
                 style: TextStyle(fontSize: 18),
               ),
             ),
@@ -3000,7 +3029,14 @@ class _HomePageState extends State<HomePage>
                     Stack(
                       alignment: Alignment.bottomRight,
                       children: [
-                        Icon(card['icon'], color: naoPermitido ? Colors.grey.shade400 : corSessao, size: 55),
+                        Transform.scale(
+                          scaleY: card['icon_inverted'] == true ? -1 : 1,
+                          child: Icon(card['icon'],
+                              color: naoPermitido
+                                  ? Colors.grey.shade400
+                                  : corSessao,
+                              size: 55),
+                        ),
                         if (naoPermitido)
                           const Icon(Icons.lock, size: 18, color: Colors.grey),
                       ],
@@ -3425,6 +3461,11 @@ class _HomePageState extends State<HomePage>
       case 'resultados':
         setState(() {
           _mostrarResultadoMensal = true;
+        });
+        break;
+      case 'registro_preset':
+        setState(() {
+          _mostrarRegistroPreset = true;
         });
         break;
     }
