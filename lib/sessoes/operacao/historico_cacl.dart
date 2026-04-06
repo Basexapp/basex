@@ -25,7 +25,7 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
   int paginaAtual = 1;
   int totalPaginas = 1;
   int totalRegistros = 0;
-  final int limitePorPagina = 10;
+  final int limitePorPagina = 15;
   
   DateTime? dataInicial;
   DateTime? dataFinal;
