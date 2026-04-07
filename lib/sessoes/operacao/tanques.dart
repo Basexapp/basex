@@ -450,7 +450,13 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           'p_data': dataStr,
         },
       );
-      final num estoqueInicial = (responseEstoque ?? 0) as num;
+      
+      num estoqueInicial = 0;
+      if (responseEstoque is Map) {
+        estoqueInicial = (responseEstoque['estoque_inicial'] ?? 0) as num;
+      } else {
+        estoqueInicial = (responseEstoque ?? 0) as num;
+      }
 
       // 2. Buscar movimentações (Fiel ao estoque_tanque_dia.dart - sem sobra_perda que não existe na tabela)
       final dadosMovs = await supabase
@@ -1190,6 +1196,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                       descricao: 'Emitir CACL Movimentação',
                       onTap: _abrirCACL,
                       enabled: _terminalEmiteCacl,
+                      tooltip: 'Disponível apenas para apuração de bombeios.',
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1199,10 +1206,8 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                       titulo: 'CACL verificação',
                       descricao: 'Emitir CACL Verificação',
                       onTap: _abrirCACLVerificacao,
-                      enabled: !_caclesTanque.any((cacl) {
-                        final status = cacl['status']?.toString().toLowerCase() ?? '';
-                        return status.contains('emitido');
-                      }),
+                      enabled: _caclesTanque.isEmpty && !_carregandoCacls,
+                      tooltip: 'Já existe CACL para a data atual.',
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1538,6 +1543,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     required String descricao,
     required VoidCallback onTap,
     bool enabled = true,
+    String? tooltip,
   }) {
     final cardBg = enabled ? Colors.white : Colors.grey.shade50;
     final innerBg = enabled ? _accent.withOpacity(0.1) : Colors.grey.shade200;
@@ -1545,7 +1551,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     final titleColor = enabled ? _ink : Colors.grey.shade600;
     final descColor = enabled ? _muted : Colors.grey.shade500;
 
-    return Material(
+    Widget card = Material(
       elevation: 2,
       color: cardBg,
       borderRadius: BorderRadius.circular(14),
@@ -1596,6 +1602,15 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         ),
       ),
     );
+
+    if (tooltip != null && !enabled) {
+      return Tooltip(
+        message: tooltip,
+        child: card,
+      );
+    }
+
+    return card;
   }
 }
 
