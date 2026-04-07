@@ -9,140 +9,194 @@ class PresetsPage extends StatefulWidget {
   State<PresetsPage> createState() => _PresetsPageState();
 }
 
+class TerminalData {
+  final int id;
+  final String bico;
+  final String produto;
+  double saldoInicial;
+  double saldoFinal;
+  double saidaTotal;
+  double totalORP;
+  double complCarga;
+  double complDescarga;
+  double consumo;
+  double afericao;
+
+  TerminalData({
+    required this.id,
+    required this.bico,
+    required this.produto,
+    this.saldoInicial = 0,
+    this.saldoFinal = 0,
+    this.saidaTotal = 0,
+    this.totalORP = 0,
+    this.complCarga = 0,
+    this.complDescarga = 0,
+    this.consumo = 0,
+    this.afericao = 0,
+  });
+}
+
 class _PresetsPageState extends State<PresetsPage> {
-  // Controladores dos campos
-  final TextEditingController _saldoInicialController = TextEditingController();
-  final TextEditingController _saldoFinalController = TextEditingController();
-
-  // Variáveis para armazenar os registros do dia
-  double? _saldoInicial;
-  double? _saldoFinal;
-  double? _totalAbastecido;
-  final List<Map<String, dynamic>> _registros = [];
-
-  // Valores fictícios para demonstração dos presets do dia
-  final List<Map<String, dynamic>> _presetsDemonstracao = [
-    {'veiculo': 'Caminhão SC-101', 'litros': 450.5, 'hora': '08:32'},
-    {'veiculo': 'Ônibus 07 - Linha 200', 'litros': 320.0, 'hora': '09:15'},
-    {'veiculo': 'Caminhão SC-102', 'litros': 580.3, 'hora': '10:45'},
-    {'veiculo': 'Trator AG-05', 'litros': 210.8, 'hora': '11:20'},
-    {'veiculo': 'Caminhão SC-103', 'litros': 495.2, 'hora': '13:30'},
-    {'veiculo': 'Ônibus 12 - Linha 305', 'litros': 298.7, 'hora': '14:50'},
-    {'veiculo': 'Caminhão SC-104', 'litros': 623.1, 'hora': '16:10'},
-  ];
+  late List<TerminalData> _terminais;
+  late int _terminalSelecionado;
+  String _abaSelecionada = 'terminal';
+  
+  late TextEditingController _saldoInicialController;
+  late TextEditingController _saldoFinalController;
+  late TextEditingController _saidaTotalController;
+  late TextEditingController _totalORPController;
+  late TextEditingController _complCargaController;
+  late TextEditingController _complDescargaController;
+  late TextEditingController _consumoController;
+  late TextEditingController _afericaoController;
 
   @override
   void initState() {
     super.initState();
-    // Adiciona alguns registros de exemplo
-    _registros.addAll([
-      {'tipo': 'Inicial', 'valor': 146258.0, 'data': '05/04/2026 06:00'},
-      {'tipo': 'Final', 'valor': 148195.6, 'data': '05/04/2026 18:30'},
-    ]);
-  }
-
-  void _salvarSaldoInicial() {
-    if (_saldoInicialController.text.isNotEmpty) {
-      setState(() {
-        _saldoInicial = double.tryParse(_saldoInicialController.text);
-        _registros.insert(0, {
-          'tipo': 'Inicial',
-          'valor': _saldoInicial,
-          'data': _formatarDataHora(),
-        });
-        _saldoInicialController.clear();
-        _calcularTotalAbastecido();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saldo inicial registrado com sucesso!')),
+    
+    final produtos = ['Gasolina A', 'Diesel S10', 'Etanol', 'Diesel S500', 'Gasolina Adit.'];
+    
+    _terminais = List.generate(14, (index) {
+      return TerminalData(
+        id: index + 1,
+        bico: 'Bico ${index + 1}',
+        produto: produtos[index % produtos.length],
+        saldoInicial: 1250.500 + (index * 100),
+        saldoFinal: 1875.300 + (index * 100),
+        saidaTotal: 624.800,
+        totalORP: 312.400 + (index * 50),
+        complCarga: 98.5,
+        complDescarga: 95.2,
+        consumo: 624.8,
+        afericao: 99.8,
       );
-    }
+    });
+    
+    _terminalSelecionado = 0;
+    
+    _saldoInicialController = TextEditingController();
+    _saldoFinalController = TextEditingController();
+    _saidaTotalController = TextEditingController();
+    _totalORPController = TextEditingController();
+    _complCargaController = TextEditingController();
+    _complDescargaController = TextEditingController();
+    _consumoController = TextEditingController();
+    _afericaoController = TextEditingController();
+    
+    _carregarDadosTerminal();
+  }
+  
+  void _carregarDadosTerminal() {
+    final terminal = _terminais[_terminalSelecionado];
+    _saldoInicialController.text = _formatarNumero(terminal.saldoInicial);
+    _saldoFinalController.text = _formatarNumero(terminal.saldoFinal);
+    _saidaTotalController.text = _formatarNumero(terminal.saidaTotal);
+    _totalORPController.text = _formatarNumero(terminal.totalORP);
+    _complCargaController.text = _formatarNumero(terminal.complCarga);
+    _complDescargaController.text = _formatarNumero(terminal.complDescarga);
+    _consumoController.text = _formatarNumero(terminal.consumo);
+    _afericaoController.text = _formatarNumero(terminal.afericao);
+  }
+  
+  String _formatarNumero(double valor) {
+    return valor.toStringAsFixed(3);
   }
 
-  void _salvarSaldoFinal() {
-    if (_saldoFinalController.text.isNotEmpty) {
-      setState(() {
-        _saldoFinal = double.tryParse(_saldoFinalController.text);
-        _registros.insert(0, {
-          'tipo': 'Final',
-          'valor': _saldoFinal,
-          'data': _formatarDataHora(),
-        });
-        _saldoFinalController.clear();
-        _calcularTotalAbastecido();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Saldo final registrado com sucesso!')),
-      );
-    }
+  void _atualizarTerminal() {
+    setState(() {
+      final terminal = _terminais[_terminalSelecionado];
+      terminal.saldoInicial = double.tryParse(_saldoInicialController.text) ?? 0;
+      terminal.saldoFinal = double.tryParse(_saldoFinalController.text) ?? 0;
+      terminal.saidaTotal = double.tryParse(_saidaTotalController.text) ?? 0;
+      terminal.totalORP = double.tryParse(_totalORPController.text) ?? 0;
+      terminal.complCarga = double.tryParse(_complCargaController.text) ?? 0;
+      terminal.complDescarga = double.tryParse(_complDescargaController.text) ?? 0;
+      terminal.consumo = double.tryParse(_consumoController.text) ?? 0;
+      terminal.afericao = double.tryParse(_afericaoController.text) ?? 0;
+    });
   }
 
-  void _calcularTotalAbastecido() {
-    if (_saldoInicial != null && _saldoFinal != null) {
-      _totalAbastecido = _saldoFinal! - _saldoInicial!;
-    } else {
-      _totalAbastecido = null;
-    }
+  @override
+  void dispose() {
+    _saldoInicialController.dispose();
+    _saldoFinalController.dispose();
+    _saidaTotalController.dispose();
+    _totalORPController.dispose();
+    _complCargaController.dispose();
+    _complDescargaController.dispose();
+    _consumoController.dispose();
+    _afericaoController.dispose();
+    super.dispose();
   }
 
-  String _formatarDataHora() {
-    final now = DateTime.now();
-    return '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  Widget _buildAppBar() {
+    return Container(
+      height: kToolbarHeight + MediaQuery.of(context).padding.top,
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top,
+        left: 16,
+        right: 16,
+      ),
+      color: Colors.white,
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: widget.onVoltar,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Presets - Terminais de Saída',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(30, 20, 30, 30),
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
         children: [
-          // Cabeçalho
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
-                onPressed: widget.onVoltar,
-                tooltip: 'Voltar',
-              ),
-              const SizedBox(width: 10),
-              const Icon(Icons.speed, color: Color(0xFF0D47A1), size: 28),
-              const SizedBox(width: 10),
-              const Text(
-                'Registro de Presets',
-                style: TextStyle(
-                  fontSize: 24,
-                  color: Color(0xFF0D47A1),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          const Divider(color: Colors.grey),
-          const SizedBox(height: 20),
-
-          // Layout principal com scroll
+          _buildAppBar(),
+          Container(height: 1, color: Colors.grey.shade200),
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Seção: Mostradores de Saldo
-                  _buildMostradoresSection(),
-                  const SizedBox(height: 30),
-
-                  // Seção: Formulário de Registro
-                  _buildFormularioSection(),
-                  const SizedBox(height: 30),
-
-                  // Seção: Presets do Dia (Tabela)
-                  _buildPresetsDoDia(),
-                  const SizedBox(height: 30),
-
-                  // Seção: Histórico de Registros
-                  _buildHistoricoRegistros(),
+                  // Navegação de abas
+                  Center(
+                    child: Container(
+                      constraints: const BoxConstraints(maxWidth: 1000),
+                      child: _buildNavegacaoAbas(),
+                    ),
+                  ),
+                  const Divider(height: 1, color: Color.fromARGB(255, 236, 236, 236)),
+                  
+                  // Conteúdo principal à esquerda
+                  Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: _abaSelecionada == 'resumo'
+                        ? _buildResumoPage()
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildCardMedicoes(),
+                              const SizedBox(height: 24),
+                              _buildCardComplementar(),
+                            ],
+                          ),
+                  ),
                 ],
               ),
             ),
@@ -151,329 +205,209 @@ class _PresetsPageState extends State<PresetsPage> {
       ),
     );
   }
-
-  Widget _buildMostradoresSection() {
+  
+  Widget _buildNavegacaoAbas() {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.grey.shade50, Colors.grey.shade100],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.dashboard, color: Color(0xFF0D47A1), size: 28),
-                SizedBox(width: 10),
-                Text(
-                  'Medidores Físicos',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMostradorDigital(
-                    titulo: 'SALDO INICIAL',
-                    valor: _saldoInicial != null ? _saldoInicial! : 0,
-                    corFundo: Colors.green.shade50,
-                    corDisplay: Colors.green.shade900,
-                    icone: Icons.play_arrow,
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: _buildMostradorDigital(
-                    titulo: 'SALDO FINAL',
-                    valor: _saldoFinal != null ? _saldoFinal! : 0,
-                    corFundo: Colors.blue.shade50,
-                    corDisplay: Colors.blue.shade900,
-                    icone: Icons.stop,
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: _buildMostradorDigital(
-                    titulo: 'TOTAL ABASTECIDO',
-                    valor: _totalAbastecido ?? 0,
-                    corFundo: Colors.orange.shade50,
-                    corDisplay: Colors.orange.shade900,
-                    icone: Icons.local_gas_station,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMostradorDigital({
-    required String titulo,
-    required double valor,
-    required Color corFundo,
-    required Color corDisplay,
-    required IconData icone,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: corFundo,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 12,
+        runSpacing: 12,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icone, color: corDisplay, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                titulo,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: corDisplay,
-                ),
-              ),
-            ],
+          // Botão Resumo
+          _buildAbaItem(
+            label: 'RESUMO',
+            sublabel: 'Geral',
+            isSelected: _abaSelecionada == 'resumo',
+            onTap: () {
+              setState(() => _abaSelecionada = 'resumo');
+            },
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.2),
-                  blurRadius: 4,
-                  offset: const Offset(2, 2),
-                ),
-              ],
-            ),
-            child: Text(
-              valor.toStringAsFixed(3),
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                fontFamily: 'monospace',
-                color: Colors.green.shade300,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Litros',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
-          ),
+          // Botões dos Terminais
+          ..._terminais.map((t) {
+            final isSelected = _abaSelecionada == 'terminal' && _terminalSelecionado == t.id - 1;
+            return _buildAbaItem(
+              label: t.bico,
+              sublabel: t.produto,
+              isSelected: isSelected,
+              onTap: () {
+                setState(() {
+                  _abaSelecionada = 'terminal';
+                  _terminalSelecionado = t.id - 1;
+                  _carregarDadosTerminal();
+                });
+              },
+            );
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildFormularioSection() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+  Widget _buildAbaItem({
+    required String label,
+    required String sublabel,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 100, // Largura fixa de 100px
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1565C0) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF1565C0) : Colors.grey.shade300,
+          ),
+          boxShadow: isSelected
+              ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2))]
+              : null,
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Icon(Icons.edit_note, color: Color(0xFF0D47A1), size: 24),
-                const SizedBox(width: 10),
-                Text(
-                  'Registrar Leitura do Medidor',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                  ),
-                ),
-              ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _saldoInicialController,
-                    decoration: InputDecoration(
-                      labelText: 'Saldo Inicial (Litros)',
-                      hintText: 'Ex: 146258',
-                      prefixIcon: Icon(Icons.start, color: Colors.green),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      suffixText: 'L',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 15),
-                ElevatedButton.icon(
-                  onPressed: _salvarSaldoInicial,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Registrar Inicial'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _saldoFinalController,
-                    decoration: InputDecoration(
-                      labelText: 'Saldo Final (Litros)',
-                      hintText: 'Ex: 148195',
-                      prefixIcon: Icon(Icons.stop, color: Colors.blue),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      suffixText: 'L',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 15),
-                ElevatedButton.icon(
-                  onPressed: _salvarSaldoFinal,
-                  icon: const Icon(Icons.save),
-                  label: const Text('Registrar Final'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-              ],
+            const SizedBox(height: 2),
+            Text(
+              sublabel,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.white.withOpacity(0.9) : Colors.grey.shade500,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildPresetsDoDia() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300),
+  
+  Widget _buildResumoPage() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.assessment, size: 80, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'Resumo em desenvolvimento',
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade500,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+    );
+  }
+  
+  Widget _buildCardMedicoes() {
+    return SizedBox(
+      width: 420, // Reduzido em 30px (era 450)
+      child: Card(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF1A237E), width: 1),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Icon(Icons.local_gas_station, color: Color(0xFF0D47A1), size: 24),
-                const SizedBox(width: 10),
-                Text(
-                  'Presets Realizados Hoje',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Color(0xFF0D47A1).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${_presetsDemonstracao.length} abastecimentos',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0D47A1),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
             Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columnSpacing: 20,
-                    headingRowColor: WidgetStateProperty.resolveWith(
-                      (states) => Color(0xFF0D47A1).withOpacity(0.1),
-                    ),
-                    columns: const [
-                      DataColumn(label: Text('Hora', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Veículo', style: TextStyle(fontWeight: FontWeight.bold))),
-                      DataColumn(label: Text('Litros', style: TextStyle(fontWeight: FontWeight.bold))),
-                    ],
-                    rows: _presetsDemonstracao.map((preset) {
-                      return DataRow(cells: [
-                        DataCell(Text(preset['hora'])),
-                        DataCell(Text(preset['veiculo'])),
-                        DataCell(
-                          Text(
-                            '${preset['litros']} L',
-                            style: const TextStyle(fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                      ]);
-                    }).toList(),
-                  ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1565C0),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
                 ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.speed, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Medições do Terminal',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _terminais[_terminalSelecionado].bico,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildCampoLimited(
+                    titulo: 'SALDO INICIAL',
+                    controller: _saldoInicialController,
+                    icone: Icons.play_arrow,
+                    cor: Colors.green,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCampoLimited(
+                    titulo: 'SALDO FINAL',
+                    controller: _saldoFinalController,
+                    icone: Icons.stop,
+                    cor: Colors.blue,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCampoLimited(
+                    titulo: 'SAÍDA TOTAL',
+                    controller: _saidaTotalController,
+                    icone: Icons.local_gas_station,
+                    cor: Colors.orange,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCampoLimited(
+                    titulo: 'TOTAL EM ORP',
+                    controller: _totalORPController,
+                    icone: Icons.trending_up,
+                    cor: Colors.purple,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                ],
               ),
             ),
           ],
@@ -482,99 +416,218 @@ class _PresetsPageState extends State<PresetsPage> {
     );
   }
 
-  Widget _buildHistoricoRegistros() {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
+  Widget _buildCampoLimited({
+    required String titulo,
+    required TextEditingController controller,
+    required IconData icone,
+    required Color cor,
+    required Function(String) onChanged,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: cor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icone, color: cor, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: Text(
+            titulo,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        SizedBox(
+          width: 160,
+          child: TextField(
+            controller: controller,
+            onChanged: onChanged,
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCardComplementar() {
+    return SizedBox(
+      width: 420, // Reduzido em 30px (era 450)
+      child: Card(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF1A237E), width: 1),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Row(
-              children: [
-                Icon(Icons.history, color: Color(0xFF0D47A1), size: 24),
-                const SizedBox(width: 10),
-                Text(
-                  'Histórico de Registros',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                  ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF1565C0),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  topRight: Radius.circular(12),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _registros.isEmpty
-                ? Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Text(
-                        'Nenhum registro ainda',
-                        style: TextStyle(color: Colors.grey.shade500),
-                      ),
-                    ),
-                  )
-                : Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columnSpacing: 20,
-                          headingRowColor: WidgetStateProperty.resolveWith(
-                            (states) => Colors.grey.shade200,
-                          ),
-                          columns: const [
-                            DataColumn(label: Text('Data/Hora', style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text('Tipo', style: TextStyle(fontWeight: FontWeight.bold))),
-                            DataColumn(label: Text('Valor (Litros)', style: TextStyle(fontWeight: FontWeight.bold))),
-                          ],
-                          rows: _registros.map((registro) {
-                            Color tipoColor = registro['tipo'] == 'Inicial'
-                                ? Colors.green
-                                : Colors.blue;
-                            return DataRow(cells: [
-                              DataCell(Text(registro['data'])),
-                              DataCell(
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: tipoColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    registro['tipo'],
-                                    style: TextStyle(
-                                      color: tipoColor,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Text(
-                                  registro['valor'].toStringAsFixed(3),
-                                  style: const TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                              ),
-                            ]);
-                          }).toList(),
-                        ),
-                      ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.white, size: 20),
+                  SizedBox(width: 12),
+                  Text(
+                    'Informações Complementares',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Colors.white,
                     ),
                   ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildCampoComplementarLimitado(
+                    titulo: 'COMPL. DE CARGA',
+                    controller: _complCargaController,
+                    icone: Icons.arrow_upward,
+                    cor: Colors.teal,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCampoComplementarLimitado(
+                    titulo: 'COMPL. DE DESCARGA',
+                    controller: _complDescargaController,
+                    icone: Icons.arrow_downward,
+                    cor: Colors.indigo,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCampoComplementarLimitado(
+                    titulo: 'CONSUMO',
+                    controller: _consumoController,
+                    icone: Icons.speed,
+                    cor: Colors.red,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCampoComplementarLimitado(
+                    titulo: 'AFERIÇÃO',
+                    controller: _afericaoController,
+                    icone: Icons.check_circle,
+                    cor: Colors.green,
+                    onChanged: (_) => _atualizarTerminal(),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCampoComplementarLimitado({
+    required String titulo,
+    required TextEditingController controller,
+    required IconData icone,
+    required Color cor,
+    required Function(String) onChanged,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: cor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icone, color: cor, size: 16),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          flex: 2,
+          child: Text(
+            titulo,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        SizedBox(
+          width: 160,
+          child: TextField(
+            controller: controller,
+            onChanged: (value) {
+              if (value.length > 10) {
+                controller.text = value.substring(0, 10);
+                controller.selection = TextSelection.fromPosition(
+                  TextPosition(offset: controller.text.length),
+                );
+              }
+              onChanged(value);
+            },
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(6),
+                borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            ),
+            keyboardType: TextInputType.number,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
     );
   }
 }
