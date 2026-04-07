@@ -46,7 +46,8 @@ class _CalcPageState extends State<CalcPage> {
   NavigatorState? _navigatorState;
 
   bool get _mostrarCampoSobraPerda {
-    return widget.dadosFormulario['origem_estoque_tanque'] == true;
+    return widget.dadosFormulario['cacl_verificacao'] == true ||
+        widget.dadosFormulario['origem_estoque_tanque'] == true;
   }
 
   double _obterEstoqueFinalCalculado20() {
@@ -1444,13 +1445,37 @@ class _CalcPageState extends State<CalcPage> {
         return;
       }
 
-      final sobraPerda = _obterValorSobraPerda(medicoes);
+      final supabase = Supabase.instance.client;
+
+      final caclData = await supabase
+          .from('cacl')
+          .select('sobra_perda')
+          .eq('id', caclId)
+          .maybeSingle();
+
+      double? sobraPerda;
+
+      final sobraPerdaRaw = caclData?['sobra_perda'];
+
+      if (sobraPerdaRaw is num) {
+        sobraPerda = sobraPerdaRaw.toDouble();
+      } else if (sobraPerdaRaw is String) {
+        sobraPerda = double.tryParse(sobraPerdaRaw.replaceAll(',', '.'));
+      }
 
       if (sobraPerda == null || sobraPerda == 0) {
         return;
+      }      
+
+      if (sobraPerdaRaw is num) {
+        sobraPerda = sobraPerdaRaw.toDouble();
+      } else if (sobraPerdaRaw is String) {
+        sobraPerda = double.tryParse(sobraPerdaRaw.replaceAll(',', '.'));
       }
 
-      final supabase = Supabase.instance.client;
+      if (sobraPerda == null || sobraPerda == 0) {
+        return;
+      }      
 
       final tanqueId = _obterTanqueId();
 
@@ -1469,27 +1494,28 @@ class _CalcPageState extends State<CalcPage> {
         return;
       }
 
+      // ✅ NOVA REGRA: só usa movimentacao_id se for CACL de movimentação
+      final bool isMovimentacao =
+          widget.dadosFormulario['cacl_movimentacao'] == true;
+
       String? movimentacaoId;
 
-      final movExistente = await supabase
-          .from('movimentacoes')
-          .select('id')
-          .eq('cacl_id', caclId)
-          .maybeSingle();
+      if (isMovimentacao) {
+        final movExistente = await supabase
+            .from('movimentacoes')
+            .select('id')
+            .eq('cacl_id', caclId)
+            .maybeSingle();
 
-      movimentacaoId = movExistente?['id']?.toString();
+        movimentacaoId = movExistente?['id']?.toString();
 
-      if (movimentacaoId == null || movimentacaoId.isEmpty) {
-        final refId = widget.dadosFormulario['movimentacao_id_referencia']
-            ?.toString()
-            .trim();
-        if (refId != null && refId.isNotEmpty) {
-          movimentacaoId = refId;
+        // Se for movimentação e não encontrou, aborta
+        if (movimentacaoId == null || movimentacaoId.isEmpty) {
+          return;
         }
-      }
-
-      if (movimentacaoId == null || movimentacaoId.isEmpty) {
-        return;
+      } else {
+        // ✅ CACL de verificação → NÃO vincula a movimentação
+        movimentacaoId = null;
       }
 
       final quantidade = sobraPerda.abs().round();
@@ -1512,7 +1538,7 @@ class _CalcPageState extends State<CalcPage> {
           : 'Perda CACL ${numeroControle ?? ''}, $dataFormatada';
 
       final payload = {
-        'movimentacao_id': movimentacaoId,
+        'movimentacao_id': movimentacaoId, // pode ser null
         'tanque_id': tanqueId,
         'produto_id': produtoId,
         'cacl_id': caclId,

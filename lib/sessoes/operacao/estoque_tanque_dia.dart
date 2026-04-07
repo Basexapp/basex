@@ -328,7 +328,7 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
           final descricao = (m['descricao']?.toString() ?? '').toUpperCase();
           final tipo = (m['tipo_mov']?.toString() ?? '').toUpperCase();
           return cliente.contains('SOBRA') || descricao.contains('SOBRA') || tipo.contains('SOBRA') ||
-                 cliente.contains('PERDA') || descricao.contains('PERDA') || tipo.contains('PERDA');
+                cliente.contains('PERDA') || descricao.contains('PERDA') || tipo.contains('PERDA');
         }
 
         final aLast = temSobraOuPerda(a) ? 1 : 0;
@@ -361,19 +361,32 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
           descricao = "Venda - $descricao";
         }
 
-        String empresaNome = '-';
-        final movData = m['movimentacoes'];
-        if (movData is Map) {
-          final empresaData = movData['empresas'];
-          if (empresaData is Map) {
-            empresaNome = empresaData['nome_dois']?.toString() ?? '-';
-          }
-        }
-
+        // ==============================================================
+        // ✅ VERIFICAÇÃO EXPLÍCITA: Só busca empresa se NÃO for sobra/perda
+        // ==============================================================
         final String? tipoMovRaw = m['tipo_mov']?.toString();
         final String tipoMov = (tipoMovRaw ?? '').toLowerCase();
         final String descLower = desc.toLowerCase();
         final String clienteLower = cliente.toLowerCase();
+
+        final bool isSobraPerda = (tipoMovRaw != null
+            ? (tipoMov.contains('sobra') || tipoMov.contains('perda'))
+            : (descLower.contains('sobra') || descLower.contains('perda') ||
+              clienteLower.contains('sobra') || clienteLower.contains('perda')));
+
+        String empresaNome = '-';
+
+        // Só busca empresa se NÃO for sobra/perda
+        if (!isSobraPerda) {
+          final movData = m['movimentacoes'];
+          if (movData is Map) {
+            final empresaData = movData['empresas'];
+            if (empresaData is Map) {
+              empresaNome = empresaData['nome_dois']?.toString() ?? '-';
+            }
+          }
+        }
+        // ==============================================================
 
         final bool eSobra = tipoMovRaw != null
             ? tipoMov.contains('sobra')

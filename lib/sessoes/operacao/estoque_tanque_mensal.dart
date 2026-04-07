@@ -296,7 +296,6 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           .gte('data_mov', _inicioMes.toIso8601String())
           .lte('data_mov', _fimMes.toIso8601String());
 
-      // Ordenação: por data (crescente); dentro da mesma data, registros com 'Sobra' ou 'Perda' vão por último
       final List<Map<String, dynamic>> listaOrdenadaParaUI =
           List<Map<String, dynamic>>.from(dados);
 
@@ -310,12 +309,11 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
         final cmpData = dataA.compareTo(dataB);
         if (cmpData != 0) return cmpData;
         
-        // Dentro da mesma data (Apenas Dia/Mês/Ano): registros com 'Sobra' ou 'Perda' vão por último
         bool temSobraOuPerda(Map<String, dynamic> m) {
           final cliente = (m['cliente']?.toString() ?? '').toUpperCase();
           final descricao = (m['descricao']?.toString() ?? '').toUpperCase();
           return cliente.contains('SOBRA') || descricao.contains('SOBRA') ||
-                 cliente.contains('PERDA') || descricao.contains('PERDA');
+                cliente.contains('PERDA') || descricao.contains('PERDA');
         }
 
         final aLast = temSobraOuPerda(a) ? 1 : 0;
@@ -325,11 +323,9 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           return aLast.compareTo(bLast);
         }
         
-        // Se ambos forem do mesmo tipo (ambos normais ou ambos sobra/perda), mantém a ordem do horário
         return da.compareTo(db);
       });
 
-      // Calcula saldo acumulado
       num saldoAmb = _estoqueInicial['amb'] ?? 0;
       num saldoVinte = _estoqueInicial['vinte'] ?? 0;
 
@@ -349,22 +345,28 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           descricao = "Venda - $descricao";
         }
 
-        // Extrair nome da empresa
-        String empresaNome = '-';
-        final movData = m['movimentacoes'];
-        if (movData is Map) {
-          final empresaData = movData['empresas'];
-          if (empresaData is Map) {
-            empresaNome = empresaData['nome_dois']?.toString() ?? '-';
-          }
-        }
-
         final String? tipoMovRaw = m['tipo_mov']?.toString();
         final String tipoMov = (tipoMovRaw ?? '').toLowerCase();
         final String descLower = desc.toLowerCase();
         final String clienteLower = cliente.toLowerCase();
 
-        // tipo_mov has priority; fall back to description/cliente when null
+        final bool isSobraPerda = (tipoMovRaw != null
+            ? (tipoMov.contains('sobra') || tipoMov.contains('perda'))
+            : (descLower.contains('sobra') || descLower.contains('perda') ||
+              clienteLower.contains('sobra') || clienteLower.contains('perda')));
+
+        String empresaNome = '-';
+
+        if (!isSobraPerda) {
+          final movData = m['movimentacoes'];
+          if (movData is Map) {
+            final empresaData = movData['empresas'];
+            if (empresaData is Map) {
+              empresaNome = empresaData['nome_dois']?.toString() ?? '-';
+            }
+          }
+        }
+
         final bool eSobra = tipoMovRaw != null
             ? tipoMov.contains('sobra')
             : descLower.contains('sobra') || clienteLower.contains('sobra');
@@ -372,8 +374,6 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
             ? tipoMov.contains('perda')
             : descLower.contains('perda') || clienteLower.contains('perda');
 
-        // For sobra/perda rows the value must appear ONLY in the sobra_perda column.
-        // Zero out entrada/saida for display so they don't show in those columns.
         final num magnitude = entradaVinte != 0 ? entradaVinte : saidaVinte;
         num? sobraPerda;
         final num entradaVinteDisplay;
@@ -392,7 +392,6 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           saidaVinteDisplay = saidaVinte;
         }
 
-        // saldo = saldo_anterior + entrada(20°) - saída(20°) + sobra_perda
         saldoAmb += entradaAmb - saidaAmb;
         saldoVinte += entradaVinteDisplay - saidaVinteDisplay + (sobraPerda ?? 0);
 
