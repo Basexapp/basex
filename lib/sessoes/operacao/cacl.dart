@@ -37,19 +37,26 @@ class _CalcPageState extends State<CalcPage> {
   double volumeTotalLiquidoFinal = 0;
   double totalSaidasAmbienteReal = 0;
   double totalSaidas20Real = 0;
+  double _estoqueInicialRPC = 0;
   bool _isGeneratingPDF = false;
   bool _isEmittingCACL = false;
   bool _caclJaEmitido = false;
   String? _numeroControle; // Variável para armazenar o número de controle
   ScaffoldMessengerState? _scaffoldMessenger;
   NavigatorState? _navigatorState;
-  bool _emFaseDeSegundaMedicao = false;
 
   bool get _mostrarCampoSobraPerda {
     return widget.dadosFormulario['origem_estoque_tanque'] == true;
   }
 
   double _obterEstoqueFinalCalculado20() {
+    if (widget.modo == CaclModo.emissao && 
+       (widget.dadosFormulario['cacl_verificacao'] == true || widget.dadosFormulario['origem_estoque_tanque'] == true)) {
+      final medicoes = widget.dadosFormulario['medicoes'] ?? {};
+      final totalEntradas = _extrairNumero(medicoes['totalEntradasPeriodo']?.toString());
+      final totalSaidas = _extrairNumero(medicoes['totalSaidasPeriodo']?.toString());
+      return _estoqueInicialRPC + totalEntradas - totalSaidas;
+    }
     final estoqueRaw = widget.dadosFormulario['estoque_final_calculado_20'];
     if (estoqueRaw is num) return estoqueRaw.toDouble();
     return double.tryParse(estoqueRaw?.toString() ?? '') ?? 0.0;
@@ -135,19 +142,46 @@ class _CalcPageState extends State<CalcPage> {
     // 🔒 REGRA ABSOLUTA: UI sempre começa sem nº de controle
     _numeroControle = null;
 
-    final medicoes = widget.dadosFormulario['medicoes'] ?? {};
-    final temHorarioFinal = medicoes['horarioFinal'] != null &&
-        medicoes['horarioFinal'].toString().isNotEmpty &&
-        medicoes['horarioFinal'].toString() != '-';
-
-    if (temHorarioFinal) {
-      _emFaseDeSegundaMedicao = true;
-    }
-
     if (widget.modo == CaclModo.emissao) {
       _calcularVolumesIniciais();
+      if (widget.dadosFormulario['cacl_verificacao'] == true || 
+          widget.dadosFormulario['origem_estoque_tanque'] == true) {
+        _buscarEstoqueInicialRPCRepositorio();
+      }
     } else {
       _carregarDadosParaVisualizacao();
+    }
+  }
+
+  Future<void> _buscarEstoqueInicialRPCRepositorio() async {
+    final tanqueId = _obterTanqueId();
+    final dataRef = _obterDataParaEstoque();
+    final dataSql = dataRef.toIso8601String().split('T')[0];
+
+    if (tanqueId == null) return;
+
+    try {
+      final supabase = Supabase.instance.client;
+      final response = await supabase.rpc(
+        'fn_estoque_inicial_tanque',
+        params: {
+          'p_tanque_id': tanqueId,
+          'p_data': dataSql,
+        },
+      );
+
+      double saldo = 0;
+      if (response is Map) {
+        saldo = (response['estoque_inicial'] ?? 0).toDouble();
+      } else {
+        saldo = (response ?? 0).toDouble();
+      }
+
+      setState(() {
+        _estoqueInicialRPC = saldo;
+      });
+    } catch (e) {
+      debugPrint('Erro ao buscar estoque inicial via RPC: $e');
     }
   }
 
@@ -1903,9 +1937,7 @@ class _CalcPageState extends State<CalcPage> {
                                 widget.modo == CaclModo.edicao) &&
                             !_caclJaEmitido)
                           ElevatedButton.icon(
-                            onPressed: (_isEmittingCACL || 
-                                        !_temVolumeMinimoValido() || 
-                                        (!_dadosFinaisEstaoCompletos() && _emFaseDeSegundaMedicao))
+                            onPressed: (_isEmittingCACL || !_temVolumeMinimoValido())
                                 ? null
                                 : (_dadosFinaisEstaoCompletos()
                                       ? _emitirCACL
@@ -2191,7 +2223,7 @@ class _CalcPageState extends State<CalcPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                 child: Text(
-                  "Estoque final calculado (20ºC):",
+                  "Estoque final calculado:",
                   style: const TextStyle(fontSize: 11),
                 ),
               ),

@@ -1045,6 +1045,41 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
         );
         
       case EstagioCACL.aberturaRealizada:
+        final bool todasApuracoesRealizadas = _movsOrdenadas.every((m) {
+          final num entAmb = (m['entrada_amb'] ?? 0) as num;
+          final num entVinte = (m['entrada_vinte'] ?? 0) as num;
+          final num saiAmb = (m['saida_amb'] ?? 0) as num;
+          final num saiVinte = (m['saida_vinte'] ?? 0) as num;
+
+          if (entAmb != 0 && entVinte == 0) return false;
+          if (saiAmb != 0 && saiVinte == 0) return false;
+          return true;
+        });
+
+        if (!todasApuracoesRealizadas) {
+          return Tooltip(
+            message: 'Complete apurações pendentes!\nO fechamento do tanque só é permitido com todas as apurações a 20ºC realizadas.',
+            preferBelow: false,
+            verticalOffset: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            textStyle: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: _buildBotaoAcao(
+              texto: 'FECHAR TANQUE',
+              cor: Colors.grey.shade300,
+              icone: Icons.inventory,
+              onPressed: () {}, // Desabilitado
+            ),
+          );
+        }
+
         return _buildBotaoAcao(
           texto: 'FECHAR TANQUE',
           cor: const Color(0xFF0D47A1),
