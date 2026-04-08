@@ -46,8 +46,7 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
 
   double _obterEstoqueFinalCalculado20() {
     final estoqueRaw = _dadosFormulario['estoque_final_calculado_20'];
-    if (estoqueRaw is num) return estoqueRaw.toDouble();
-    return double.tryParse(estoqueRaw?.toString() ?? '') ?? 0.0;
+    return (estoqueRaw is num) ? estoqueRaw.toDouble() : (double.tryParse(estoqueRaw?.toString() ?? '') ?? 0.0);
   }
 
   String _obterEstoqueFinalCalculadoFormatado() {
@@ -83,8 +82,10 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
     if (_obterVolume20DisponivelRaw(medicoes) == null) return null;
 
     final volume20Raw = _obterVolume20DisponivelRaw(medicoes);
-    final volume20 = _extrairNumero(volume20Raw);
-    return volume20 - _obterEstoqueFinalCalculado20();
+    final volume20Final = _extrairNumero(volume20Raw);
+    final estoqueFinalCalculado = _obterEstoqueFinalCalculado20();
+    
+    return volume20Final - estoqueFinalCalculado;
   }
 
   String _formatarSobraPerdaComSinal(double valor) {
@@ -96,7 +97,16 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
   String _obterSobraPerdaFormatada(Map<String, dynamic> medicoes) {
     final sobraPerda = _obterValorSobraPerda(medicoes);
     if (sobraPerda == null) return '-';
-    return _formatarSobraPerdaComSinal(sobraPerda);
+    
+    final formattedValue = _formatarSobraPerdaComSinal(sobraPerda);
+    final estoqueFinalCalculado = _obterEstoqueFinalCalculado20();
+    
+    if (estoqueFinalCalculado != 0) {
+      final percentual = (sobraPerda / estoqueFinalCalculado) * 100;
+      return '$formattedValue (${percentual >= 0 ? '+' : ''}${percentual.toStringAsFixed(2)}%)';
+    }
+    
+    return formattedValue;
   }
 
   TextStyle _obterEstiloSobraPerda(Map<String, dynamic> medicoes) {
@@ -1139,18 +1149,18 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
     
     final volume20Final = _converterVolumeParaDouble(medicoes['volume20Final']?.toString() ?? '0');
     final volume20Inicial = _converterVolumeParaDouble(medicoes['volume20Inicial']?.toString() ?? '0');
-    
+    final estoqueFinalCalculado = _obterEstoqueFinalCalculado20();
+
     // Usar diferença armazenada ou calcular se não existir
     double diferenca;
     double porcentagem;
     
-    if (_dadosFormulario['cacl_verificacao'] == true) {
-      // Para verificação, a diferença é (Volume 20ºC Final - Volume 20ºC Inicial) - (Entradas - Saídas 20ºC)
-      // Que corresponde exatamente ao campo DIFERENÇA da linha Volume a 20ºC na tabela de comparação
-      diferenca = (volume20Final - volume20Inicial) - _totalSaidas20Real;
+    if (_dadosFormulario['cacl_verificacao'] == true || _dadosFormulario['origem_estoque_tanque'] == true) {
+      // Diferença = Volume 20ºC Final - Estoque Final Calculado
+      diferenca = volume20Final - estoqueFinalCalculado;
       
-      // O percentual é quanto esta diferença representa do "Volume total do produto na 2ª medição"
-      porcentagem = volume20Final != 0 ? (diferenca / volume20Final) * 100 : 0.0;
+      // O percentual é quanto esta diferença representa do "Estoque final calculado"
+      porcentagem = estoqueFinalCalculado != 0 ? (diferenca / estoqueFinalCalculado) * 100 : 0.0;
     } else {
       // Casos normais (não verificação)
       if (medicoes['diferencaFaturado'] != null) {
@@ -1235,7 +1245,7 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
                           color: Color(0xFFF5F5F5),
                           child: Center(
                             child: Text(
-                              "Diferença",
+                              "Sobra/Perda",
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
