@@ -170,13 +170,17 @@ class DesenvolvedorPageState extends State<DesenvolvedorPage>
                     fit: BoxFit.contain,
                     child: Stack(
                       children: [
+                        // Camada de fundo preta para garantir que nada brilhe por trás das bordas
+                        Positioned.fill(child: Container(color: Colors.black)),
+                        
                         Image.asset('assets/desenvolvedor.png'),
 
+                        // DEGRADÊ LATERAL ESQUERDO (Aumentado para cobrir a borda)
                         Positioned(
-                          left: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: 80,
+                          left: -1, // Pequeno overflow para garantir cobertura
+                          top: -1,
+                          bottom: -1,
+                          width: 120,
                           child: Container(
                             decoration: const BoxDecoration(
                               gradient: LinearGradient(
@@ -184,19 +188,21 @@ class DesenvolvedorPageState extends State<DesenvolvedorPage>
                                 end: Alignment.centerRight,
                                 colors: [
                                   Color(0xFF000000),
-                                  Color(0x99000000),
+                                  Color(0xFF000000), // Sólido no início para matar a linha branca
                                   Color(0x00000000),
                                 ],
+                                stops: [0.0, 0.1, 1.0],
                               ),
                             ),
                           ),
                         ),
 
+                        // DEGRADÊ LATERAL DIREITO (Aumentado para cobrir a borda)
                         Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: 80,
+                          right: -1,
+                          top: -1,
+                          bottom: -1,
+                          width: 120,
                           child: Container(
                             decoration: const BoxDecoration(
                               gradient: LinearGradient(
@@ -204,14 +210,16 @@ class DesenvolvedorPageState extends State<DesenvolvedorPage>
                                 end: Alignment.centerLeft,
                                 colors: [
                                   Color(0xFF000000),
-                                  Color(0x99000000),
+                                  Color(0xFF000000),
                                   Color(0x00000000),
                                 ],
+                                stops: [0.0, 0.1, 1.0],
                               ),
                             ),
                           ),
                         ),
 
+                        // DEGRADÊ VERTICAL (Aumentado e reforçado)
                         Positioned.fill(
                           child: Container(
                             decoration: const BoxDecoration(
@@ -220,13 +228,13 @@ class DesenvolvedorPageState extends State<DesenvolvedorPage>
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   Color(0xFF000000),
-                                  Color(0x66000000),
+                                  Color(0xFF000000),
                                   Color(0x00000000),
                                   Color(0x00000000),
-                                  Color(0x66000000),
+                                  Color(0xFF000000),
                                   Color(0xFF000000),
                                 ],
-                                stops: [0.0, 0.15, 0.3, 0.7, 0.85, 1.0],
+                                stops: [0.0, 0.05, 0.3, 0.7, 0.95, 1.0],
                               ),
                             ),
                           ),
@@ -420,12 +428,14 @@ class EnviarSugestaoPageState extends State<EnviarSugestaoPage> {
 
       // Gera o número de controle (YYYYMMDDHHMMSS)
       final agora = DateTime.now();
-      final nControle = "${agora.year}"
+      final nControleStr = "${agora.year}"
           "${agora.month.toString().padLeft(2, '0')}"
           "${agora.day.toString().padLeft(2, '0')}"
           "${agora.hour.toString().padLeft(2, '0')}"
           "${agora.minute.toString().padLeft(2, '0')}"
           "${agora.second.toString().padLeft(2, '0')}";
+      
+      final nControle = double.tryParse(nControleStr);
 
       // Prepara os dados para inserir na tabela 'ajuda'
       final data = {
@@ -434,7 +444,7 @@ class EnviarSugestaoPageState extends State<EnviarSugestaoPage> {
         'texto': texto, // O texto completo da mensagem
         'data_criacao': agora.toIso8601String(),
         'status': 'pendente', // Status padrão
-        'n_controle': nControle, // Número de controle (Data/Hora)
+        'n_controle': nControle, // Número de controle (Numeric no Supabase)
       };
 
       // Insere na tabela 'ajuda' do Supabase
@@ -1002,7 +1012,7 @@ class EnviarSugestaoPageState extends State<EnviarSugestaoPage> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Sua mensagem é confidencial. Será usada para melhorias no sistema.',
+                                  'Sua mensagem será bem recebida e usada para melhorias no sistema.',
                                   style: TextStyle(
                                     color: Colors.white.withOpacity(0.6),
                                     fontSize: 13,

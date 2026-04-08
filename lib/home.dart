@@ -1116,6 +1116,7 @@ class _HomePageState extends State<HomePage>
       _mostrarTempDensMedia = false;
       _mostrarMenuSuporte = false;
       _mostrarSuporte = false;
+      _mostrarFilaSolicitacoes = false; // Resetar Fila de Solicitações
       _mostrarEstoqueProduto = false;
       _mostrarRegistroPreset = false;
       _mostrarContaCorrenteRefinarias = false;

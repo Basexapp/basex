@@ -280,7 +280,7 @@ class _FilaSolicitacoesPageState extends State<FilaSolicitacoesPage> {
                                       SizedBox(
                                         width: 130,
                                         child: Text(
-                                          item['n_controle'] ?? '-',
+                                          item['n_controle']?.toString() ?? '-',
                                           style: TextStyle(fontSize: 12, color: Colors.blueGrey[600], fontFamily: 'monospace'),
                                         ),
                                       ),

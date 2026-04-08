@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 class PresetsPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -35,6 +37,28 @@ class TerminalData {
     this.consumo = 0,
     this.afericao = 0,
   });
+}
+
+class ThousandSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.selection.baseOffset == 0) return newValue;
+
+    String cleanText = newValue.text.replaceAll('.', '');
+    if (cleanText.isEmpty) return newValue;
+
+    double? value = double.tryParse(cleanText);
+    if (value == null) return oldValue;
+
+    final formatter = NumberFormat('#,###', 'pt_BR');
+    String newText = formatter.format(value).replaceAll(',', '.');
+
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
+  }
 }
 
 class _PresetsPageState extends State<PresetsPage> {
@@ -101,20 +125,25 @@ class _PresetsPageState extends State<PresetsPage> {
   }
 
   String _formatarNumero(double valor) {
-    return valor.toStringAsFixed(3);
+    return NumberFormat('#,###', 'pt_BR').format(valor).replaceAll(',', '.');
+  }
+
+  double _parseTexto(String texto) {
+    final semMilhar = texto.replaceAll('.', '');
+    return double.tryParse(semMilhar) ?? 0;
   }
 
   void _atualizarTerminal() {
     setState(() {
       final terminal = _terminais[_terminalSelecionado];
-      terminal.saldoInicial = double.tryParse(_saldoInicialController.text) ?? 0;
-      terminal.saldoFinal = double.tryParse(_saldoFinalController.text) ?? 0;
-      terminal.saidaTotal = double.tryParse(_saidaTotalController.text) ?? 0;
-      terminal.totalORP = double.tryParse(_totalORPController.text) ?? 0;
-      terminal.complCarga = double.tryParse(_complCargaController.text) ?? 0;
-      terminal.complDescarga = double.tryParse(_complDescargaController.text) ?? 0;
-      terminal.consumo = double.tryParse(_consumoController.text) ?? 0;
-      terminal.afericao = double.tryParse(_afericaoController.text) ?? 0;
+      terminal.saldoInicial = _parseTexto(_saldoInicialController.text);
+      terminal.saldoFinal = _parseTexto(_saldoFinalController.text);
+      terminal.saidaTotal = _parseTexto(_saidaTotalController.text);
+      terminal.totalORP = _parseTexto(_totalORPController.text);
+      terminal.complCarga = _parseTexto(_complCargaController.text);
+      terminal.complDescarga = _parseTexto(_complDescargaController.text);
+      terminal.consumo = _parseTexto(_consumoController.text);
+      terminal.afericao = _parseTexto(_afericaoController.text);
     });
   }
 
@@ -590,6 +619,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardMedicoes(int numeroTerminal) {
     return SizedBox(
       width: 420,
+      height: 225, // Altura fixa para os cards da esquerda
       child: Card(
         color: Colors.white,
         elevation: 0,
@@ -615,7 +645,7 @@ class _PresetsPageState extends State<PresetsPage> {
                   const Icon(Icons.speed, color: Colors.white, size: 20),
                   const SizedBox(width: 12),
                   Text(
-                    'Medição do Terminal $numeroTerminal',
+                    'Registro - Terminal $numeroTerminal',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -703,6 +733,10 @@ class _PresetsPageState extends State<PresetsPage> {
             child: TextField(
               controller: controller,
               onChanged: onChanged,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                ThousandSeparatorInputFormatter(),
+              ],
               textAlign: TextAlign.center,
               textAlignVertical: TextAlignVertical.center,
               decoration: InputDecoration(
@@ -738,6 +772,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardComplementar() {
     return SizedBox(
       width: 420,
+      height: (225 * 2) + 24, // Altura somada de dois cards + espaçamento + 20px extra
       child: Card(
         color: Colors.white,
         elevation: 0,
@@ -747,7 +782,6 @@ class _PresetsPageState extends State<PresetsPage> {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -773,65 +807,60 @@ class _PresetsPageState extends State<PresetsPage> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildCampoInput(
-                    titulo: 'TOTAL EM ORP',
-                    controller: _totalORPController,
-                    icone: Icons.trending_up,
-                    cor: Colors.purple,
-                    onChanged: (_) => _atualizarTerminal(),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCampoDiferenca(),
-                  const SizedBox(height: 10),
-                  const Center(
-                    child: SizedBox(
-                      width: 380,
-                      child: Divider(
-                        color: Color.fromARGB(255, 230, 230, 230),
-                        thickness: 1,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildCampoInput(
+                      titulo: 'TOTAL EM ORP',
+                      controller: _totalORPController,
+                      icone: Icons.trending_up,
+                      cor: Colors.purple,
+                      onChanged: (_) => _atualizarTerminal(),
+                    ),
+                    _buildCampoDiferenca(),
+                    const Center(
+                      child: SizedBox(
+                        width: 380,
+                        child: Divider(
+                          color: Color.fromARGB(255, 230, 230, 230),
+                          thickness: 1,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCampoInput(
-                    titulo: 'COMPL. DE CARGA',
-                    controller: _complCargaController,
-                    icone: Icons.arrow_upward,
-                    cor: Colors.teal,
-                    onChanged: (_) => _atualizarTerminal(),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCampoInput(
-                    titulo: 'COMPL. DE DESCARGA',
-                    controller: _complDescargaController,
-                    icone: Icons.arrow_downward,
-                    cor: Colors.indigo,
-                    onChanged: (_) => _atualizarTerminal(),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCampoInput(
-                    titulo: 'CONSUMO',
-                    controller: _consumoController,
-                    icone: Icons.speed,
-                    cor: Colors.red,
-                    onChanged: (_) => _atualizarTerminal(),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCampoInput(
-                    titulo: 'AFERIÇÃO',
-                    controller: _afericaoController,
-                    icone: Icons.check_circle,
-                    cor: Colors.green,
-                    onChanged: (_) => _atualizarTerminal(),
-                  ),
-                  const SizedBox(height: 10),
-                  _buildCampoDiferencaReal(),
-                ],
+                    _buildCampoInput(
+                      titulo: 'COMPL. DE CARGA',
+                      controller: _complCargaController,
+                      icone: Icons.arrow_upward,
+                      cor: Colors.teal,
+                      onChanged: (_) => _atualizarTerminal(),
+                    ),
+                    _buildCampoInput(
+                      titulo: 'COMPL. DE DESCARGA',
+                      controller: _complDescargaController,
+                      icone: Icons.arrow_downward,
+                      cor: Colors.indigo,
+                      onChanged: (_) => _atualizarTerminal(),
+                    ),
+                    _buildCampoInput(
+                      titulo: 'CONSUMO',
+                      controller: _consumoController,
+                      icone: Icons.speed,
+                      cor: Colors.red,
+                      onChanged: (_) => _atualizarTerminal(),
+                    ),
+                    _buildCampoInput(
+                      titulo: 'AFERIÇÃO',
+                      controller: _afericaoController,
+                      icone: Icons.check_circle,
+                      cor: Colors.green,
+                      onChanged: (_) => _atualizarTerminal(),
+                    ),
+                    _buildCampoDiferencaReal(),
+                  ],
+                ),
               ),
             ),
           ],
@@ -957,19 +986,6 @@ class _PresetsPageState extends State<PresetsPage> {
                 children: const [
                   Text(
                     '82',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('|', style: TextStyle(color: Colors.grey)),
-                  ),
-                  Text(
-                    '0,04%',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
