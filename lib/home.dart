@@ -1563,9 +1563,7 @@ class _HomePageState extends State<HomePage>
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? Colors.white
-                                          : (_hoveredMenuIndex == index
-                                                ? const Color(0xFFFAFBFF)
-                                                : const Color(0xFFF5F5F5)),
+                                          : const Color(0xFFF5F5F5),
                                       border: Border(
                                         left: BorderSide(
                                           color: isSelected
@@ -2426,7 +2424,7 @@ class _HomePageState extends State<HomePage>
 
       if (_mostrarRegistroPreset) {
         return PresetsPage(
-          key: UniqueKey(),
+          key: const ValueKey('presets-page'),
           onVoltar: () {
             setState(() {
               _mostrarRegistroPreset = false;
