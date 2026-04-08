@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:printing/printing.dart';
 
 class ResultadosPage extends StatefulWidget {
   final VoidCallback? onVoltar;
@@ -13,6 +18,7 @@ class ResultadosPage extends StatefulWidget {
 
 class _ResultadosPageState extends State<ResultadosPage> {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final GlobalKey _printKey = GlobalKey();
   
   String? _selectedTerminalId;
   List<Map<String, dynamic>> _terminais = [];
@@ -30,6 +36,8 @@ class _ResultadosPageState extends State<ResultadosPage> {
   
   // Estados de carregamento
   bool _carregandoDados = false;
+  bool _preparandoPdf = false;
+  int _segundosRestantes = 0;
   String? _erroMensagem;
 
   @override
@@ -160,6 +168,86 @@ class _ResultadosPageState extends State<ResultadosPage> {
         );
       },
     );
+  }
+
+  Future<Uint8List> _capturarImagem() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    final boundary = _printKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 3);
+
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    return byteData!.buffer.asUint8List();
+  }
+
+  Future<void> gerarPdf() async {
+    setState(() {
+      _preparandoPdf = true;
+      _segundosRestantes = 20;
+    });
+
+    // Inicia a contagem regressiva em segundo plano (apenas visual)
+    _iniciarCronometro();
+
+    try {
+      // O PDF é gerado e baixado imediatamente, sem esperar o contador acabar
+      final imgBytes = await _capturarImagem();
+
+      final terminalNome = _terminais.firstWhere(
+        (t) => t['id'].toString() == _selectedTerminalId,
+        orElse: () => {'nome': 'Todos os Terminais'},
+      )['nome'];
+
+      final pdf = pw.Document();
+
+      final image = pw.MemoryImage(imgBytes);
+
+      pdf.addPage(
+        pw.Page(
+          build: (context) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text(
+                'Resultado Mensal - $terminalNome',
+                textAlign: pw.TextAlign.center,
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Align(
+                alignment: pw.Alignment.topCenter,
+                child: pw.Image(image),
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (format) async => pdf.save(),
+      );
+    } catch (e) {
+      debugPrint('Erro ao gerar PDF: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _preparandoPdf = false;
+          _segundosRestantes = 0;
+        });
+      }
+    }
+  }
+
+  void _iniciarCronometro() async {
+    while (_segundosRestantes > 0 && _preparandoPdf) {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return;
+      setState(() {
+        _segundosRestantes--;
+      });
+    }
   }
 
   Future<void> _carregarTerminais() async {
@@ -364,14 +452,12 @@ class _ResultadosPageState extends State<ResultadosPage> {
         
         // 3. Calcular totais
         num totalEntradas = 0;
-        num totalEntradasAmb = 0;
         num totalSaidas = 0;
         num totalSaidasAmb = 0;
         num totalSobraPerda = 0;
         
         for (final mov in movimentacoes) {
           final num entradaVinte = (mov['entrada_vinte'] ?? 0) as num;
-          final num entradaAmb = (mov['entrada_amb'] ?? 0) as num;
           final num saidaVinte = (mov['saida_vinte'] ?? 0) as num;
           final num saidaAmb = (mov['saida_amb'] ?? 0) as num;
           
@@ -388,7 +474,6 @@ class _ResultadosPageState extends State<ResultadosPage> {
             totalSobraPerda -= saidaVinte;
           } else {
             totalEntradas += entradaVinte;
-            totalEntradasAmb += entradaAmb;
             totalSaidas += saidaVinte;
             totalSaidasAmb += saidaAmb;
           }
@@ -397,11 +482,8 @@ class _ResultadosPageState extends State<ResultadosPage> {
         // 4. Calcular saldo final
         final saldoFinal = estoqueInicial + totalEntradas - totalSaidas + totalSobraPerda;
         
-        // 5. Calcular diferença amb/20°C
-        final totalEntradasLiquidas = totalEntradas + (totalSobraPerda > 0 ? totalSobraPerda : 0);
-        final totalSaidasLiquidas = totalSaidas + (totalSobraPerda < 0 ? -totalSobraPerda : 0);
-        
-        final diferencaAmb = (totalEntradasAmb - totalSaidasAmb) - (totalEntradasLiquidas - totalSaidasLiquidas);
+        // 5. Calcular diferença amb/20°C (MODIFICADO: total saídas ambiente - total saídas a 20°C)
+        final diferencaAmb = totalSaidasAmb - totalSaidas;
         
         // 6. Novo Total: Soma de Diferença amb + Sobra/Perda
         final totalGeralSegundaTabela = totalSobraPerda + diferencaAmb;
@@ -569,89 +651,179 @@ class _ResultadosPageState extends State<ResultadosPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          _buildAppBar(),
-          Container(height: 1, color: Colors.grey.shade200),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32.0),
-              child: Center(
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Colors.white,
+          body: Column(
+            children: [
+              _buildAppBar(),
+              Container(height: 1, color: Colors.grey.shade200),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Center(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildTerminalSelector(),
+                        const SizedBox(height: 16),
+                        if (_carregandoTanques || _carregandoDados)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (_erroMensagem != null)
+                          Container(
+                            padding: const EdgeInsets.all(32),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Column(
+                              children: [
+                                const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _erroMensagem!,
+                                  style: const TextStyle(color: Colors.red),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: _carregarDadosMovimentacao,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF1565C0),
+                                  ),
+                                  child: const Text('Tentar Novamente'),
+                                ),
+                              ],
+                            ),
+                          )
+                        else if (_tanques.isEmpty && _selectedTerminalId != null)
+                          Container(
+                            padding: const EdgeInsets.all(32),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: const Text(
+                              'Nenhum tanque encontrado para este terminal.',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          )
+                        else if (_tanques.isNotEmpty)
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildTableTitleWithButton(),
+                              const SizedBox(height: 16),
+                              RepaintBoundary(
+                                key: _printKey,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildTableSection(
+                                      title: 'Resumo da movimentação mensal',
+                                      rows: _buildSaldoRows,
+                                    ),
+                                    const SizedBox(height: 24),
+                                    _buildTableSection(
+                                      title: 'Ganhos / Perdas / Variação',
+                                      rows: _buildPerdaSobraRows,
+                                      showColumnHeader: false,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (_preparandoPdf)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _buildTerminalSelector(),
-                    const SizedBox(height: 16),
-                    if (_carregandoTanques || _carregandoDados)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      )
-                    else if (_erroMensagem != null)
-                      Container(
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-                            const SizedBox(height: 16),
-                            Text(
-                              _erroMensagem!,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _carregarDadosMovimentacao,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF1565C0),
-                              ),
-                              child: const Text('Tentar Novamente'),
-                            ),
-                          ],
-                        ),
-                      )
-                    else if (_tanques.isEmpty && _selectedTerminalId != null)
-                      Container(
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                        ),
-                        child: const Text(
-                          'Nenhum tanque encontrado para este terminal.',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      )
-                    else if (_tanques.isNotEmpty)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildTableSection(
-                            title: 'Resumo da movimentação mensal',
-                            rows: _buildSaldoRows,
-                          ),
-                          const SizedBox(height: 24),
-                          _buildTableSection(
-                            title: 'Ganhos / Perdas / Variação',
-                            rows: _buildPerdaSobraRows,
-                            showColumnHeader: false,
-                          ),
-                        ],
+                    const CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1565C0)),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Relaxe, estamos preparando o PDF. São só $_segundosRestantes segundos',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1565C0),
+                        decoration: TextDecoration.none,
                       ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Aproveite para tomar um café ☕',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
                   ],
                 ),
               ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildTableTitleWithButton() {
+    final double columnWidth = 140.0;
+    final double firstColumnWidth = 180.0;
+    final double totalWidth = firstColumnWidth + (_tanques.length * columnWidth);
+    
+    return SizedBox(
+      width: totalWidth,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Text(
+            'Resultado Mensal - ${_terminais.firstWhere(
+              (t) => t['id'].toString() == _selectedTerminalId,
+              orElse: () => {'nome': 'Todos os Terminais'},
+            )['nome']}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF37474F),
+            ),
+          ),
+          Positioned(
+            right: 0,
+            child: IconButton(
+              icon: const Icon(Icons.picture_as_pdf, color: Color(0xFF1565C0)),
+              tooltip: 'Gerar PDF',
+              onPressed: gerarPdf,
             ),
           ),
         ],
@@ -840,7 +1012,7 @@ class _ResultadosPageState extends State<ResultadosPage> {
       final dados = _dadosTanques[tanque['id']];
       return _formatarNumero(dados?['totalSobraPerda']);
     }).toList();
-    rows.add(_buildDataRow('Sobra/Perda', sobraPerdaValues, firstColumnWidth, columnWidth));
+    rows.add(_buildDataRow('Sobra/Perda (apuração)', sobraPerdaValues, firstColumnWidth, columnWidth));
     
     final diferencaValues = _tanques.map((tanque) {
       final dados = _dadosTanques[tanque['id']];
@@ -909,7 +1081,7 @@ class _ResultadosPageState extends State<ResultadosPage> {
               ),
             ),
           );
-        }).toList(),
+        }),
       ],
     );
   }
