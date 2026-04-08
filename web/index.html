@@ -28,7 +28,7 @@
 
           // Se já existe um SW esperando, ativa imediatamente
           if (reg.waiting) {
-            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            reg.waiting.postMessage('skipWaiting');
           }
 
           // Quando uma nova versão é encontrada, força ativação
@@ -39,7 +39,7 @@
             newWorker.addEventListener('statechange', function () {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                 console.log('Nova versão disponível, ativando...');
-                newWorker.postMessage({ type: 'SKIP_WAITING' });
+                newWorker.postMessage('skipWaiting');
               }
             });
           });
@@ -56,7 +56,7 @@
       });
     }
 
-    // Função global para atualização manual (fallback)
+    // Função global para atualização: limpa tudo e força navegação fresh
     window.atualizarApp = async function () {
       try {
         console.log('Iniciando atualização do app...');
@@ -75,10 +75,13 @@
           }
         }
 
-        window.location.reload();
+        // Navega com cache-bust para forçar o browser a buscar tudo do servidor
+        var url = new URL(window.location.href);
+        url.searchParams.set('cache_bust', Date.now());
+        window.location.replace(url.toString());
       } catch (e) {
         console.error('Erro ao atualizar app:', e);
-        window.location.reload();
+        window.location.replace(window.location.pathname + '?cache_bust=' + Date.now());
       }
     };
   </script>

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'dart:js_interop';
+import 'dart:html' as html;
 import 'login_page.dart';
 import 'home.dart';
 import 'configuracoes/escolher_senha.dart';
@@ -22,7 +23,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   final supabase = Supabase.instance.client;
   String _statusMessage = 'Verificando atualizações...';
-  String _versaoExibida = '2.1.6';
+  String _versaoExibida = '2.1.7';
   Timer? _timer;
 
   @override
@@ -52,9 +53,20 @@ class _SplashScreenState extends State<SplashScreen> {
       final precisaAtualizar = await _verificarAtualizacao();
       
       if (precisaAtualizar && mounted) {
-        _mostrarDialogAtualizacao();
-        return;
+        // Verifica se já tentamos atualizar nesta sessão (anti-loop)
+        final jaAtualizou = html.window.sessionStorage['app_atualizado'];
+        if (jaAtualizou == 'true') {
+          // Já tentou atualizar mas o código velho ainda está cacheado.
+          // Segue para o login normalmente — no próximo acesso virá a versão nova.
+          html.window.sessionStorage.remove('app_atualizado');
+        } else {
+          _mostrarDialogAtualizacao();
+          return;
+        }
       }
+      
+      // Limpa flag de atualização se versões batem
+      html.window.sessionStorage.remove('app_atualizado');
       
       _statusMessage = 'Verificando sessão...';
       if (mounted) setState(() {});
@@ -93,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   String _getVersaoAtual() {
-    return '2.1.6';
+    return '2.1.7';
   }
 
   void _mostrarDialogAtualizacao() {
@@ -132,14 +144,19 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _recarregarApp() {
+    // Marca que já tentamos atualizar (previne loop infinito)
+    html.window.sessionStorage['app_atualizado'] = 'true';
+    
     // Chama a função JS que limpa service workers + caches e recarrega
     if (atualizarApp != null) {
       atualizarApp!.callAsFunction();
     } else {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const SplashScreen()),
-        (route) => false,
-      );
+      // Fallback: navega com cache-bust
+      final uri = Uri.base.replace(queryParameters: {
+        ...Uri.base.queryParameters,
+        'cache_bust': DateTime.now().millisecondsSinceEpoch.toString(),
+      });
+      html.window.location.replace(uri.toString());
     }
   }
 
