@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../../login_page.dart';
 
 class PresetsPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -110,6 +111,96 @@ class _PresetsPageState extends State<PresetsPage> {
     _afericaoController = TextEditingController();
 
     _carregarDadosTerminal();
+  }
+
+  void _abrirDialogSaldoFinal() {
+    final user = UsuarioAtual.instance;
+    final String tituloPreset = user?.terminalNome ?? 'Preset1';
+    final TextEditingController dialogController = TextEditingController(text: _saldoFinalController.text);
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF1A237E), width: 1),
+        ),
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Saldo Final - $tituloPreset',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A237E),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: dialogController,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  ThousandSeparatorInputFormatter(),
+                ],
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                ),
+                keyboardType: TextInputType.number,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('CANCELAR'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      _saldoFinalController.text = dialogController.text;
+                      _atualizarTerminal();
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('SALVAR'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _carregarDadosTerminal() {
@@ -619,7 +710,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardMedicoes(int numeroTerminal) {
     return SizedBox(
       width: 420,
-      height: 225, // Altura fixa para os cards da esquerda
+      height: 245, // Aumentado de 225 para 245 (20px extra) para evitar overflow
       child: Card(
         color: Colors.white,
         elevation: 0,
@@ -674,6 +765,8 @@ class _PresetsPageState extends State<PresetsPage> {
                     icone: Icons.stop,
                     cor: Colors.blue,
                     onChanged: (_) => _atualizarTerminal(),
+                    onAddPressed: _abrirDialogSaldoFinal,
+                    hasValue: _saldoFinalController.text.isNotEmpty,
                   ),
                   const SizedBox(height: 10),
                   _buildCampoInput(
@@ -699,15 +792,20 @@ class _PresetsPageState extends State<PresetsPage> {
     required IconData icone,
     required Color cor,
     required Function(String) onChanged,
+    VoidCallback? onAddPressed,
+    bool hasValue = false,
   }) {
-    return SizedBox(
-      height: 35, // Altura fixa da linha
+    return Container(
+      height: 35, // Altura única para a linha inteira
+      margin: const EdgeInsets.symmetric(vertical: 4), // Pequeno respiro entre linhas
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center, // Centraliza todos horizontalmente NA MESMA LINHA
         children: [
+          // Ícone
           Container(
             width: 28,
             height: 28,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
               color: cor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(6),
@@ -715,6 +813,8 @@ class _PresetsPageState extends State<PresetsPage> {
             child: Icon(icone, color: cor, size: 16),
           ),
           const SizedBox(width: 12),
+          
+          // Título
           Expanded(
             flex: 2,
             child: Text(
@@ -726,10 +826,38 @@ class _PresetsPageState extends State<PresetsPage> {
               ),
             ),
           ),
+
+          // Botão de Adição/Edição
+          if (onAddPressed != null) ...[
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: ElevatedButton(
+                onPressed: onAddPressed,
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                child: Icon(
+                  hasValue ? Icons.edit : Icons.add,
+                  size: 12,
+                ),
+              ),
+            ),
+          ],
+          
           const SizedBox(width: 12),
+
+          // Input
           SizedBox(
             width: 160,
-            height: 35, // Altura fixa do input
+            height: 32, // Um pouco menor que o Container pai para garantir centralização
             child: TextField(
               controller: controller,
               onChanged: onChanged,
@@ -738,9 +866,10 @@ class _PresetsPageState extends State<PresetsPage> {
                 ThousandSeparatorInputFormatter(),
               ],
               textAlign: TextAlign.center,
-              textAlignVertical: TextAlignVertical.center,
+              textAlignVertical: TextAlignVertical.center, // Garante que o texto dentro do input esteja centralizado
               decoration: InputDecoration(
-                isDense: true,
+                isCollapsed: true, // Remove paddings internos padrões que causam desalinhamento
+                contentPadding: const EdgeInsets.symmetric(vertical: 10), // Centraliza o texto verticalmente no campo
                 filled: true,
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
@@ -755,7 +884,6 @@ class _PresetsPageState extends State<PresetsPage> {
                   borderRadius: BorderRadius.circular(6),
                   borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
               ),
               keyboardType: TextInputType.number,
               style: const TextStyle(
@@ -772,7 +900,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardComplementar() {
     return SizedBox(
       width: 420,
-      height: (225 * 2) + 24, // Altura somada de dois cards + espaçamento + 20px extra
+      height: (245 * 2) + 24, // Ajustado para refletir a nova altura dos cards de medição
       child: Card(
         color: Colors.white,
         elevation: 0,
