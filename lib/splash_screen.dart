@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import 'dart:js_interop';
 import 'login_page.dart';
 import 'home.dart';
 import 'configuracoes/escolher_senha.dart';
 import 'configuracoes/redefinir_senha.dart';
-import 'dart:async';
+
+@JS()
+external JSFunction? atualizarApp;
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,7 +22,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   final supabase = Supabase.instance.client;
   String _statusMessage = 'Verificando atualizações...';
-  String _versaoExibida = '2.1.5';
+  String _versaoExibida = '2.1.6';
   Timer? _timer;
 
   @override
@@ -29,7 +33,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _carregarVersao() async {
-    final versao = await _getVersaoAtual();
+    final versao = _getVersaoAtual();
     if (mounted) {
       setState(() {
         _versaoExibida = versao;
@@ -45,7 +49,6 @@ class _SplashScreenState extends State<SplashScreen> {
 
   Future<void> _iniciarVerificacoes() async {
     try {
-      // Primeiro verifica se há atualizações disponíveis
       final precisaAtualizar = await _verificarAtualizacao();
       
       if (precisaAtualizar && mounted) {
@@ -53,77 +56,44 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
       
-      // Se não precisa atualizar, continua com a verificação de sessão
       _statusMessage = 'Verificando sessão...';
       if (mounted) setState(() {});
       
       await _verificarSessao();
     } catch (e) {
       print('Erro na verificação inicial: $e');
-      // Em caso de erro, continua com a verificação de sessão
       _statusMessage = 'Verificando sessão...';
       if (mounted) setState(() {});
       await _verificarSessao();
     }
   }
 
+  /// Busca /version.json (com cache-bust) e compara com a versão hardcoded.
+  /// O arquivo version.json é deployado junto com o app no Firebase Hosting
+  /// e tem header Cache-Control: no-cache, garantindo que sempre retorne a
+  /// versão mais recente do servidor.
   Future<bool> _verificarAtualizacao() async {
     try {
-      // URL do seu servidor com a versão mais recente
-      // ATENÇÃO: Substitua pela URL real do seu backend quando estiver em produção
-      // Por enquanto, retorna false para não bloquear o desenvolvimento
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final baseUrl = Uri.base.origin;
       final response = await http.get(
-        Uri.parse('https://seuservidor.com/api/versao'),
-        headers: {'Content-Type': 'application/json'},
-      ).timeout(const Duration(seconds: 3));
+        Uri.parse('$baseUrl/version.json?t=$timestamp'),
+      ).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final String versaoServidor = data['versao']?.toString() ?? '0';
-        
-        // Obtém a versão atual do app
-        final String versaoAtual = await _getVersaoAtual();
-        
-        // Compara as versões
-        return _compararVersoes(versaoServidor, versaoAtual);
+        final String versaoAtual = _getVersaoAtual();
+        return versaoServidor != versaoAtual;
       }
     } catch (e) {
-      // Servidor de versão não configurado ainda — ignora silenciosamente
+      // Falha ao buscar version.json — segue normalmente
     }
-    return false; // Retorna false para desenvolvimento
+    return false;
   }
 
-  Future<String> _getVersaoAtual() async {
-    try {
-      // Retorna uma versão padrão
-      // Em produção, você pode usar package_info_plus para obter a versão real
-      return '2.1.5';
-    } catch (e) {
-      return '2.1.5';
-    }
-  }
-
-  bool _compararVersoes(String servidor, String atual) {
-    try {
-      List<int> versaoServidor = servidor.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      List<int> versaoAtual = atual.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-      
-      // Garante que ambas as listas tenham o mesmo tamanho
-      while (versaoServidor.length < 3) {
-        versaoServidor.add(0);
-      }
-      while (versaoAtual.length < 3) {
-        versaoAtual.add(0);
-      }
-      
-      for (int i = 0; i < versaoServidor.length; i++) {
-        if (versaoServidor[i] > versaoAtual[i]) return true;
-        if (versaoServidor[i] < versaoAtual[i]) return false;
-      }
-      return false;
-    } catch (e) {
-      return false;
-    }
+  String _getVersaoAtual() {
+    return '2.1.6';
   }
 
   void _mostrarDialogAtualizacao() {
@@ -162,11 +132,15 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _recarregarApp() {
-    // Força o recarregamento completo do app
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const SplashScreen()),
-      (route) => false,
-    );
+    // Chama a função JS que limpa service workers + caches e recarrega
+    if (atualizarApp != null) {
+      atualizarApp!.callAsFunction();
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const SplashScreen()),
+        (route) => false,
+      );
+    }
   }
 
   Future<void> _verificarSessao() async {

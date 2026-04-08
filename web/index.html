@@ -20,21 +20,50 @@
   <script src="flutter_bootstrap.js" async></script>
 
   <script>
+    // Detecta atualizações do service worker e força ativação imediata
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {
-        navigator.serviceWorker.register('flutter_service_worker.js?v=73');
+        navigator.serviceWorker.getRegistration().then(function (reg) {
+          if (!reg) return;
+
+          // Se já existe um SW esperando, ativa imediatamente
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+
+          // Quando uma nova versão é encontrada, força ativação
+          reg.addEventListener('updatefound', function () {
+            var newWorker = reg.installing;
+            if (!newWorker) return;
+
+            newWorker.addEventListener('statechange', function () {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('Nova versão disponível, ativando...');
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          });
+        });
+
+        // Quando o novo SW assume controle, recarrega a página
+        var refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', function () {
+          if (refreshing) return;
+          refreshing = true;
+          console.log('Service worker atualizado, recarregando...');
+          window.location.reload();
+        });
       });
     }
 
-    // Função global para atualização
+    // Função global para atualização manual (fallback)
     window.atualizarApp = async function () {
       try {
         console.log('Iniciando atualização do app...');
-        
+
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
           for (const reg of regs) {
-            console.log('Desregistrando service worker...');
             await reg.unregister();
           }
         }
@@ -42,16 +71,14 @@
         if (window.caches) {
           const keys = await caches.keys();
           for (const key of keys) {
-            console.log('Limpando cache:', key);
             await caches.delete(key);
           }
         }
 
-        console.log('Recarregando página...');
-        window.location.reload(true);
+        window.location.reload();
       } catch (e) {
         console.error('Erro ao atualizar app:', e);
-        window.location.reload(true);
+        window.location.reload();
       }
     };
   </script>

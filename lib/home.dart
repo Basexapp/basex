@@ -1821,7 +1821,7 @@ class _HomePageState extends State<HomePage>
             Icon(Icons.do_not_disturb, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 30), // Aumente este espaçamento
             const Text(
-              'Indisponível no plano contratado.',
+              'Em breve! Em processo de adequação à sua organização.',
               style: TextStyle(
                 fontSize: 24,
                 color: Colors.grey,
@@ -1876,7 +1876,7 @@ class _HomePageState extends State<HomePage>
           default:
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Indisponível no plano contratado.'),
+                content: Text('Em breve! Em processo de adequação à sua organização.'),
                 backgroundColor: Colors.orange,
                 duration: Duration(seconds: 2),
               ),
@@ -2791,7 +2791,7 @@ class _HomePageState extends State<HomePage>
             titulo: 'Dutoviário',
             conteudo: const Center(
               child: Text(
-                'Indisponível no plano contratado.',
+                'Em breve! Em processo de adequação à sua organização.',
                 style: TextStyle(fontSize: 18),
               ),
             ),
@@ -2806,7 +2806,7 @@ class _HomePageState extends State<HomePage>
             titulo: 'Rodoviário',
             conteudo: const Center(
               child: Text(
-                'Indisponível no plano contratado.',
+                'Em breve! Em processo de adequação à sua organização.',
                 style: TextStyle(fontSize: 18),
               ),
             ),
@@ -2865,7 +2865,7 @@ class _HomePageState extends State<HomePage>
             titulo: 'Tabela de Preços - Refinaria',
             conteudo: const Center(
               child: Text(
-                'Indisponível no plano contratado.',
+                'Em breve! Em processo de adequação à sua organização.',
                 style: TextStyle(fontSize: 18),
               ),
             ),
@@ -3359,7 +3359,7 @@ class _HomePageState extends State<HomePage>
       case 'dutoviario':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Indisponível no plano contratado.'),
+            content: Text('Em breve! Em processo de adequação à sua organização.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 2),
           ),
@@ -3368,7 +3368,7 @@ class _HomePageState extends State<HomePage>
       case 'rodoviario':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Indisponível no plano contratado.'),
+            content: Text('Em breve! Em processo de adequação à sua organização.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 2),
           ),
@@ -3765,7 +3765,7 @@ class _HomePageState extends State<HomePage>
       case 'bombeios':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Indisponível no plano contratado.'),
+            content: Text('Em breve! Em processo de adequação à sua organização.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 2),
           ),
@@ -3792,7 +3792,7 @@ class _HomePageState extends State<HomePage>
   void _navegarParaCardGestaoContratos(String tipo) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Indisponível no plano contratado.'),
+        content: Text('Em breve! Em processo de adequação à sua organização.'),
         backgroundColor: Colors.orange,
         duration: Duration(seconds: 2),
       ),
@@ -3809,7 +3809,7 @@ class _HomePageState extends State<HomePage>
       case 'analise_conformidade':
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Indisponível no plano contratado.'),
+            content: Text('Em breve! Em processo de adequação à sua organização.'),
             backgroundColor: Colors.orange,
             duration: Duration(seconds: 2),
           ),
