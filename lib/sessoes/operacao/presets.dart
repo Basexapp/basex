@@ -16,6 +16,7 @@ class TerminalData {
   final int id;
   final String bico;
   final String produto;
+  int quantidadePresets; // Nova propriedade para controlar quantos presets aparecem
   double saldoInicial;
   double saldoFinal;
   double saidaTotal;
@@ -29,6 +30,7 @@ class TerminalData {
     required this.id,
     required this.bico,
     required this.produto,
+    this.quantidadePresets = 2, // Padrão solicitado anteriormente
     this.saldoInicial = 0,
     this.saldoFinal = 0,
     this.saidaTotal = 0,
@@ -77,6 +79,15 @@ class _PresetsPageState extends State<PresetsPage> {
   late TextEditingController _consumoController;
   late TextEditingController _afericaoController;
 
+  // Novos controladores para os containers de registro (Suporta até 3 agora)
+  late TextEditingController _saldoInicialController2;
+  late TextEditingController _saldoFinalController2;
+  late TextEditingController _saidaTotalController2;
+
+  late TextEditingController _saldoInicialController3;
+  late TextEditingController _saldoFinalController3;
+  late TextEditingController _saidaTotalController3;
+
   @override
   void initState() {
     super.initState();
@@ -88,6 +99,7 @@ class _PresetsPageState extends State<PresetsPage> {
         id: index + 1,
         bico: 'Bico ${index + 1}',
         produto: produtos[index],
+        quantidadePresets: 2, // Começa com 2 por padrão
         saldoInicial: 1250.500 + (index * 100),
         saldoFinal: 1875.300 + (index * 100),
         saidaTotal: 624.800,
@@ -110,98 +122,16 @@ class _PresetsPageState extends State<PresetsPage> {
     _consumoController = TextEditingController();
     _afericaoController = TextEditingController();
 
+    _saldoInicialController2 = TextEditingController(text: '0');
+    _saldoFinalController2 = TextEditingController(text: '0');
+    _saidaTotalController2 = TextEditingController(text: '0');
+
+    _saldoInicialController3 = TextEditingController(text: '0');
+    _saldoFinalController3 = TextEditingController(text: '0');
+    _saidaTotalController3 = TextEditingController(text: '0');
+
     _carregarDadosTerminal();
-  }
-
-  void _abrirDialogSaldoFinal() {
-    final user = UsuarioAtual.instance;
-    final String tituloPreset = user?.terminalNome ?? 'Preset1';
-    final TextEditingController dialogController = TextEditingController(text: _saldoFinalController.text);
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF1A237E), width: 1),
-        ),
-        child: Container(
-          width: 300,
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Saldo Final - $tituloPreset',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1A237E),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: dialogController,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  ThousandSeparatorInputFormatter(),
-                ],
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(
-                  isDense: true,
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: BorderSide(color: Colors.grey.shade300),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                ),
-                keyboardType: TextInputType.number,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('CANCELAR'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () {
-                      _saldoFinalController.text = dialogController.text;
-                      _atualizarTerminal();
-                      Navigator.pop(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A237E),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text('SALVAR'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  }  
 
   void _carregarDadosTerminal() {
     final terminal = _terminais[_terminalSelecionado];
@@ -235,7 +165,135 @@ class _PresetsPageState extends State<PresetsPage> {
       terminal.complDescarga = _parseTexto(_complDescargaController.text);
       terminal.consumo = _parseTexto(_consumoController.text);
       terminal.afericao = _parseTexto(_afericaoController.text);
+
+      // Sincronizar também os valores do segundo controlador se necessário, 
+      // ou apenas garantir que o estado seja reconstruído para os cálculos.
     });
+  }
+
+  String _formatarSomaSaidas() {
+    double soma = _parseTexto(_saidaTotalController.text) + 
+                 _parseTexto(_saidaTotalController2.text) +
+                 _parseTexto(_saidaTotalController3.text);
+    return _formatarNumero(soma);
+  }
+
+  void _abrirConfiguracoes() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        // Criamos uma cópia temporária para o diálogo
+        final List<int> tempQuantidades = _terminais.map((t) => t.quantidadePresets).toList();
+
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Container(
+                width: 350,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.settings, color: Color(0xFF1A237E), size: 24),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Configuração de Presets',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A237E),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Selecione a quantidade de presets por produto:',
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    ...List.generate(_terminais.length, (index) {
+                      final terminal = _terminais[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                terminal.produto,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: DropdownButton<int>(
+                                value: tempQuantidades[index],
+                                underline: const SizedBox(),
+                                items: [1, 2, 3].map((val) {
+                                  return DropdownMenuItem<int>(
+                                    value: val,
+                                    child: Text(val.toString()),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setStateDialog(() {
+                                      tempQuantidades[index] = val;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 32),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('CANCELAR'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() {
+                              for (int i = 0; i < _terminais.length; i++) {
+                                _terminais[i].quantidadePresets = tempQuantidades[i];
+                              }
+                            });
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1A237E),
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('SALVAR'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -248,6 +306,12 @@ class _PresetsPageState extends State<PresetsPage> {
     _complDescargaController.dispose();
     _consumoController.dispose();
     _afericaoController.dispose();
+    _saldoInicialController2.dispose();
+    _saldoFinalController2.dispose();
+    _saidaTotalController2.dispose();
+    _saldoInicialController3.dispose();
+    _saldoFinalController3.dispose();
+    _saidaTotalController3.dispose();
     super.dispose();
   }
 
@@ -276,6 +340,11 @@ class _PresetsPageState extends State<PresetsPage> {
                 color: Colors.black,
               ),
             ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings, color: Colors.black54),
+            onPressed: _abrirConfiguracoes,
+            tooltip: 'Configurar Presets',
           ),
         ],
       ),
@@ -308,9 +377,15 @@ class _PresetsPageState extends State<PresetsPage> {
                       if (_abaSelecionada == 'resumo')
                         _buildResumoPage()
                       else ...[
-                        _buildCardMedicoes(1),
-                        const SizedBox(height: 24),
-                        _buildCardMedicoes(2),
+                        ...List.generate(_terminais[_terminalSelecionado].quantidadePresets, (index) {
+                          return Column(
+                            children: [
+                              _buildCardMedicoes(index + 1),
+                              if (index < _terminais[_terminalSelecionado].quantidadePresets - 1)
+                                const SizedBox(height: 24),
+                            ],
+                          );
+                        }),
                       ]
                     ],
                   ),
@@ -710,7 +785,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardMedicoes(int numeroTerminal) {
     return SizedBox(
       width: 420,
-      height: 245, // Aumentado de 225 para 245 (20px extra) para evitar overflow
+      height: 245,
       child: Card(
         color: Colors.white,
         elevation: 0,
@@ -733,10 +808,10 @@ class _PresetsPageState extends State<PresetsPage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.speed, color: Colors.white, size: 20),
+                  const Icon(Icons.speed, color: Colors.black, size: 20),
                   const SizedBox(width: 12),
                   Text(
-                    'Registro - Terminal $numeroTerminal',
+                    'Registro - Preset - ${_terminais[_terminalSelecionado].produto}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -753,33 +828,135 @@ class _PresetsPageState extends State<PresetsPage> {
                 children: [
                   _buildCampoInput(
                     titulo: 'SALDO INICIAL',
-                    controller: _saldoInicialController,
+                    controller: numeroTerminal == 1 ? _saldoInicialController : numeroTerminal == 2 ? _saldoInicialController2 : _saldoInicialController3,
                     icone: Icons.play_arrow,
                     cor: Colors.green,
-                    onChanged: (_) => _atualizarTerminal(),
+                    onChanged: (val) => _atualizarTerminal(),
                   ),
                   const SizedBox(height: 10),
                   _buildCampoInput(
                     titulo: 'SALDO FINAL',
-                    controller: _saldoFinalController,
+                    controller: numeroTerminal == 1 ? _saldoFinalController : numeroTerminal == 2 ? _saldoFinalController2 : _saldoFinalController3,
                     icone: Icons.stop,
                     cor: Colors.blue,
-                    onChanged: (_) => _atualizarTerminal(),
-                    onAddPressed: _abrirDialogSaldoFinal,
-                    hasValue: _saldoFinalController.text.isNotEmpty,
+                    onChanged: (val) => _atualizarTerminal(),
+                    onAddPressed: () => _abrirDialogSaldoFinalIndependente(numeroTerminal),
+                    hasValue: (numeroTerminal == 1 ? _saldoFinalController : numeroTerminal == 2 ? _saldoFinalController2 : _saldoFinalController3).text.isNotEmpty,
                   ),
                   const SizedBox(height: 10),
                   _buildCampoInput(
                     titulo: 'SAÍDA REGISTRADA',
-                    controller: _saidaTotalController,
+                    controller: numeroTerminal == 1 ? _saidaTotalController : numeroTerminal == 2 ? _saidaTotalController2 : _saidaTotalController3,
                     icone: Icons.local_gas_station,
                     cor: Colors.orange,
-                    onChanged: (_) => _atualizarTerminal(),
+                    onChanged: (val) => _atualizarTerminal(),
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _abrirDialogSaldoFinalIndependente(int numero) {
+    final user = UsuarioAtual.instance;
+    final String tituloPreset = '${user?.terminalNome ?? 'Preset'}$numero';
+    final TextEditingController dialogController = TextEditingController(
+      text: numero == 1
+          ? _saldoFinalController.text
+          : numero == 2
+              ? _saldoFinalController2.text
+              : _saldoFinalController3.text,
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF1A237E), width: 1),
+        ),
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Saldo Final - $tituloPreset',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A237E),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: dialogController,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  ThousandSeparatorInputFormatter(),
+                ],
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                ),
+                keyboardType: TextInputType.number,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('CANCELAR'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (numero == 1) {
+                        _saldoFinalController.text = dialogController.text;
+                      } else if (numero == 2) {
+                        _saldoFinalController2.text = dialogController.text;
+                      } else {
+                        _saldoFinalController3.text = dialogController.text;
+                      }
+                      _atualizarTerminal();
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('SALVAR'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -797,7 +974,7 @@ class _PresetsPageState extends State<PresetsPage> {
   }) {
     return Container(
       height: 35, // Altura única para a linha inteira
-      margin: const EdgeInsets.symmetric(vertical: 4), // Pequeno respiro entre linhas
+      margin: const EdgeInsets.symmetric(vertical: 2), // Reduzido de 4 para 2
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center, // Centraliza todos horizontalmente NA MESMA LINHA
         children: [
@@ -900,7 +1077,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardComplementar() {
     return SizedBox(
       width: 420,
-      height: (245 * 2) + 24, // Ajustado para refletir a nova altura dos cards de medição
+      height: (233.0 * 2) + (24.0 * 2), // Altura fixa: equivale ao máximo de 3 presets
       child: Card(
         color: Colors.white,
         elevation: 0,
@@ -937,10 +1114,16 @@ class _PresetsPageState extends State<PresetsPage> {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    _buildCampoTextoFixo(
+                      titulo: 'TOTAL SAÍDA PRESETS',
+                      valor: _formatarSomaSaidas(),
+                      icone: Icons.assessment,
+                      cor: Colors.blueAccent,
+                    ),
                     _buildCampoInput(
                       titulo: 'TOTAL EM ORP',
                       controller: _totalORPController,
@@ -988,6 +1171,68 @@ class _PresetsPageState extends State<PresetsPage> {
                     ),
                     _buildCampoDiferencaReal(),
                   ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Componente para exibir valor fixo (não editável) com o mesmo layout do input
+  Widget _buildCampoTextoFixo({
+    required String titulo,
+    required String valor,
+    required IconData icone,
+    required Color cor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: SizedBox(
+        height: 35,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: cor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(icone, color: cor, size: 16),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: Text(
+                titulo,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 160,
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Center(
+                child: Text(
+                  valor,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
                 ),
               ),
             ),
