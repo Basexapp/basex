@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
 
 class PresetsPage extends StatefulWidget {
@@ -13,32 +14,32 @@ class PresetsPage extends StatefulWidget {
 }
 
 class TerminalData {
-  final int id;
-  final String bico;
-  final String produto;
-  int quantidadePresets; // Nova propriedade para controlar quantos presets aparecem
+  final String id;
+  final String presetRef;
+  final String produtoNome;
+  final String produtoId;
   double saldoInicial;
   double saldoFinal;
   double saidaTotal;
-  double totalORP;
-  double complCarga;
-  double complDescarga;
-  double consumo;
-  double afericao;
 
   TerminalData({
     required this.id,
-    required this.bico,
-    required this.produto,
-    this.quantidadePresets = 2, // Padrão solicitado anteriormente
+    required this.presetRef,
+    required this.produtoNome,
+    required this.produtoId,
     this.saldoInicial = 0,
     this.saldoFinal = 0,
     this.saidaTotal = 0,
-    this.totalORP = 0,
-    this.complCarga = 0,
-    this.complDescarga = 0,
-    this.consumo = 0,
-    this.afericao = 0,
+  });
+}
+
+class ProdutoAgrupado {
+  final String nome;
+  final List<TerminalData> presets;
+
+  ProdutoAgrupado({
+    required this.nome,
+    required this.presets,
   });
 }
 
@@ -65,84 +66,105 @@ class ThousandSeparatorInputFormatter extends TextInputFormatter {
 }
 
 class _PresetsPageState extends State<PresetsPage> {
-  late List<TerminalData> _terminais;
-  late int _terminalSelecionado;
+  List<ProdutoAgrupado> _produtosAgrupados = [];
+  int _produtoSelecionadoIndex = 0;
   String _abaSelecionada = 'terminal';
   DateTime _dataSelecionada = DateTime.now();
+  bool _carregando = true;
 
-  late TextEditingController _saldoInicialController;
-  late TextEditingController _saldoFinalController;
-  late TextEditingController _saidaTotalController;
+  // Controllers para até 3 presets por produto
+  final List<TextEditingController> _saldoInicialControllers = List.generate(3, (_) => TextEditingController(text: '0'));
+  final List<TextEditingController> _saldoFinalControllers = List.generate(3, (_) => TextEditingController(text: '0'));
+  final List<TextEditingController> _saidaTotalControllers = List.generate(3, (_) => TextEditingController(text: '0'));
+
   late TextEditingController _totalORPController;
   late TextEditingController _complCargaController;
   late TextEditingController _complDescargaController;
   late TextEditingController _consumoController;
   late TextEditingController _afericaoController;
 
-  // Novos controladores para os containers de registro (Suporta até 3 agora)
-  late TextEditingController _saldoInicialController2;
-  late TextEditingController _saldoFinalController2;
-  late TextEditingController _saidaTotalController2;
-
-  late TextEditingController _saldoInicialController3;
-  late TextEditingController _saldoFinalController3;
-  late TextEditingController _saidaTotalController3;
-
   @override
   void initState() {
     super.initState();
 
-    final produtos = ['Gasolina C', 'S500', 'S10', 'HIDRATADO'];
-
-    _terminais = List.generate(produtos.length, (index) {
-      return TerminalData(
-        id: index + 1,
-        bico: 'Bico ${index + 1}',
-        produto: produtos[index],
-        quantidadePresets: 2, // Começa com 2 por padrão
-        saldoInicial: 1250.500 + (index * 100),
-        saldoFinal: 1875.300 + (index * 100),
-        saidaTotal: 624.800,
-        totalORP: 312.400 + (index * 50),
-        complCarga: 98.5,
-        complDescarga: 95.2,
-        consumo: 624.8,
-        afericao: 99.8,
-      );
-    });
-
-    _terminalSelecionado = 0;
-
-    _saldoInicialController = TextEditingController();
-    _saldoFinalController = TextEditingController();
-    _saidaTotalController = TextEditingController();
     _totalORPController = TextEditingController();
     _complCargaController = TextEditingController();
     _complDescargaController = TextEditingController();
     _consumoController = TextEditingController();
     _afericaoController = TextEditingController();
 
-    _saldoInicialController2 = TextEditingController(text: '0');
-    _saldoFinalController2 = TextEditingController(text: '0');
-    _saidaTotalController2 = TextEditingController(text: '0');
+    _buscarPresets();
+  }
 
-    _saldoInicialController3 = TextEditingController(text: '0');
-    _saldoFinalController3 = TextEditingController(text: '0');
-    _saidaTotalController3 = TextEditingController(text: '0');
+  Future<void> _buscarPresets() async {
+    final terminalId = UsuarioAtual.instance?.terminalId;
+    if (terminalId == null) {
+      if (mounted) setState(() => _carregando = false);
+      return;
+    }
 
-    _carregarDadosTerminal();
-  }  
+    try {
+      final response = await Supabase.instance.client
+          .from('presets')
+          .select('id, preset_ref, produto_id, produtos(nome_dois)')
+          .eq('terminal_id', terminalId);
 
-  void _carregarDadosTerminal() {
-    final terminal = _terminais[_terminalSelecionado];
-    _saldoInicialController.text = _formatarNumero(terminal.saldoInicial);
-    _saldoFinalController.text = _formatarNumero(terminal.saldoFinal);
-    _saidaTotalController.text = _formatarNumero(terminal.saidaTotal);
-    _totalORPController.text = _formatarNumero(terminal.totalORP);
-    _complCargaController.text = _formatarNumero(terminal.complCarga);
-    _complDescargaController.text = _formatarNumero(terminal.complDescarga);
-    _consumoController.text = _formatarNumero(terminal.consumo);
-    _afericaoController.text = _formatarNumero(terminal.afericao);
+      final List<dynamic> data = response as List<dynamic>;
+      
+      final Map<String, List<TerminalData>> mapaAgrupado = {};
+
+      for (var item in data) {
+        final prodNome = item['produtos']['nome_dois']?.toString() ?? 'Sem Nome';
+        final terminal = TerminalData(
+          id: item['id'].toString(),
+          presetRef: item['preset_ref']?.toString() ?? '',
+          produtoNome: prodNome,
+          produtoId: item['produto_id'].toString(),
+        );
+
+        if (!mapaAgrupado.containsKey(prodNome)) {
+          mapaAgrupado[prodNome] = [];
+        }
+        mapaAgrupado[prodNome]!.add(terminal);
+      }
+
+      final novosProdutos = mapaAgrupado.entries.map((e) => ProdutoAgrupado(nome: e.key, presets: e.value)).toList();
+
+      if (mounted) {
+        setState(() {
+          _produtosAgrupados = novosProdutos;
+          _carregando = false;
+          if (_produtosAgrupados.isNotEmpty) {
+            _carregarDadosProduto(0);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar presets: $e');
+      if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  void _carregarDadosProduto(int index) {
+    final produto = _produtosAgrupados[index];
+    for (int i = 0; i < 3; i++) {
+      if (i < produto.presets.length) {
+        final preset = produto.presets[i];
+        _saldoInicialControllers[i].text = _formatarNumero(preset.saldoInicial);
+        _saldoFinalControllers[i].text = _formatarNumero(preset.saldoFinal);
+        _saidaTotalControllers[i].text = _formatarNumero(preset.saidaTotal);
+      } else {
+        _saldoInicialControllers[i].text = '0';
+        _saldoFinalControllers[i].text = '0';
+        _saidaTotalControllers[i].text = '0';
+      }
+    }
+    // Hardcoded ou vindo de outro lugar futuramente
+    _totalORPController.text = '0';
+    _complCargaController.text = '0';
+    _complDescargaController.text = '0';
+    _consumoController.text = '0';
+    _afericaoController.text = '0';
   }
 
   String _formatarNumero(double valor) {
@@ -156,162 +178,41 @@ class _PresetsPageState extends State<PresetsPage> {
 
   void _atualizarTerminal() {
     setState(() {
-      final terminal = _terminais[_terminalSelecionado];
-      terminal.saldoInicial = _parseTexto(_saldoInicialController.text);
-      terminal.saldoFinal = _parseTexto(_saldoFinalController.text);
-      terminal.saidaTotal = _parseTexto(_saidaTotalController.text);
-      terminal.totalORP = _parseTexto(_totalORPController.text);
-      terminal.complCarga = _parseTexto(_complCargaController.text);
-      terminal.complDescarga = _parseTexto(_complDescargaController.text);
-      terminal.consumo = _parseTexto(_consumoController.text);
-      terminal.afericao = _parseTexto(_afericaoController.text);
-
-      // Sincronizar também os valores do segundo controlador se necessário, 
-      // ou apenas garantir que o estado seja reconstruído para os cálculos.
+      if (_produtosAgrupados.isNotEmpty) {
+        final atual = _produtosAgrupados[_produtoSelecionadoIndex];
+        for (int i = 0; i < atual.presets.length && i < 3; i++) {
+          atual.presets[i].saldoInicial = _parseTexto(_saldoInicialControllers[i].text);
+          atual.presets[i].saldoFinal = _parseTexto(_saldoFinalControllers[i].text);
+          atual.presets[i].saidaTotal = _parseTexto(_saidaTotalControllers[i].text);
+        }
+      }
     });
   }
 
   String _formatarSomaSaidas() {
-    double soma = _parseTexto(_saidaTotalController.text) + 
-                 _parseTexto(_saidaTotalController2.text) +
-                 _parseTexto(_saidaTotalController3.text);
+    double soma = 0;
+    for (int i = 0; i < 3; i++) {
+      soma += _parseTexto(_saidaTotalControllers[i].text);
+    }
     return _formatarNumero(soma);
-  }
-
-  void _abrirConfiguracoes() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        // Criamos uma cópia temporária para o diálogo
-        final List<int> tempQuantidades = _terminais.map((t) => t.quantidadePresets).toList();
-
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return Dialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Container(
-                width: 350,
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.settings, color: Color(0xFF1A237E), size: 24),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Configuração de Presets',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A237E),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Selecione a quantidade de presets por produto:',
-                      style: TextStyle(fontSize: 13, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 16),
-                    ...List.generate(_terminais.length, (index) {
-                      final terminal = _terminais[index];
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                terminal.produto,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: DropdownButton<int>(
-                                value: tempQuantidades[index],
-                                underline: const SizedBox(),
-                                items: [1, 2, 3].map((val) {
-                                  return DropdownMenuItem<int>(
-                                    value: val,
-                                    child: Text(val.toString()),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) {
-                                    setStateDialog(() {
-                                      tempQuantidades[index] = val;
-                                    });
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('CANCELAR'),
-                        ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              for (int i = 0; i < _terminais.length; i++) {
-                                _terminais[i].quantidadePresets = tempQuantidades[i];
-                              }
-                            });
-                            Navigator.pop(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1A237E),
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('SALVAR'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
   }
 
   @override
   void dispose() {
-    _saldoInicialController.dispose();
-    _saldoFinalController.dispose();
-    _saidaTotalController.dispose();
+    for (var c in _saldoInicialControllers) {
+      c.dispose();
+    }
+    for (var c in _saldoFinalControllers) {
+      c.dispose();
+    }
+    for (var c in _saidaTotalControllers) {
+      c.dispose();
+    }
     _totalORPController.dispose();
     _complCargaController.dispose();
     _complDescargaController.dispose();
     _consumoController.dispose();
     _afericaoController.dispose();
-    _saldoInicialController2.dispose();
-    _saldoFinalController2.dispose();
-    _saidaTotalController2.dispose();
-    _saldoInicialController3.dispose();
-    _saldoFinalController3.dispose();
-    _saidaTotalController3.dispose();
     super.dispose();
   }
 
@@ -341,11 +242,7 @@ class _PresetsPageState extends State<PresetsPage> {
               ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.settings, color: Colors.black54),
-            onPressed: _abrirConfiguracoes,
-            tooltip: 'Configurar Presets',
-          ),
+          // Botão de configurações removido conforme solicitação
         ],
       ),
     );
@@ -360,44 +257,49 @@ class _PresetsPageState extends State<PresetsPage> {
           _buildAppBar(),
           Container(height: 1, color: Colors.grey.shade200),
           // Abas (sempre fixas no topo) sem limitação de largura
-          _buildNavegacaoAbas(),
+          if (_carregando)
+            const LinearProgressIndicator(minHeight: 2, color: Color(0xFF1565C0))
+          else
+            _buildNavegacaoAbas(),
           const Divider(height: 1, color: Color.fromARGB(255, 236, 236, 236)),
-
+          
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(32),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  // Coluna de Medições
-                  Column(
+            child: _carregando 
+              ? const Center(child: CircularProgressIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(32),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      if (_abaSelecionada == 'resumo')
-                        _buildResumoPage()
-                      else ...[
-                        ...List.generate(_terminais[_terminalSelecionado].quantidadePresets, (index) {
-                          return Column(
-                            children: [
-                              _buildCardMedicoes(index + 1),
-                              if (index < _terminais[_terminalSelecionado].quantidadePresets - 1)
-                                const SizedBox(height: 24),
-                            ],
-                          );
-                        }),
-                      ]
+                      // Coluna de Medições
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (_abaSelecionada == 'resumo')
+                            _buildResumoPage()
+                          else if (_produtosAgrupados.isNotEmpty) ...[
+                            ...List.generate(_produtosAgrupados[_produtoSelecionadoIndex].presets.length, (index) {
+                              return Column(
+                                children: [
+                                  _buildCardMedicoes(index),
+                                  if (index < _produtosAgrupados[_produtoSelecionadoIndex].presets.length - 1)
+                                    const SizedBox(height: 24),
+                                ],
+                              );
+                            }),
+                          ]
+                        ],
+                      ),
+
+                      const SizedBox(width: 32),
+
+                      // Coluna de Informações (Agora dentro do scroll junto com as medições)
+                      if (_abaSelecionada != 'resumo' && _produtosAgrupados.isNotEmpty)
+                        _buildCardComplementar(),
                     ],
                   ),
-
-                  const SizedBox(width: 32),
-
-                  // Coluna de Informações (Agora dentro do scroll junto com as medições)
-                  if (_abaSelecionada != 'resumo')
-                    _buildCardComplementar(),
-                ],
-              ),
-            ),
+                ),
           ),
         ],
       ),
@@ -426,17 +328,18 @@ class _PresetsPageState extends State<PresetsPage> {
                     setState(() => _abaSelecionada = 'resumo');
                   },
                 ),
-                // Botões dos Terminais
-                ..._terminais.map((t) {
-                  final isSelected = _abaSelecionada == 'terminal' && _terminalSelecionado == t.id - 1;
+                // Botões dos Produtos Agrupados
+                ...List.generate(_produtosAgrupados.length, (index) {
+                  final prod = _produtosAgrupados[index];
+                  final isSelected = _abaSelecionada == 'terminal' && _produtoSelecionadoIndex == index;
                   return _buildAbaItem(
-                    label: t.produto,
+                    label: prod.nome,
                     isSelected: isSelected,
                     onTap: () {
                       setState(() {
                         _abaSelecionada = 'terminal';
-                        _terminalSelecionado = t.id - 1;
-                        _carregarDadosTerminal();
+                        _produtoSelecionadoIndex = index;
+                        _carregarDadosProduto(index);
                       });
                     },
                   );
@@ -782,7 +685,10 @@ class _PresetsPageState extends State<PresetsPage> {
     );
   }
 
-  Widget _buildCardMedicoes(int numeroTerminal) {
+  Widget _buildCardMedicoes(int index) {
+    if (_produtosAgrupados.isEmpty) return const SizedBox();
+    final preset = _produtosAgrupados[_produtoSelecionadoIndex].presets[index];
+
     return SizedBox(
       width: 420,
       height: 245,
@@ -811,7 +717,7 @@ class _PresetsPageState extends State<PresetsPage> {
                   const Icon(Icons.speed, color: Colors.black, size: 20),
                   const SizedBox(width: 12),
                   Text(
-                    'Registro - Preset - ${_terminais[_terminalSelecionado].produto}',
+                    'Registro - ${preset.presetRef} - ${preset.produtoNome}',
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -828,7 +734,7 @@ class _PresetsPageState extends State<PresetsPage> {
                 children: [
                   _buildCampoInput(
                     titulo: 'SALDO INICIAL',
-                    controller: numeroTerminal == 1 ? _saldoInicialController : numeroTerminal == 2 ? _saldoInicialController2 : _saldoInicialController3,
+                    controller: _saldoInicialControllers[index],
                     icone: Icons.play_arrow,
                     cor: Colors.green,
                     onChanged: (val) => _atualizarTerminal(),
@@ -836,17 +742,17 @@ class _PresetsPageState extends State<PresetsPage> {
                   const SizedBox(height: 10),
                   _buildCampoInput(
                     titulo: 'SALDO FINAL',
-                    controller: numeroTerminal == 1 ? _saldoFinalController : numeroTerminal == 2 ? _saldoFinalController2 : _saldoFinalController3,
+                    controller: _saldoFinalControllers[index],
                     icone: Icons.stop,
                     cor: Colors.blue,
                     onChanged: (val) => _atualizarTerminal(),
-                    onAddPressed: () => _abrirDialogSaldoFinalIndependente(numeroTerminal),
-                    hasValue: (numeroTerminal == 1 ? _saldoFinalController : numeroTerminal == 2 ? _saldoFinalController2 : _saldoFinalController3).text.isNotEmpty,
+                    onAddPressed: () => _abrirDialogSaldoFinalIndependente(index),
+                    hasValue: _saldoFinalControllers[index].text.isNotEmpty && _saldoFinalControllers[index].text != '0',
                   ),
                   const SizedBox(height: 10),
                   _buildCampoInput(
                     titulo: 'SAÍDA REGISTRADA',
-                    controller: numeroTerminal == 1 ? _saidaTotalController : numeroTerminal == 2 ? _saidaTotalController2 : _saidaTotalController3,
+                    controller: _saidaTotalControllers[index],
                     icone: Icons.local_gas_station,
                     cor: Colors.orange,
                     onChanged: (val) => _atualizarTerminal(),
@@ -860,15 +766,12 @@ class _PresetsPageState extends State<PresetsPage> {
     );
   }
 
-  void _abrirDialogSaldoFinalIndependente(int numero) {
-    final user = UsuarioAtual.instance;
-    final String tituloPreset = '${user?.terminalNome ?? 'Preset'}$numero';
+  void _abrirDialogSaldoFinalIndependente(int index) {
+    if (_produtosAgrupados.isEmpty) return;
+    final preset = _produtosAgrupados[_produtoSelecionadoIndex].presets[index];
+    final String tituloPreset = preset.presetRef;
     final TextEditingController dialogController = TextEditingController(
-      text: numero == 1
-          ? _saldoFinalController.text
-          : numero == 2
-              ? _saldoFinalController2.text
-              : _saldoFinalController3.text,
+      text: _saldoFinalControllers[index].text,
     );
 
     showDialog(
@@ -937,13 +840,7 @@ class _PresetsPageState extends State<PresetsPage> {
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {
-                      if (numero == 1) {
-                        _saldoFinalController.text = dialogController.text;
-                      } else if (numero == 2) {
-                        _saldoFinalController2.text = dialogController.text;
-                      } else {
-                        _saldoFinalController3.text = dialogController.text;
-                      }
+                      _saldoFinalControllers[index].text = dialogController.text;
                       _atualizarTerminal();
                       Navigator.pop(context);
                     },
@@ -1077,7 +974,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardComplementar() {
     return SizedBox(
       width: 420,
-      height: (233.0 * 2) + (24.0 * 2), // Altura fixa: equivale ao máximo de 3 presets
+      height: 520, // Altura ajustada
       child: Card(
         color: Colors.white,
         elevation: 0,
