@@ -67,10 +67,12 @@ class ThousandSeparatorInputFormatter extends TextInputFormatter {
 
 class _PresetsPageState extends State<PresetsPage> {
   List<ProdutoAgrupado> _produtosAgrupados = [];
+  String _terminalNome = '';
   int _produtoSelecionadoIndex = 0;
   String _abaSelecionada = 'terminal';
   DateTime _dataSelecionada = DateTime.now();
   bool _carregando = true;
+  bool _jaSalvoHoje = false;
 
   // Controllers para até 3 presets por produto
   final List<TextEditingController> _saldoInicialControllers = List.generate(3, (_) => TextEditingController(text: '0'));
@@ -106,14 +108,19 @@ class _PresetsPageState extends State<PresetsPage> {
     try {
       final response = await Supabase.instance.client
           .from('presets')
-          .select('id, preset_ref, produto_id, produtos(nome_dois)')
+          .select('id, preset_ref, produto_id, produtos(nome_dois), terminais(nome_dois)')
           .eq('terminal_id', terminalId);
 
       final List<dynamic> data = response as List<dynamic>;
       
       final Map<String, List<TerminalData>> mapaAgrupado = {};
+      String nomeTerminal = '';
 
       for (var item in data) {
+        if (nomeTerminal.isEmpty && item['terminais'] != null) {
+          nomeTerminal = item['terminais']['nome_dois']?.toString() ?? '';
+        }
+
         final prodNome = item['produtos']['nome_dois']?.toString() ?? 'Sem Nome';
         final terminal = TerminalData(
           id: item['id'].toString(),
@@ -133,6 +140,7 @@ class _PresetsPageState extends State<PresetsPage> {
       if (mounted) {
         setState(() {
           _produtosAgrupados = novosProdutos;
+          _terminalNome = nomeTerminal;
           _carregando = false;
           if (_produtosAgrupados.isNotEmpty) {
             _carregarDadosProduto(0);
@@ -145,26 +153,133 @@ class _PresetsPageState extends State<PresetsPage> {
     }
   }
 
-  void _carregarDadosProduto(int index) {
+  Future<void> _carregarDadosProduto(int index) async {
     final produto = _produtosAgrupados[index];
+    
+    // Datas
+    final dataISO = _dataSelecionada.toIso8601String().substring(0, 10);
+    final dataAnterior = _dataSelecionada.subtract(const Duration(days: 1)).toIso8601String().substring(0, 10);
+
+    bool jaSalvoQualquer = false;
+    double saldoFinalHoje = 0;
+    Map<String, dynamic>? dadosComplementares;
+
     for (int i = 0; i < 3; i++) {
       if (i < produto.presets.length) {
         final preset = produto.presets[i];
-        _saldoInicialControllers[i].text = _formatarNumero(preset.saldoInicial);
-        _saldoFinalControllers[i].text = _formatarNumero(preset.saldoFinal);
-        _saidaTotalControllers[i].text = _formatarNumero(preset.saidaTotal);
+        
+        // 1. Buscar se já existe envio para hoje
+        double saldoFinalEncontrado = 0;
+        try {
+          final resHoje = await Supabase.instance.client
+              .from('preset_registro')
+              .select('id, sd_final')
+              .eq('preset_id', preset.id)
+              .eq('data_mov', dataISO)
+              .eq('tipo_registro', 'REGISTRO')
+              .maybeSingle();
+
+          if (resHoje != null) {
+            jaSalvoQualquer = true;
+            saldoFinalEncontrado = double.tryParse(resHoje['sd_final'].toString()) ?? 0;
+          }
+        } catch (_) {}
+
+        // 2. Buscar saldo inicial (final do dia anterior)
+        double saldoInicialDia = 0;
+        try {
+          final res = await Supabase.instance.client
+              .from('preset_registro')
+              .select('sd_final')
+              .eq('preset_id', preset.id)
+              .eq('data_mov', dataAnterior)
+              .eq('tipo_registro', 'REGISTRO')
+              .maybeSingle();
+          
+          if (res != null) {
+            saldoInicialDia = double.tryParse(res['sd_final'].toString()) ?? 0;
+          }
+        } catch (e) {
+          debugPrint('Erro ao buscar saldo anterior: $e');
+        }
+
+        _saldoInicialControllers[i].text = _formatarNumero(saldoInicialDia);
+        
+        // Se já salvou, mostrar o saldo final do banco
+        if (jaSalvoQualquer) {
+          _saldoFinalControllers[i].text = _formatarNumero(saldoFinalEncontrado);
+          double saida = saldoFinalEncontrado - saldoInicialDia;
+          _saidaTotalControllers[i].text = _formatarNumero(saida < 0 ? 0 : saida);
+        } else {
+          // Nova lógica solicitada:
+          // Se saldo inicial for 0, final inicia com 0.
+          // Se saldo inicial > 0, final inicia vazio.
+          if (saldoInicialDia == 0) {
+            _saldoFinalControllers[i].text = '0';
+          } else {
+            _saldoFinalControllers[i].text = '';
+          }
+          _saidaTotalControllers[i].text = '0';
+        }
       } else {
         _saldoInicialControllers[i].text = '0';
         _saldoFinalControllers[i].text = '0';
         _saidaTotalControllers[i].text = '0';
       }
     }
-    // Hardcoded ou vindo de outro lugar futuramente
-    _totalORPController.text = '0';
-    _complCargaController.text = '0';
-    _complDescargaController.text = '0';
-    _consumoController.text = '0';
-    _afericaoController.text = '0';
+
+    // 3. Buscar dados COMPLEMENTARES de hoje, se houver
+    double totalSaidaAmbDia = 0;
+    try {
+      final dataStr = _dataSelecionada.toIso8601String().substring(0, 10);
+      final responseSaidas = await Supabase.instance.client
+          .from('movimentacoes_tanque')
+          .select('saida_amb')
+          .eq('produto_id', produto.presets.first.produtoId)
+          .gte('data_mov', '$dataStr 00:00:00')
+          .lte('data_mov', '$dataStr 23:59:59');
+      
+      if (responseSaidas != null) {
+        final List<dynamic> saidas = responseSaidas as List<dynamic>;
+        totalSaidaAmbDia = saidas.fold<double>(0, (sum, item) => sum + (double.tryParse(item['saida_amb'].toString()) ?? 0));
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar saídas AMB: $e');
+    }
+
+    try {
+      final resComp = await Supabase.instance.client
+          .from('preset_registro')
+          .select()
+          .eq('produto_id', produto.presets.first.produtoId)
+          .eq('data_mov', dataISO)
+          .eq('tipo_registro', 'COMPLEMENTAR')
+          .maybeSingle();
+      
+      if (resComp != null) {
+        dadosComplementares = resComp;
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _jaSalvoHoje = jaSalvoQualquer;
+        
+        if (dadosComplementares != null) {
+          _totalORPController.text = _formatarNumero(totalSaidaAmbDia);
+          _complCargaController.text = _formatarNumero(double.tryParse(dadosComplementares['compl_carga'].toString()) ?? 0);
+          _complDescargaController.text = _formatarNumero(double.tryParse(dadosComplementares['compl_descarga'].toString()) ?? 0);
+          _consumoController.text = _formatarNumero(double.tryParse(dadosComplementares['consumo'].toString()) ?? 0);
+          _afericaoController.text = _formatarNumero(double.tryParse(dadosComplementares['afericao'].toString()) ?? 0);
+        } else {
+          _totalORPController.text = _formatarNumero(totalSaidaAmbDia);
+          _complCargaController.text = '0';
+          _complDescargaController.text = '0';
+          _consumoController.text = '0';
+          _afericaoController.text = '0';
+        }
+      });
+    }
   }
 
   String _formatarNumero(double valor) {
@@ -176,14 +291,38 @@ class _PresetsPageState extends State<PresetsPage> {
     return double.tryParse(semMilhar) ?? 0;
   }
 
+  bool _todosSaldosPreenchidos() {
+    if (_produtosAgrupados.isEmpty) return false;
+    
+    // Validar saldos finais
+    final presets = _produtosAgrupados[_produtoSelecionadoIndex].presets;
+    for (int i = 0; i < presets.length && i < 3; i++) {
+      final texto = _saldoFinalControllers[i].text.trim();
+      if (texto.isEmpty) return false;
+    }
+
+    // Validar Total em ORP
+    if (_totalORPController.text.trim().isEmpty) return false;
+
+    return true;
+  }
+
   void _atualizarTerminal() {
     setState(() {
       if (_produtosAgrupados.isNotEmpty) {
         final atual = _produtosAgrupados[_produtoSelecionadoIndex];
         for (int i = 0; i < atual.presets.length && i < 3; i++) {
-          atual.presets[i].saldoInicial = _parseTexto(_saldoInicialControllers[i].text);
-          atual.presets[i].saldoFinal = _parseTexto(_saldoFinalControllers[i].text);
-          atual.presets[i].saidaTotal = _parseTexto(_saidaTotalControllers[i].text);
+          double sIni = _parseTexto(_saldoInicialControllers[i].text);
+          double sFin = _parseTexto(_saldoFinalControllers[i].text);
+          
+          double sTot = sFin - sIni;
+          if (sTot < 0) sTot = 0;
+
+          atual.presets[i].saldoInicial = sIni;
+          atual.presets[i].saldoFinal = sFin;
+          atual.presets[i].saidaTotal = sTot;
+          
+          _saidaTotalControllers[i].text = _formatarNumero(sTot);
         }
       }
     });
@@ -195,6 +334,85 @@ class _PresetsPageState extends State<PresetsPage> {
       soma += _parseTexto(_saidaTotalControllers[i].text);
     }
     return _formatarNumero(soma);
+  }
+
+  Future<void> _salvarDados() async {
+    if (!_todosSaldosPreenchidos()) return;
+
+    final terminalId = UsuarioAtual.instance?.terminalId;
+    final usuarioId = Supabase.instance.client.auth.currentUser?.id;
+    final produto = _produtosAgrupados[_produtoSelecionadoIndex];
+    final dataMov = _dataSelecionada.toIso8601String().substring(0, 10);
+
+    final List<Map<String, dynamic>> inserts = [];
+
+    for (int i = 0; i < produto.presets.length && i < 3; i++) {
+      final preset = produto.presets[i];
+      inserts.add({
+        'preset_id': preset.id,
+        'produto_id': preset.produtoId,
+        'terminal_id': terminalId,
+        'usuario_id': usuarioId,
+        'data_mov': dataMov,
+        'tipo_registro': 'REGISTRO',
+        'created_at': DateTime.now().toIso8601String(),
+        'sd_inicial': _parseTexto(_saldoInicialControllers[i].text),
+        'sd_final': _parseTexto(_saldoFinalControllers[i].text),
+        'saida_registrada': _parseTexto(_saidaTotalControllers[i].text),
+      });
+    }
+
+    final totalSaidaPresets = _parseTexto(_formatarSomaSaidas());
+    final totalOrp = _parseTexto(_totalORPController.text);
+    final diferenca = totalSaidaPresets - totalOrp;
+    final complCarga = _parseTexto(_complCargaController.text);
+    final complDescarga = _parseTexto(_complDescargaController.text);
+    final consumo = _parseTexto(_consumoController.text);
+    final afericao = _parseTexto(_afericaoController.text);
+    
+    // Aplicando a mesma lógica de cálculo (Diferença - Complementares)
+    final diferencaReal = diferenca - complCarga - complDescarga - consumo - afericao;
+
+    inserts.add({
+      'preset_id': null,
+      'produto_id': produto.presets.isNotEmpty ? produto.presets.first.produtoId : null,
+      'terminal_id': terminalId,
+      'usuario_id': usuarioId,
+      'data_mov': dataMov,
+      'tipo_registro': 'COMPLEMENTAR',
+      'created_at': DateTime.now().toIso8601String(),
+      'total_saida_presets': totalSaidaPresets,
+      'total_orp': totalOrp,
+      'diferenca': diferenca,
+      'compl_carga': complCarga,
+      'compl_descarga': complDescarga,
+      'consumo': consumo,
+      'afericao': afericao,
+      'diferenca_real': diferencaReal,
+    });
+
+    try {
+      await Supabase.instance.client.from('preset_registro').insert(inserts);
+      if (mounted) {
+        setState(() => _jaSalvoHoje = true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Dados salvos com sucesso!'),
+            backgroundColor: Color(0xFF1565C0),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Erro ao salvar preset_registro: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao salvar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -232,10 +450,10 @@ class _PresetsPageState extends State<PresetsPage> {
             onPressed: widget.onVoltar,
           ),
           const SizedBox(width: 8),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Presets - Terminais de Saída',
-              style: TextStyle(
+              _terminalNome.isEmpty ? 'Presets' : 'Presets - $_terminalNome',
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
                 color: Colors.black,
@@ -348,46 +566,84 @@ class _PresetsPageState extends State<PresetsPage> {
             ),
           ),
           const SizedBox(width: 16),
-          // Botão de DATA alinhado à DIREITA
-          InkWell(
-            onTap: () => _abrirCalendario(context),
-            borderRadius: BorderRadius.circular(8),
-            hoverColor: Colors.transparent,
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            child: Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey.shade300),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Color(0xFF1565C0)),
-                  const SizedBox(width: 12),
-                  Text(
-                    textoData,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black87,
+          // Seletor de DATA com setas de navegação
+          Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Seta para DIA ANTERIOR
+                _buildSetaNavegacao(
+                  icon: Icons.chevron_left,
+                  onTap: () {
+                    setState(() {
+                      _dataSelecionada = _dataSelecionada.subtract(const Duration(days: 1));
+                      _carregarDadosProduto(_produtoSelecionadoIndex);
+                    });
+                  },
+                ),
+                Container(width: 1, color: Colors.grey.shade200),
+                // Botão CENTRAL (Calendário + Data)
+                InkWell(
+                  onTap: () => _abrirCalendario(context),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 14, color: Color(0xFF1565C0)),
+                        const SizedBox(width: 10),
+                        Text(
+                          textoData,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                Container(width: 1, color: Colors.grey.shade200),
+                // Seta para PRÓXIMO DIA
+                _buildSetaNavegacao(
+                  icon: Icons.chevron_right,
+                  onTap: () {
+                    setState(() {
+                      _dataSelecionada = _dataSelecionada.add(const Duration(days: 1));
+                      _carregarDadosProduto(_produtoSelecionadoIndex);
+                    });
+                  },
+                ),
+              ],
             ),
           )
         ],
+      ),
+    );
+  }
+
+  Widget _buildSetaNavegacao({required IconData icon, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        width: 36,
+        height: 42,
+        alignment: Alignment.center,
+        child: Icon(icon, size: 20, color: Colors.grey.shade600),
       ),
     );
   }
@@ -587,6 +843,7 @@ class _PresetsPageState extends State<PresetsPage> {
     if (data != null) {
       setState(() {
         _dataSelecionada = data;
+        _carregarDadosProduto(_produtoSelecionadoIndex); // Recarregar saldos para a nova data
       });
     }
   }
@@ -738,6 +995,7 @@ class _PresetsPageState extends State<PresetsPage> {
                     icone: Icons.play_arrow,
                     cor: Colors.green,
                     onChanged: (val) => _atualizarTerminal(),
+                    readOnly: true, // Campo não editável
                   ),
                   const SizedBox(height: 10),
                   _buildCampoInput(
@@ -756,6 +1014,7 @@ class _PresetsPageState extends State<PresetsPage> {
                     icone: Icons.local_gas_station,
                     cor: Colors.orange,
                     onChanged: (val) => _atualizarTerminal(),
+                    readOnly: true, // Campo não editável, auto-calculado
                   ),
                 ],
               ),
@@ -767,7 +1026,7 @@ class _PresetsPageState extends State<PresetsPage> {
   }
 
   void _abrirDialogSaldoFinalIndependente(int index) {
-    if (_produtosAgrupados.isEmpty) return;
+    if (_produtosAgrupados.isEmpty || _jaSalvoHoje) return; // Bloqueia se já salvo
     final preset = _produtosAgrupados[_produtoSelecionadoIndex].presets[index];
     final String tituloPreset = preset.presetRef;
     final TextEditingController dialogController = TextEditingController(
@@ -868,6 +1127,7 @@ class _PresetsPageState extends State<PresetsPage> {
     required Function(String) onChanged,
     VoidCallback? onAddPressed,
     bool hasValue = false,
+    bool readOnly = false, // Novo parâmetro opcional
   }) {
     return Container(
       height: 35, // Altura única para a linha inteira
@@ -932,37 +1192,50 @@ class _PresetsPageState extends State<PresetsPage> {
           SizedBox(
             width: 160,
             height: 32, // Um pouco menor que o Container pai para garantir centralização
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                ThousandSeparatorInputFormatter(),
-              ],
-              textAlign: TextAlign.center,
-              textAlignVertical: TextAlignVertical.center, // Garante que o texto dentro do input esteja centralizado
-              decoration: InputDecoration(
-                isCollapsed: true, // Remove paddings internos padrões que causam desalinhamento
-                contentPadding: const EdgeInsets.symmetric(vertical: 10), // Centraliza o texto verticalmente no campo
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+            child: SelectionContainer.disabled(
+              child: TextField(
+                controller: controller,
+                onChanged: onChanged,
+                enabled: !_jaSalvoHoje, // Bloqueia input se já salvo
+                readOnly: readOnly, // Aplicar readOnly aqui
+                mouseCursor: (_jaSalvoHoje || readOnly) ? SystemMouseCursors.basic : SystemMouseCursors.text,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  ThousandSeparatorInputFormatter(),
+                ],
+                textAlign: TextAlign.center,
+                textAlignVertical: TextAlignVertical.center, // Garante que o texto dentro do input esteja centralizado
+                decoration: InputDecoration(
+                  isCollapsed: true, // Remove paddings internos padrões que causam desalinhamento
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10), // Centraliza o texto verticalmente no campo
+                  filled: true,
+                  fillColor: (_jaSalvoHoje || readOnly) ? Colors.grey.shade100 : Colors.white, // Cor de fundo se for readOnly ou já salvo
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  disabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(
+                      color: (_jaSalvoHoje || readOnly) ? Colors.grey.shade300 : const Color(0xFF1565C0),
+                      width: (_jaSalvoHoje || readOnly) ? 1.0 : 1.5,
+                    ),
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
+                keyboardType: TextInputType.number,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: (_jaSalvoHoje || readOnly) ? Colors.grey.shade600 : Colors.black87, // Cor do texto se for readOnly ou já salvo
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(6),
-                  borderSide: const BorderSide(color: Color(0xFF1565C0), width: 1.5),
-                ),
-              ),
-              keyboardType: TextInputType.number,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -974,7 +1247,7 @@ class _PresetsPageState extends State<PresetsPage> {
   Widget _buildCardComplementar() {
     return SizedBox(
       width: 420,
-      height: 520, // Altura ajustada
+      height: 513,
       child: Card(
         color: Colors.white,
         elevation: 0,
@@ -994,16 +1267,40 @@ class _PresetsPageState extends State<PresetsPage> {
                   topRight: Radius.circular(12),
                 ),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.white, size: 20),
-                  SizedBox(width: 12),
-                  Text(
-                    'Informações Complementares',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Colors.white,
+                  const Icon(Icons.info_outline, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Informações Complementares',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 30,
+                    child: ElevatedButton.icon(
+                      onPressed: (_todosSaldosPreenchidos() && !_jaSalvoHoje) ? _salvarDados : null,
+                      icon: const Icon(Icons.save, size: 16),
+                      label: Text(
+                        _jaSalvoHoje ? 'Já Enviado' : 'Salvar dados',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _jaSalvoHoje ? Colors.green.shade100 : const Color.fromARGB(255, 255, 221, 0),
+                        foregroundColor: _jaSalvoHoje ? Colors.green.shade700 : Colors.black,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade500,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
                     ),
                   ),
                 ],
@@ -1021,12 +1318,11 @@ class _PresetsPageState extends State<PresetsPage> {
                       icone: Icons.assessment,
                       cor: Colors.blueAccent,
                     ),
-                    _buildCampoInput(
+                    _buildCampoTextoFixo(
                       titulo: 'TOTAL EM ORP',
-                      controller: _totalORPController,
+                      valor: _totalORPController.text,
                       icone: Icons.trending_up,
                       cor: Colors.purple,
-                      onChanged: (_) => _atualizarTerminal(),
                     ),
                     _buildCampoDiferenca(),
                     const Center(
@@ -1122,13 +1418,16 @@ class _PresetsPageState extends State<PresetsPage> {
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(color: Colors.grey.shade300),
               ),
-              child: Center(
-                child: Text(
-                  valor,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.basic,
+                child: Center(
+                  child: Text(
+                    valor,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
               ),
@@ -1141,6 +1440,23 @@ class _PresetsPageState extends State<PresetsPage> {
 
   // Campo de diferença real com altura fixa de 35px
   Widget _buildCampoDiferencaReal() {
+    double totalSaidaPresets = _parseTexto(_formatarSomaSaidas());
+    double totalOrp = _parseTexto(_totalORPController.text);
+    double diferenca = totalSaidaPresets - totalOrp;
+    double complCarga = _parseTexto(_complCargaController.text);
+    double complDescarga = _parseTexto(_complDescargaController.text);
+    double consumo = _parseTexto(_consumoController.text);
+    double afericao = _parseTexto(_afericaoController.text);
+
+    // Nova lógica: Diferença real é a Diferença menos todos os campos complementares abaixo dela
+    double diferencaReal = diferenca - complCarga - complDescarga - consumo - afericao;
+    
+    // Percentual em relação ao TOTAL EM ORP (evitar divisão por zero)
+    double porcentagem = 0;
+    if (totalOrp > 0) {
+      porcentagem = (diferencaReal / totalOrp) * 100;
+    }
+
     return SizedBox(
       height: 35,
       child: Row(
@@ -1177,33 +1493,36 @@ class _PresetsPageState extends State<PresetsPage> {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: Colors.grey.shade300),
             ),
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text(
-                    '82',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                      color: Colors.black87,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.basic,
+              child: Center(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _formatarNumero(diferencaReal),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8),
-                    child: Text('|', style: TextStyle(color: Colors.grey)),
-                  ),
-                  Text(
-                    '0,04%',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                      color: Colors.black87,
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('|', style: TextStyle(color: Colors.grey)),
                     ),
-                  ),
-                ],
+                    Text(
+                      '${porcentagem.toStringAsFixed(2).replaceAll('.', ',')}%',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           )
@@ -1214,6 +1533,10 @@ class _PresetsPageState extends State<PresetsPage> {
 
   // Campo de diferença com altura fixa de 35px
   Widget _buildCampoDiferenca() {
+    double totalSaidaPresets = _parseTexto(_formatarSomaSaidas());
+    double totalOrp = _parseTexto(_totalORPController.text);
+    double diferenca = totalSaidaPresets - totalOrp;
+
     return SizedBox(
       height: 35,
       child: Row(
@@ -1250,20 +1573,18 @@ class _PresetsPageState extends State<PresetsPage> {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: Colors.grey.shade300),
             ),
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Text(
-                    '82',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                      color: Colors.black87,
-                    ),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.basic,
+              child: Center(
+                child: Text(
+                  _formatarNumero(diferenca),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.2,
+                    color: Colors.black87,
                   ),
-                ],
+                ),
               ),
             ),
           )
