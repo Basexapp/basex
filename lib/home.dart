@@ -36,6 +36,7 @@ import 'sessoes/almoxerifado/frascos_amostras.dart';
 import 'sessoes/almoxerifado/filtro_estoque_frascos.dart';
 import 'sessoes/operacao/estoque_produto.dart';
 import 'sessoes/operacao/filtro_estoque_produto.dart';
+import 'sessoes/operacao/gestao_bombeios.dart';
 import 'sessoes/operacao/resultados.dart';
 import 'sessoes/estoques/controle_descargas.dart';
 import 'sessoes/bombeios/ordem_bombeio.dart';
@@ -113,6 +114,7 @@ class _HomePageState extends State<HomePage>
   bool _mostrarFilaSolicitacoes = false;
   bool _mostrarTempDensMedia = false;
   bool _mostrarEstoqueProduto = false;
+  bool _mostrarGestaoBombeios = false;
   bool _mostrarResultadoMensal = false;
   bool _mostrarRegistroPreset = false;
   bool _mostrarCardsFilial = false;
@@ -572,6 +574,15 @@ class _HomePageState extends State<HomePage>
         'tipo': 'registro_preset',
         'sessao_pai': 'Operação',
         'icon_inverted': true,
+      },
+      {
+        'id': '0bc9a8ec-40a0-41c1-a44a-405c64c233a5',
+        'icon': Icons.data_saver_off,
+        'label': 'Gestão de Bombeios',
+        'descricao': 'Controle e acompanhamento de bombeios',
+        'tipo': '0bc9a8ec-40a0-41c1-a44a-405c64c233a5',
+        'sessao_pai': 'Operação',
+        'favorito': false,
       },
     ];
 
@@ -1121,6 +1132,7 @@ class _HomePageState extends State<HomePage>
       _mostrarRegistroPreset = false;
       _mostrarContaCorrenteRefinarias = false;
       _voltarParaTanquesApoCACL = false;
+      _mostrarGestaoBombeios = false;
       _resetarTodasFlagsGestaoFrota();
       _mostrarFilhosSessao = false;
       _sessaoAtual = null;
@@ -2412,6 +2424,31 @@ class _HomePageState extends State<HomePage>
         );
       }
 
+      if (_mostrarGestaoBombeios) {
+        return FiltroGestaoBombeiosPage(
+          terminalId: _terminalParaFiltroId,
+          empresaId: _empresaParaFiltroId,
+          empresaNome: _empresaParaFiltroNome,
+          onConsultar: ({
+            String? terminalId,
+            DateTime? dataInicial,
+            DateTime? dataFinal,
+            String? produtoId,
+            String? produtoNome,
+            String? pesquisa,
+          }) {
+            // Futura implementação da página de resultado
+            debugPrint('Consultar bombeios: $terminalId, $dataInicial - $dataFinal, $produtoId, $produtoNome, $pesquisa');
+          },
+          onVoltar: () {
+            setState(() {
+              _mostrarGestaoBombeios = false;
+              _mostrarFilhosDaSessao('Operação');
+            });
+          },
+        );
+      }
+
       if (_mostrarResultadoMensal) {
         return ResultadosPage(
           onVoltar: () {
@@ -3412,6 +3449,11 @@ class _HomePageState extends State<HomePage>
       case 'estoque_produto':
         setState(() {
           _mostrarEstoqueProduto = true;
+        });
+        break;
+      case '0bc9a8ec-40a0-41c1-a44a-405c64c233a5': // Gestão de Bombeios
+        setState(() {
+          _mostrarGestaoBombeios = true;
         });
         break;
       case 'perdas_sobras':
