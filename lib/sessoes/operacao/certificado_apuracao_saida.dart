@@ -563,11 +563,6 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       
       _preencherCamposComDadosExistentes();
       
-      final movimentacaoId = _dadosExistentes!['movimentacao_id']?.toString();
-      if (movimentacaoId != null && movimentacaoId.isNotEmpty) {
-        await _carregarDadosColetasTanques(movimentacaoId);
-      }
-      
     } catch (e) {
       print('Erro ao carregar certificado: $e');
       if (context.mounted) {
@@ -578,36 +573,6 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           ),
         );
       }
-    }
-  }
-  
-  Future<void> _carregarDadosColetasTanques(String movimentacaoId) async {
-    try {
-      final supabase = Supabase.instance.client;
-      
-      final coletas = await supabase
-          .from('coletas_tanques')
-          .select('*')
-          .eq('movimentacao_id', movimentacaoId)
-          .order('tanque_numero');
-      
-      if (coletas.isEmpty) return;
-      
-      setState(() {
-        for (int i = 0; i < coletas.length && i < _tanques.length; i++) {
-          final coleta = coletas[i];
-          final tanque = _tanques[i];
-          
-          if (coleta['volume_amb'] != null) {
-            tanque.volumeAmbCtrl.text = _mascaraMilharUI(coleta['volume_amb'].toString());
-          }
-          if (coleta['volume_vinte'] != null) {
-            tanque.volume20CCtrl.text = _mascaraMilharUI(coleta['volume_vinte'].toString());
-          }
-        }
-      });
-    } catch (e) {
-      print('Erro ao carregar dados das coletas: $e');
     }
   }
   

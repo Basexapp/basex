@@ -115,7 +115,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('produtos')
-          .select('id, nome_dois');
+          .select('id, nome_dois, grupo');
       _produtos = ordenarProdutosPorClasse(
         List<Map<String, dynamic>>.from(response),
       );
@@ -780,24 +780,24 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         !(produtoPreenchido && clientePreenchido && pagamentoPreenchido);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: incompleto ? Colors.orange.shade50 : Colors.grey.shade50,
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
           color: incompleto ? Colors.orange.shade300 : Colors.grey.shade300,
-          width: 1,
+          width: 0.8,
         ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           SizedBox(
-            width: 140,
+            width: 120,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: const Color(0xFF0D47A1).withOpacity(0.08),
                   borderRadius: BorderRadius.circular(20),
@@ -809,20 +809,20 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                 child: Text(
                   '${tanque.capacidade}.000 L',
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF0D47A1),
-                    height: 1.2,
+                    height: 1.1,
                   ),
                 ),
               ),
             ),
           ),
           
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           
           SizedBox(
-            width: 200,
+            width: 180,
             child: DropdownButtonFormField<String>(
               initialValue: tanque.produtoId,
               isExpanded: true,
@@ -831,26 +831,43 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                   value: '',
                   child: Text('', style: TextStyle(fontSize: 13)),
                 ),
-                ..._produtos
-                    .map(
-                      (p) => DropdownMenuItem<String>(
-                        value: p['id'].toString(),
+                ..._produtos.map(
+                  (p) {
+                    final isGrupo2 = p['grupo']?.toString() == '2';
+                    return DropdownMenuItem<String>(
+                      value: p['id'].toString(),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isGrupo2 ? Colors.grey.shade800 : null,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                         child: Text(
                           p['nome_dois'],
-                          style: const TextStyle(fontSize: 13),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: isGrupo2 ? Colors.white : Colors.black87,
+                          ),
+                          overflow: TextOverflow.visible,
                         ),
                       ),
-                    ),
+                    );
+                  },
+                ),
               ],
               onChanged: (v) => setState(() => tanque.produtoId = v),
               decoration: _inputDecoration('Produto*', incompleto: incompleto && !produtoPreenchido),
             ),
           ),
           
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           
           SizedBox(
-            width: 230,
+            width: 220,
             child: TextFormField(
               controller: tanque.clienteController,
               style: const TextStyle(fontSize: 13),
@@ -860,10 +877,10 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             ),
           ),
           
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
           
           SizedBox(
-            width: 180,
+            width: 170,
             child: TextFormField(
               controller: tanque.pagamentoController,
               style: const TextStyle(fontSize: 13),
@@ -872,9 +889,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
               decoration: _inputDecoration('Forma de pagamento*', incompleto: incompleto && !pagamentoPreenchido),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           Padding(
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 2),
             child: IconButton(
               tooltip: 'Limpar linha',
               icon: Container(
@@ -882,8 +899,8 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                   color: Colors.grey.shade200,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                padding: const EdgeInsets.all(6),
-                child: const Icon(Icons.backspace, size: 18, color: Colors.black54),
+                padding: const EdgeInsets.all(4),
+                child: const Icon(Icons.backspace, size: 16, color: Colors.black54),
               ),
               onPressed: () {
                 tanque.produtoId = null;
@@ -1128,23 +1145,23 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                           fillColor: _modoEdicao ? Colors.grey.shade200 : Colors.grey.shade50,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                              width: 2.0,
+                            borderSide: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1.0,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                              width: 2.0,
+                            borderSide: BorderSide(
+                              color: Colors.grey.shade300,
+                              width: 1.0,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(6),
                             borderSide: const BorderSide(
-                              color: Colors.red,
-                              width: 2.5,
+                              color: Color(0xFF0D47A1),
+                              width: 1.2,
                             ),
                           ),
                         ),
@@ -1326,18 +1343,18 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.all(20),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
       ),
       child: SizedBox(
-        width: 900,
+        width: 880,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: const BoxDecoration(
                 color: Color(0xFF0D47A1),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
@@ -1379,7 +1396,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 color: Colors.grey.shade50,
                 borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
@@ -1389,13 +1406,13 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
-                    width: 150,
+                    width: 140,
                     child: OutlinedButton(
                       onPressed: _salvando
                           ? null
                           : () => Navigator.of(context).pop(false),
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -1403,8 +1420,8 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                       ),
                       child: _salvando
                           ? const SizedBox(
-                              width: 16,
-                              height: 16,
+                              width: 14,
+                              height: 14,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text(
@@ -1417,21 +1434,21 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                   const SizedBox(width: 12),
                   
                   SizedBox(
-                    width: 150,
+                    width: 140,
                     child: ElevatedButton(
                       onPressed: _salvando ? null : _salvarVenda,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D47A1),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(6),
                         ),
                       ),
                       child: _salvando
                           ? const SizedBox(
-                              width: 16,
-                              height: 16,
+                              width: 14,
+                              height: 14,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: Colors.white,
