@@ -42,6 +42,7 @@ import 'sessoes/estoques/controle_descargas.dart';
 import 'sessoes/bombeios/ordem_bombeio.dart';
 import 'sessoes/financeiro/conta_corrente_refinarias.dart';
 import 'sessoes/operacao/presets.dart';
+import 'sessoes/gestao_de_frota/veiculos_geral_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -125,6 +126,7 @@ class _HomePageState extends State<HomePage>
 
   // NOVAS VARIÁVEIS PARA GESTÃO DE FROTA
   bool _mostrarVeiculos = false;
+  int _abaInicialVeiculos = 0;
   bool _mostrarDetalhesVeiculo = false;
   Map<String, dynamic>? _veiculoSelecionado;
   bool _mostrarMotoristas = false;
@@ -688,8 +690,8 @@ class _HomePageState extends State<HomePage>
       {
         'id': 'fallback-veiculos',
         'icon': Icons.directions_car,
-        'label': 'Veículos Próprios',
-        'descricao': 'Gerenciar frota de veículos próprios',
+        'label': 'Veículos',
+        'descricao': 'Gerenciar frota de veículos',
         'tipo': 'veiculos',
         'sessao_pai': 'Gestão de Frota',
       },
@@ -699,14 +701,6 @@ class _HomePageState extends State<HomePage>
         'label': 'Transportadoras',
         'descricao': 'Gerenciar transportadoras',
         'tipo': 'transportadoras',
-        'sessao_pai': 'Gestão de Frota',
-      },
-      {
-        'id': 'fallback-terceiros',
-        'icon': Icons.local_shipping,
-        'label': 'Veículos de terceiros',
-        'descricao': 'Gerenciar veículos de transportadoras',
-        'tipo': 'veiculos_terceiros',
         'sessao_pai': 'Gestão de Frota',
       },
       {
@@ -2504,8 +2498,10 @@ class _HomePageState extends State<HomePage>
       if (_mostrarVeiculos && !_mostrarDetalhesVeiculo) {
         return VeiculosPage(
           key: const ValueKey('veiculos-page'),
+          abaInicial: _abaInicialVeiculos,
           onVoltar: () {
             setState(() {
+              _abaInicialVeiculos = 0;
               _resetarTodasFlagsGestaoFrota();
               _mostrarFilhosDaSessao('Gestão de Frota');
             });
@@ -3681,13 +3677,13 @@ class _HomePageState extends State<HomePage>
       case 'veiculos':
         setState(() {
           _mostrarVeiculos = true;
+          _abaInicialVeiculos = 0;
           _mostrarDetalhesVeiculo = false;
           _veiculoSelecionado = null;
           _mostrarMotoristas = false;
         });
         break;
 
-      case 'veiculos_terceiros':
       case 'transportadoras':
         setState(() {
           _mostrarTransportadoras = true;

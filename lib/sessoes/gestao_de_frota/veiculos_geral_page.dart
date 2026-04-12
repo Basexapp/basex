@@ -1,6 +1,48 @@
 // veiculos_geral_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+// ==============================
+// FORMATTER PARA PLACA
+// ==============================
+class PlacaMascaraFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var texto = newValue.text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+
+    // Limitar a 7 caracteres alfanuméricos (ABC1234)
+    if (texto.length > 7) {
+      texto = texto.substring(0, 7);
+    }
+
+    String resultado = '';
+    for (int i = 0; i < texto.length; i++) {
+      if (i < 3) {
+        // Primeiros 3 devem ser letras
+        if (RegExp(r'[A-Z]').hasMatch(texto[i])) {
+          resultado += texto[i];
+        }
+      } else {
+        // Restantes podem ser letras ou números
+        resultado += texto[i];
+      }
+    }
+
+    // Adicionar hífen automático após o 3º caractere
+    if (resultado.length > 3) {
+      resultado = '${resultado.substring(0, 3)}-${resultado.substring(3)}';
+    }
+
+    return TextEditingValue(
+      text: resultado,
+      selection: TextSelection.collapsed(offset: resultado.length),
+    );
+  }
+}
 
 // ==============================
 // DIALOG DE EDIÇÃO PARA VEÍCULOS GERAIS
@@ -24,6 +66,7 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
   late TextEditingController _renavamController;
   late TextEditingController _transportadoraController;
   late TextEditingController _transportadoraIdController;
+  late List<TextEditingController> _tanqueControllers;
   List<int> _tanques = [];
   String? _selectedTransportadoraId;
   List<Map<String, dynamic>> _transportadoras = [];
@@ -39,6 +82,9 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
     _transportadoraIdController = TextEditingController();
     _selectedTransportadoraId = widget.veiculo['transportadora_id']?.toString();
     _tanques = List<int>.from(widget.veiculo['tanques'] ?? []);
+    _tanqueControllers = _tanques
+        .map((t) => TextEditingController(text: t.toString()))
+        .toList();
     _carregarTransportadoras();
   }
 
@@ -56,6 +102,9 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
     _renavamController.dispose();
     _transportadoraController.dispose();
     _transportadoraIdController.dispose();
+    for (var controller in _tanqueControllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -80,21 +129,22 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
   void _adicionarTanque() {
     setState(() {
       _tanques.add(0);
+      _tanqueControllers.add(TextEditingController(text: '0'));
     });
   }
 
   void _removerTanque(int index) {
     setState(() {
       _tanques.removeAt(index);
+      _tanqueControllers[index].dispose();
+      _tanqueControllers.removeAt(index);
     });
   }
 
   void _atualizarTanque(int index, String valor) {
     final numero = int.tryParse(valor);
     if (numero != null) {
-      setState(() {
-        _tanques[index] = numero;
-      });
+      _tanques[index] = numero;
     }
   }
 
@@ -238,6 +288,8 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
                               value: _selectedTransportadoraId,
                               hint: const Text('Selecionar transportadora', style: TextStyle(fontSize: 13)),
                               isExpanded: true,
+                              dropdownColor: Colors.white,
+                              menuMaxHeight: 500,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -285,6 +337,7 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
                           TextField(
                             controller: _placaController,
                             style: const TextStyle(fontSize: 13),
+                            inputFormatters: [PlacaMascaraFormatter()],
                             decoration: InputDecoration(
                               label: Text('Placa *', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
                               border: OutlineInputBorder(
@@ -439,6 +492,7 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
                                     children: [
                                       Expanded(
                                         child: TextField(
+                                          controller: _tanqueControllers[index],
                                           style: const TextStyle(fontSize: 13),
                                           decoration: InputDecoration(
                                             label: Text('Compartimento ${index + 1} (m³)', 

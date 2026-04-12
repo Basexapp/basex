@@ -729,11 +729,13 @@ class MenuPlacaWidget extends StatelessWidget {
 class VeiculosPage extends StatefulWidget {
   final VoidCallback onVoltar;
   final Function(Map<String, dynamic>) onSelecionarVeiculo;
+  final int abaInicial;
   
   const VeiculosPage({
     super.key,
     required this.onVoltar,
     required this.onSelecionarVeiculo,
+    this.abaInicial = 0,
   });
 
   @override
@@ -745,7 +747,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
   bool _carregando = true;
   String _filtroVeiculos = '';
   String _filtroTerceiros = '';
-  int _abaAtual = 0; // 0 = Veículos, 1 = Conjuntos
+  late int _abaAtual; // 0 = Veículos, 1 = Conjuntos, 2 = Geral/Terceiros
   int _terceirosRefreshToken = 0;
   final TextEditingController _buscaVeiculosController = TextEditingController();
   final TextEditingController _buscaConjuntosController = TextEditingController();
@@ -754,6 +756,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
   @override
   void initState() {
     super.initState();
+    _abaAtual = widget.abaInicial;
     _carregarVeiculos();
   }
 
@@ -966,11 +969,11 @@ class _VeiculosPageState extends State<VeiculosPage> {
               children: [
                 Row(
                   children: [
-                    _botaoAba("Veículos", 0),
+                    _botaoAba("Veículos Próprios", 0),
+                    const SizedBox(width: 16),
+                    _botaoAba("Veículos de Terceiros", 2),
                     const SizedBox(width: 16),
                     _botaoAba("Conjuntos", 1),
-                    const SizedBox(width: 16),
-                    _botaoAba("Terceiros", 2),
                   ],
                 ),
 

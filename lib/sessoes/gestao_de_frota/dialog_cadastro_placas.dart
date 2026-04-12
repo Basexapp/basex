@@ -152,7 +152,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
     if (widget.tipoCadastro == TipoCadastroVeiculo.proprios && _placas.length >= 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('No cadastro de veículos próprios, apenas 1 placa por vez.'),
+          content: const Text('No cadastro de veículos, apenas 1 placa por vez.'),
           backgroundColor: Colors.orange[700],
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),

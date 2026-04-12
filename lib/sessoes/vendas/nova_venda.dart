@@ -152,7 +152,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
   }
 
   Future<void> _buscarPlacas(_PlacaVenda placa, String texto) async {
-    if (texto.length < 3) {
+    if (texto.isEmpty) {
       placa.placasEncontradas.clear();
       placa.mostrarSugestoes = false;
       setState(() {});
@@ -165,15 +165,70 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
 
     try {
       final supabase = Supabase.instance.client;
-      final response = await supabase
-          .from('view_placas_tanques')
-          .select('placas, tanques')
-          .ilike('placas', '${texto.replaceAll('-', '').toUpperCase()}%')
-          .order('placas')
+      final termoBusca = texto.trim().toUpperCase();
+      
+      // Buscar na tabela equipamentos
+      final responseEquipamentos = await supabase
+          .from('equipamentos')
+          .select('placa, tanques')
+          .ilike('placa', '%$termoBusca%')
+          .order('placa')
           .limit(10);
-
-      placa.placasEncontradas = List<Map<String, dynamic>>.from(response);
-    } catch (_) {
+      
+      // Buscar na tabela veiculos_geral
+      final responseVeiculos = await supabase
+          .from('veiculos_geral')
+          .select('placa, tanques')
+          .ilike('placa', '%$termoBusca%')
+          .order('placa')
+          .limit(10);
+      
+      // Combinar os resultados
+      List<Map<String, dynamic>> resultadosCombinados = [];
+      
+      // Adicionar resultados de equipamentos
+      for (var item in responseEquipamentos) {
+        resultadosCombinados.add({
+          'placas': item['placa']?.toString().toUpperCase() ?? '',
+          'tanques': item['tanques'] ?? [],
+          'origem': 'equipamentos'
+        });
+      }
+      
+      // Adicionar resultados de veiculos_geral
+      for (var item in responseVeiculos) {
+        resultadosCombinados.add({
+          'placas': item['placa']?.toString().toUpperCase() ?? '',
+          'tanques': item['tanques'] ?? [],
+          'origem': 'veiculos_geral'
+        });
+      }
+      
+      // Remover duplicatas (mesma placa em ambas as tabelas)
+      final placasUnicas = <String>{};
+      resultadosCombinados = resultadosCombinados.where((item) {
+        final placaAtual = item['placas'].toString();
+        if (placasUnicas.contains(placaAtual)) {
+          return false;
+        }
+        placasUnicas.add(placaAtual);
+        return true;
+      }).toList();
+      
+      // Ordenar por placa
+      resultadosCombinados.sort((a, b) => 
+        a['placas'].toString().compareTo(b['placas'].toString())
+      );
+      
+      // Limitar a 10 resultados no total
+      if (resultadosCombinados.length > 10) {
+        resultadosCombinados = resultadosCombinados.sublist(0, 10);
+      }
+      
+      placa.placasEncontradas = resultadosCombinados;
+      
+    } catch (e) {
+      print('Erro ao buscar placas: $e');
       placa.placasEncontradas.clear();
     } finally {
       placa.carregandoPlacas = false;
@@ -188,8 +243,14 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
     final List<dynamic> tanques = item['tanques'] ?? [];
 
     placa.tanques.clear();
-    for (final t in tanques) {
-      placa.tanques.add(_TanqueVenda(capacidade: t.toString()));
+    
+    // Se não houver tanques definidos, criar pelo menos um tanque padrão
+    if (tanques.isEmpty) {
+      placa.tanques.add(_TanqueVenda(capacidade: '0'));
+    } else {
+      for (final t in tanques) {
+        placa.tanques.add(_TanqueVenda(capacidade: t.toString()));
+      }
     }
 
     setState(() {});
@@ -1024,180 +1085,204 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
     final index = _placasVenda.indexOf(placa);
     final mostrarRemover = !primeira && !_modoEdicao;
     
-    return Container(
-      key: ValueKey<int>(index),
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 180,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Placa ${index + 1}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey,
+    return TapRegion(
+      onTapOutside: (_) {
+        if (placa.mostrarSugestoes) {
+          setState(() => placa.mostrarSugestoes = false);
+        }
+      },
+      child: Container(
+        key: ValueKey<int>(index),
+        margin: const EdgeInsets.only(bottom: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 180,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Placa ${index + 1}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey,
+                        ),
                       ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: placa.controller,
+                        style: const TextStyle(fontSize: 13),
+                        enabled: !_modoEdicao,
+                        inputFormatters: [PlacaMascaraFormatter()],
+                        decoration: InputDecoration(
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 10,
+                          ),
+                          filled: true,
+                          fillColor: _modoEdicao ? Colors.grey.shade200 : Colors.grey.shade50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2.0,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2.0,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2.5,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(width: 8),
+                
+                if (!_modoEdicao)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Pesquisar placa',
+                          icon: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade200,
+                              borderRadius: BorderRadius.circular(5),
+                              border: Border.all(color: Colors.grey.shade400),
+                            ),
+                            padding: const EdgeInsets.all(5),
+                            child: placa.carregandoPlacas
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(
+                                    Icons.search,
+                                    color: Color(0xFF0D47A1),
+                                    size: 18,
+                                  ),
+                          ),
+                          onPressed: () => _buscarPlacas(placa, placa.controller.text),
+                        ),
+                        const SizedBox(width: 8),
+                        if (primeira)
+                          IconButton(
+                            tooltip: 'Adicionar outra placa',
+                            icon: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D47A1),
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              padding: const EdgeInsets.all(5),
+                              child: const Icon(
+                                Icons.add,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                            onPressed: _adicionarPlaca,
+                          )
+                        else if (mostrarRemover)
+                          IconButton(
+                            tooltip: 'Remover esta placa',
+                            icon: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade500,
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              padding: const EdgeInsets.all(5),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                            ),
+                            onPressed: () => _removerPlaca(index),
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    TextField(
-                      controller: placa.controller,
-                      onChanged: (v) => _buscarPlacas(placa, v),
-                      style: const TextStyle(fontSize: 13),
-                      enabled: !_modoEdicao,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 10,
-                        ),
-                        filled: true,
-                        fillColor: _modoEdicao ? Colors.grey.shade200 : Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: const BorderSide(
-                            color: Colors.red,
-                            width: 2.0,
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: const BorderSide(
-                            color: Colors.red,
-                            width: 2.0,
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(6),
-                          borderSide: const BorderSide(
-                            color: Colors.red,
-                            width: 2.5,
-                          ),
-                        ),
-                        suffixIcon: placa.carregandoPlacas && !_modoEdicao
-                            ? const Padding(
-                                padding: EdgeInsets.all(8),
-                                child: SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                ),
-                              )
-                            : const Icon(Icons.search, size: 18),
-                      ),
+                  ),
+                const SizedBox(width: 8),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: true,
+                      builder: (context) => DialogCadastroPlacas(tipoCadastro: TipoCadastroVeiculo.terceiros),
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text(
+                    'Cadastrar placa',
+                    style: TextStyle(fontSize: 14, decoration: TextDecoration.underline),
+                  ),
+                ),
+              ],
+            ),
+    
+            if (placa.mostrarSugestoes && !_modoEdicao)
+              Container(
+                margin: const EdgeInsets.only(top: 4, left: 0),
+                width: 350,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
-              ),
-              
-              const SizedBox(width: 8),
-              
-              if (primeira && !_modoEdicao)
-                Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: IconButton(
-                    tooltip: 'Adicionar outra placa',
-                    icon: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0D47A1),
-                        borderRadius: BorderRadius.circular(5),
+                child: Column(
+                  children: placa.placasEncontradas.map((item) {
+                    return ListTile(
+                      dense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                      title: Text(
+                        item['placas'],
+                        style: const TextStyle(fontSize: 13),
                       ),
-                      padding: const EdgeInsets.all(5),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    onPressed: _adicionarPlaca,
-                  ),
-                )
-              else if (mostrarRemover)
-                Padding(
-                  padding: const EdgeInsets.only(top: 24),
-                  child: IconButton(
-                    tooltip: 'Remover esta placa',
-                    icon: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade500,
-                        borderRadius: BorderRadius.circular(5),
-                      ),
-                      padding: const EdgeInsets.all(5),
-                      child: const Icon(
-                        Icons.close,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                    onPressed: () => _removerPlaca(index),
-                  ),
-                ),
-              const SizedBox(width: 8),
-              const Spacer(),
-              TextButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: true,
-                    builder: (context) => DialogCadastroPlacas(tipoCadastro: TipoCadastroVeiculo.terceiros),
-                  );
-                },
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'Cadastrar placa',
-                  style: TextStyle(fontSize: 14, decoration: TextDecoration.underline),
+                      onTap: () => _selecionarPlaca(placa, item),
+                    );
+                  }).toList(),
                 ),
               ),
+    
+            if (placa.tanques.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              if (_carregandoProdutos)
+                const Center(child: CircularProgressIndicator()),
+              ...placa.tanques.map(_buildTanqueLinha),
             ],
-          ),
-
-          if (placa.mostrarSugestoes && !_modoEdicao)
-            Container(
-              margin: const EdgeInsets.only(top: 4, left: 0),
-              width: 350,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: placa.placasEncontradas.map((item) {
-                  return ListTile(
-                    dense: true,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                    title: Text(
-                      item['placas'],
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    onTap: () => _selecionarPlaca(placa, item),
-                  );
-                }).toList(),
-              ),
-            ),
-
-          if (placa.tanques.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            if (_carregandoProdutos)
-              const Center(child: CircularProgressIndicator()),
-            ...placa.tanques.map(_buildTanqueLinha),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1440,6 +1525,44 @@ class UpperCaseTextFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: newValue.text.toUpperCase(),
       selection: newValue.selection,
+    );
+  }
+}
+
+class PlacaMascaraFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var texto = newValue.text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+
+    // Limitar a 7 caracteres alfanuméricos (ABC1234)
+    if (texto.length > 7) {
+      texto = texto.substring(0, 7);
+    }
+
+    String resultado = '';
+    for (int i = 0; i < texto.length; i++) {
+      if (i < 3) {
+        // Primeiros 3 devem ser letras
+        if (RegExp(r'[A-Z]').hasMatch(texto[i])) {
+          resultado += texto[i];
+        }
+      } else {
+        // Restantes podem ser letras ou números
+        resultado += texto[i];
+      }
+    }
+
+    // Adicionar hífen automático após o 3º caractere
+    if (resultado.length > 3) {
+      resultado = '${resultado.substring(0, 3)}-${resultado.substring(3)}';
+    }
+
+    return TextEditingValue(
+      text: resultado,
+      selection: TextSelection.collapsed(offset: resultado.length),
     );
   }
 }
