@@ -111,7 +111,7 @@ class _PresetsPageState extends State<PresetsPage> {
           .select('id, preset_ref, produto_id, produtos(nome_dois), terminais(nome_dois)')
           .eq('terminal_id', terminalId);
 
-      final List<dynamic> data = response as List<dynamic>;
+      final List<dynamic> data = response;
       
       final Map<String, List<TerminalData>> mapaAgrupado = {};
       String nomeTerminal = '';
@@ -161,7 +161,6 @@ class _PresetsPageState extends State<PresetsPage> {
     final dataAnterior = _dataSelecionada.subtract(const Duration(days: 1)).toIso8601String().substring(0, 10);
 
     bool jaSalvoQualquer = false;
-    double saldoFinalHoje = 0;
     Map<String, dynamic>? dadosComplementares;
 
     for (int i = 0; i < 3; i++) {
@@ -239,10 +238,8 @@ class _PresetsPageState extends State<PresetsPage> {
           .gte('data_mov', '$dataStr 00:00:00')
           .lte('data_mov', '$dataStr 23:59:59');
       
-      if (responseSaidas != null) {
-        final List<dynamic> saidas = responseSaidas as List<dynamic>;
-        totalSaidaAmbDia = saidas.fold<double>(0, (sum, item) => sum + (double.tryParse(item['saida_amb'].toString()) ?? 0));
-      }
+      final List<dynamic> saidas = responseSaidas;
+      totalSaidaAmbDia = saidas.fold<double>(0, (sum, item) => sum + (double.tryParse(item['saida_amb'].toString()) ?? 0));
     } catch (e) {
       debugPrint('Erro ao buscar saídas AMB: $e');
     }

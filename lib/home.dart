@@ -42,7 +42,6 @@ import 'sessoes/estoques/controle_descargas.dart';
 import 'sessoes/bombeios/ordem_bombeio.dart';
 import 'sessoes/financeiro/conta_corrente_refinarias.dart';
 import 'sessoes/operacao/presets.dart';
-import 'sessoes/gestao_de_frota/veiculos_geral_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
