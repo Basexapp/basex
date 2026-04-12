@@ -1,6 +1,69 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
+
+class PlacaMascaraFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var texto = newValue.text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+
+    // Limitar a 7 caracteres alfanuméricos (ABC1234)
+    if (texto.length > 7) {
+      texto = texto.substring(0, 7);
+    }
+
+    String resultado = '';
+    for (int i = 0; i < texto.length; i++) {
+      if (i < 3) {
+        // Primeiros 3 devem ser letras
+        if (RegExp(r'[A-Z]').hasMatch(texto[i])) {
+          resultado += texto[i];
+        }
+      } else {
+        // Restantes podem ser letras ou números
+        resultado += texto[i];
+      }
+    }
+
+    // Adicionar hífen automático após o 3º caractere
+    if (resultado.length > 3) {
+      resultado = '${resultado.substring(0, 3)}-${resultado.substring(3)}';
+    }
+
+    return TextEditingValue(
+      text: resultado,
+      selection: TextSelection.collapsed(offset: resultado.length),
+    );
+  }
+}
+
+class VirgulaAutomaticaFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Permitir apenas números
+    var texto = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (texto.isEmpty) return newValue.copyWith(text: '');
+
+    String resultado = texto;
+    // Adicionar vírgula após o segundo dígito
+    if (texto.length > 2) {
+      resultado = '${texto.substring(0, 2)},${texto.substring(2)}';
+    }
+
+    return TextEditingValue(
+      text: resultado,
+      selection: TextSelection.collapsed(offset: resultado.length),
+    );
+  }
+}
 
 class TemperaturaDensidadeMediaPage extends StatefulWidget {
   final VoidCallback? onVoltar;
@@ -19,6 +82,10 @@ class _TemperaturaDensidadeMediaPageState
   bool _carregando = true;
   bool _erro = false;
   String _mensagemErro = '';
+
+  // Variáveis para Paginação
+  int _paginaAtual = 0;
+  final int _itensPorPagina = 10;
 
   final TextEditingController _placaController = TextEditingController();
   final ScrollController _verticalScrollController = ScrollController();
@@ -463,6 +530,10 @@ class _TemperaturaDensidadeMediaPageState
               ),
               child: Container(
             width: 500,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF0D47A1), width: 1),
+            ),
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -569,8 +640,10 @@ class _TemperaturaDensidadeMediaPageState
                 const SizedBox(height: 8),
                 TextField(
                   controller: _placaDialogController,
+                  inputFormatters: [PlacaMascaraFormatter()],
+                  maxLength: 8,
                   decoration: InputDecoration(
-                    hintText: 'Digite a placa do veículo',
+                    counterText: '',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -594,9 +667,11 @@ class _TemperaturaDensidadeMediaPageState
                 const SizedBox(height: 8),
                 TextField(
                   controller: _tempAmostraController,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [VirgulaAutomaticaFormatter()],
+                  maxLength: 4,
                   decoration: InputDecoration(
-                    hintText: 'Ex: 25,5',
+                    counterText: '',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -619,9 +694,13 @@ class _TemperaturaDensidadeMediaPageState
                 const SizedBox(height: 8),
                 TextField(
                   controller: _densidadeObsController,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
+                  ],
+                  maxLength: 6,
                   decoration: InputDecoration(
-                    hintText: 'Ex: 0,825',
+                    counterText: '',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -644,9 +723,11 @@ class _TemperaturaDensidadeMediaPageState
                 const SizedBox(height: 8),
                 TextField(
                   controller: _tempCtController,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [VirgulaAutomaticaFormatter()],
+                  maxLength: 4,
                   decoration: InputDecoration(
-                    hintText: 'Ex: 28,0',
+                    counterText: '',
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -735,7 +816,7 @@ class _TemperaturaDensidadeMediaPageState
   List<Map<String, dynamic>> get _registrosFiltrados {
     final placaFiltro = _placaController.text.trim().toLowerCase();
 
-    return _registros.where((r) {
+    final filtrados = _registros.where((r) {
       if (placaFiltro.isNotEmpty) {
         final placa = r['placa']?.toString().toLowerCase() ?? '';
         if (!placa.contains(placaFiltro)) return false;
@@ -743,6 +824,27 @@ class _TemperaturaDensidadeMediaPageState
 
       return true;
     }).toList();
+
+    return filtrados;
+  }
+
+  List<Map<String, dynamic>> get _registrosPaginados {
+    final filtrados = _registrosFiltrados;
+    final totalRegistros = filtrados.length;
+    final totalPaginas = (totalRegistros / _itensPorPagina).ceil();
+
+    if (_paginaAtual >= totalPaginas && totalPaginas > 0) {
+      _paginaAtual = totalPaginas - 1;
+    }
+
+    final inicio = _paginaAtual * _itensPorPagina;
+    final fim = (inicio + _itensPorPagina) < totalRegistros
+        ? (inicio + _itensPorPagina)
+        : totalRegistros;
+
+    if (inicio >= totalRegistros) return [];
+
+    return filtrados.sublist(inicio, fim);
   }
 
   Map<String, double> _calcularMedias(List<Map<String, dynamic>> registros) {
@@ -938,8 +1040,11 @@ class _TemperaturaDensidadeMediaPageState
       return _buildErro();
     }
 
-    final registros = _registrosFiltrados;
-    final medias = _calcularMedias(registros);
+    final registrosFiltrados = _registrosFiltrados;
+    final totalRegistros = registrosFiltrados.length;
+    final totalPaginas = (totalRegistros / _itensPorPagina).ceil();
+    final registrosExibidos = _registrosPaginados;
+    final medias = _calcularMedias(registrosFiltrados);
 
     return Scaffold(
       appBar: null,
@@ -1024,9 +1129,48 @@ class _TemperaturaDensidadeMediaPageState
           ),
           // Conteúdo principal
           Expanded(
-            child: registros.isEmpty
+            child: registrosFiltrados.isEmpty
                 ? _buildVazio()
-                : _buildTable(registros, medias),
+                : Column(
+                    children: [
+                      Expanded(
+                        child: _buildTable(registrosExibidos, medias),
+                      ),
+                      // Controle de Paginação
+                      if (totalPaginas > 1)
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border(top: BorderSide(color: Colors.grey.shade300)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.chevron_left),
+                                onPressed: _paginaAtual > 0
+                                    ? () => setState(() => _paginaAtual--)
+                                    : null,
+                              ),
+                              Text(
+                                'Página ${_paginaAtual + 1} de $totalPaginas',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.chevron_right),
+                                onPressed: _paginaAtual < totalPaginas - 1
+                                    ? () => setState(() => _paginaAtual++)
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -1158,7 +1302,7 @@ class _TemperaturaDensidadeMediaPageState
 
                         return Container(
                           color: isEven ? const Color(0xFFF0F1F6) : const Color(0xFFF8F9FA),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                           child: Row(
                             children: [
                               Expanded(
@@ -1166,7 +1310,7 @@ class _TemperaturaDensidadeMediaPageState
                                 child: Text(
                                   dataFormatada,
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 11),
                                 ),
                               ),
                               Expanded(
@@ -1174,7 +1318,7 @@ class _TemperaturaDensidadeMediaPageState
                                 child: Text(
                                   r['placa']?.toString() ?? '',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 11),
                                 ),
                               ),
                               Expanded(
@@ -1182,7 +1326,7 @@ class _TemperaturaDensidadeMediaPageState
                                 child: Text(
                                   r['produto_nome']?.toString() ?? '',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 11),
                                 ),
                               ),
                               Expanded(
@@ -1195,7 +1339,7 @@ class _TemperaturaDensidadeMediaPageState
                                           r['densid_obs'].toString()
                                       : '',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 11),
                                 ),
                               ),
                               Expanded(
@@ -1208,7 +1352,7 @@ class _TemperaturaDensidadeMediaPageState
                                           r['temp_amostra'].toString()
                                       : '',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 11),
                                 ),
                               ),
                               Expanded(
@@ -1221,14 +1365,14 @@ class _TemperaturaDensidadeMediaPageState
                                           r['temp_ct'].toString()
                                       : '',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontSize: 12),
+                                  style: const TextStyle(fontSize: 11),
                                 ),
                               ),
                               SizedBox(
                                 width: 50,
                                 child: PopupMenuButton<String>(
                                   color: Colors.white,
-                                  icon: const Icon(Icons.more_vert, size: 20),
+                                  icon: const Icon(Icons.more_vert, size: 18),
                                   onSelected: (value) {
                                     if (value == 'excluir') {
                                       _excluirRegistro(r['id'].toString());
@@ -1239,9 +1383,9 @@ class _TemperaturaDensidadeMediaPageState
                                       value: 'excluir',
                                       child: Row(
                                         children: [
-                                          Icon(Icons.delete, color: Colors.red, size: 20),
+                                          Icon(Icons.delete, color: Colors.red, size: 18),
                                           SizedBox(width: 8),
-                                          Text('Excluir registro'),
+                                          Text('Excluir registro', style: TextStyle(fontSize: 12)),
                                         ],
                                       ),
                                     ),
