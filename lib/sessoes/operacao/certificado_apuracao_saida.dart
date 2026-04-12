@@ -736,16 +736,17 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
 
       // Horário de São Paulo (UTC-3)
       final agoraSaoPaulo = DateTime.now().toUtc().subtract(const Duration(hours: 3));
-      final sessentaMinAtrasSaoPaulo = agoraSaoPaulo.subtract(const Duration(minutes: 60));
+      // ALTERADO: 60 minutos -> 120 minutos
+      final centoEVinteMinAtrasSaoPaulo = agoraSaoPaulo.subtract(const Duration(minutes: 120));
       
       // Formatar datas no formato que o PostgreSQL espera (YYYY-MM-DD HH:MM:SS)
       String formatarDataParaPostgres(DateTime date) {
         return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
       }
       
-      final dataInicio = formatarDataParaPostgres(sessentaMinAtrasSaoPaulo);
+      final dataInicio = formatarDataParaPostgres(centoEVinteMinAtrasSaoPaulo);
       
-      // Buscar registros do MESMO produto nos últimos 60 minutos
+      // Buscar registros do MESMO produto nos últimos 120 minutos
       final registros = await Supabase.instance.client
           .from('temp_e_dens')
           .select('temp_amostra, densid_obs, temp_ct, data_hora_medicao, produto_id')
@@ -815,7 +816,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         await _calcularResultadosObtidos();
         
         if (mounted) {
-          String mensagem = '✓ Dados carregados (média de ${registros.length} registro(s) dos últimos 60 min)';
+          String mensagem = '✓ Dados carregados (média de ${registros.length} registro(s) dos últimos 120 min)';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(mensagem),
@@ -825,7 +826,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           );
         }
       } else {
-        // Nenhum registro encontrado nos últimos 60 minutos
+        // Nenhum registro encontrado nos últimos 120 minutos
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

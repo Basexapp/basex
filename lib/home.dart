@@ -17,6 +17,7 @@ import 'sessoes/operacao/estoque_tanques_geral.dart';
 import 'sessoes/operacao/historico_cacl.dart';
 import 'sessoes/operacao/listar_cacls.dart';
 import 'sessoes/estoques/estoque_downloads.dart';
+import 'sessoes/relatorios/relatorios_downloads.dart';
 import 'sessoes/estoques/filtro_contabil_fisico.dart';
 import 'sessoes/estoques/filtro_vendas.dart';
 import 'sessoes/estoques/contabil_fisico.dart';
@@ -828,6 +829,17 @@ class _HomePageState extends State<HomePage>
         'descricao': 'Gestão de contratos firmados com refinarias',
         'tipo': 'contratos_refinarias',
         'sessao_pai': 'Gestão de contratos',
+      },
+    ];
+
+    _filhosPorSessao['Relatórios'] = [
+      {
+        'id': 'fallback-downloads',
+        'icon': Icons.download,
+        'label': 'Downloads',
+        'descricao': 'Baixar relatórios e dados',
+        'tipo': 'downloads',
+        'sessao_pai': 'Relatórios',
       },
     ];
   }    
@@ -1697,7 +1709,7 @@ class _HomePageState extends State<HomePage>
         return _buildInicioPage(usuario);
 
       case 'Relatórios':
-        return _buildRelatoriosPage();
+        return _buildConteudoSessoes();
 
       case 'Configurações':
         return _buildConfiguracoesPage(usuario);
@@ -2593,17 +2605,19 @@ class _HomePageState extends State<HomePage>
     // SEÇÃO: Relatórios
     if (sessaoAtual == 'Relatórios') {
       if (_mostrarDownloads) {
-        return DownloadsPage(
-          key: const ValueKey('downloads-page'),
+        return RelatoriosDownloadsPage(
+          key: const ValueKey('relatorios-downloads-page'),
           onVoltar: () {
             setState(() {
               _mostrarDownloads = false;
+              _mostrarFilhosDaSessao('Relatórios');
             });
           },
         );
       }
-      
-      return _buildRelatoriosPage();
+      if (_mostrarFilhosSessao && _sessaoAtual == 'Relatórios') {
+        return _buildFilhosSessaoPage();
+      }
     }
 
     // SEÇÃO: Configurações
@@ -3381,6 +3395,9 @@ class _HomePageState extends State<HomePage>
       case 'Gestão de contratos':
         _navegarParaCardGestaoContratos(tipo);
         break;
+      case 'Relatórios':
+        _navegarParaCardRelatorios(tipo);
+        break;
       default:
         debugPrint('Sessão pai não reconhecida: $sessaoPai');
     }
@@ -3834,6 +3851,16 @@ class _HomePageState extends State<HomePage>
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  void _navegarParaCardRelatorios(String tipo) {
+    switch (tipo) {
+      case 'downloads':
+        setState(() {
+          _mostrarDownloads = true;
+        });
+        break;
+    }
   }
 
   void _navegarParaCardLaboratorio(String tipo) {
