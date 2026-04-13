@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
 // ==============================
 // FORMATTER PARA PLACA
@@ -67,7 +68,7 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
   late TextEditingController _transportadoraController;
   late TextEditingController _transportadoraIdController;
   late List<TextEditingController> _tanqueControllers;
-  List<int> _tanques = [];
+  List<double> _tanques = [];
   String? _selectedTransportadoraId;
   List<Map<String, dynamic>> _transportadoras = [];
   bool _carregandoTransportadoras = false;
@@ -81,9 +82,11 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
     _transportadoraController = TextEditingController(text: _getNomeTransportadora(widget.veiculo));
     _transportadoraIdController = TextEditingController();
     _selectedTransportadoraId = widget.veiculo['transportadora_id']?.toString();
-    _tanques = List<int>.from(widget.veiculo['tanques'] ?? []);
+    _tanques = (widget.veiculo['tanques'] as List?)?.map((t) => double.tryParse(t.toString()) ?? 0.0).toList() ?? [];
+    
+    final fmt = NumberFormat('#,##0', 'pt_BR');
     _tanqueControllers = _tanques
-        .map((t) => TextEditingController(text: t.toString()))
+        .map((t) => TextEditingController(text: fmt.format((t * 1000).toInt())))
         .toList();
     _carregarTransportadoras();
   }
@@ -128,8 +131,8 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
 
   void _adicionarTanque() {
     setState(() {
-      _tanques.add(0);
-      _tanqueControllers.add(TextEditingController(text: '0'));
+      _tanques.add(0.0);
+      _tanqueControllers.add(TextEditingController(text: ''));
     });
   }
 
@@ -142,9 +145,34 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
   }
 
   void _atualizarTanque(int index, String valor) {
-    final numero = int.tryParse(valor);
-    if (numero != null) {
-      _tanques[index] = numero;
+    if (valor.isEmpty) {
+      _tanques[index] = 0.0;
+      return;
+    }
+    
+    // Remove os pontos de milhar antes de parsear
+    final limpo = valor.replaceAll('.', '').replaceAll(',', '.');
+    final litros = double.tryParse(limpo);
+    if (litros != null) {
+      _tanques[index] = litros / 1000;
+    }
+  }
+
+  void _formatarCampo(int index, String valor) {
+    if (valor.isEmpty) return;
+    
+    final fmt = NumberFormat('#,##0', 'pt_BR');
+    final limpo = valor.replaceAll('.', '').replaceAll(',', '.');
+    final p = int.tryParse(limpo);
+    
+    if (p != null) {
+      final formatado = fmt.format(p);
+      if (formatado != valor) {
+        _tanqueControllers[index].value = TextEditingValue(
+          text: formatado,
+          selection: TextSelection.collapsed(offset: formatado.length),
+        );
+      }
     }
   }
 
@@ -171,7 +199,7 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
       };
 
       await Supabase.instance.client
-          .from('veiculos_geral')
+          .from('veiculos')
           .update(dados)
           .eq('id', widget.veiculo['id']);
 
@@ -495,7 +523,7 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
                                           controller: _tanqueControllers[index],
                                           style: const TextStyle(fontSize: 13),
                                           decoration: InputDecoration(
-                                            label: Text('Compartimento ${index + 1} (m³)', 
+                                            label: Text('Compartimento ${index + 1} (L)', 
                                                 style: TextStyle(fontSize: 11, color: Colors.grey[700])),
                                             border: OutlineInputBorder(
                                               borderRadius: BorderRadius.circular(4),
@@ -513,7 +541,10 @@ class _DialogEditarVeiculoGeralState extends State<DialogEditarVeiculoGeral> {
                                             isDense: true,
                                           ),
                                           keyboardType: TextInputType.number,
-                                          onChanged: (value) => _atualizarTanque(index, value),
+                                          onChanged: (value) {
+                                            _atualizarTanque(index, value);
+                                            _formatarCampo(index, value);
+                                          },
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -780,10 +811,12 @@ class MenuVeiculoWidget extends StatelessWidget {
 // ==============================
 class VeiculosGeralPage extends StatefulWidget {
   final String filtro;
+  final VoidCallback? onRefresh;
 
   const VeiculosGeralPage({
     super.key,
     required this.filtro,
+    this.onRefresh,
   });
 
   @override
@@ -806,13 +839,17 @@ class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
     if (widget.filtro != oldWidget.filtro) {
       setState(() {});
     }
+    // Se a key ou um sinal de refresh vindo de fora mudar
+    if (widget.onRefresh != oldWidget.onRefresh) {
+      _carregarVeiculos();
+    }
   }
 
   Future<void> _carregarVeiculos() async {
     setState(() => _carregando = true);
     try {
       final data = await Supabase.instance.client
-          .from('veiculos_geral')
+          .from('veiculos')
           .select('''
             id,
             placa,
@@ -834,13 +871,13 @@ class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
     }
   }
 
-  List<int> _parseTanques(dynamic data) {
-    if (data is List) return data.cast<int>();
+  List<double> _parseTanques(dynamic data) {
+    if (data is List) return data.map((t) => double.tryParse(t.toString()) ?? 0.0).toList();
     return [];
   }
 
-  int _totalTanques(List<int> tanques) {
-    if (tanques.isEmpty) return 0;
+  double _totalTanques(List<double> tanques) {
+    if (tanques.isEmpty) return 0.0;
     return tanques.reduce((a, b) => a + b);
   }
 
@@ -852,7 +889,7 @@ class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
     return '--';
   }
 
-  Color _corBoca(int capacidade) {
+  Color _corBoca(double capacidade) {
     final cores = [
       Colors.blue,
       Colors.green,
@@ -865,7 +902,7 @@ class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
       Colors.cyan,
       Colors.lime,
     ];
-    return cores[capacidade % cores.length];
+    return cores[(capacidade.toInt()) % cores.length];
   }
 
   List<Map<String, dynamic>> get _veiculosFiltrados {
@@ -896,7 +933,7 @@ class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
   Future<void> _excluirVeiculo(String id, String placa) async {
     try {
       await Supabase.instance.client
-          .from('veiculos_geral')
+          .from('veiculos')
           .delete()
           .eq('id', id);
       
@@ -1072,7 +1109,7 @@ class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
                                                   borderRadius: BorderRadius.circular(10),
                                                 ),
                                                 child: Text(
-                                                  '$c',
+                                                  NumberFormat('#,##0', 'pt_BR').format((c * 1000).toInt()),
                                                   style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
@@ -1110,7 +1147,7 @@ class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
                                             ),
                                             const SizedBox(width: 4),
                                             Text(
-                                              '$total',
+                                              NumberFormat('#,##0', 'pt_BR').format((total * 1000).toInt()),
                                               style: const TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.bold,

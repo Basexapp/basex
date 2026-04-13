@@ -115,10 +115,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('produtos')
-          .select('id, nome_dois, grupo');
-      _produtos = ordenarProdutosPorClasse(
-        List<Map<String, dynamic>>.from(response),
-      );
+          .select('id, nome_dois, grupo, posicao')
+          .order('posicao', ascending: true);
+      _produtos = List<Map<String, dynamic>>.from(response);
     } catch (_) {
       _produtos = [];
     } finally {
@@ -175,9 +174,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
           .order('placa')
           .limit(10);
       
-      // Buscar na tabela veiculos_geral
+      // Buscar na tabela veiculos
       final responseVeiculos = await supabase
-          .from('veiculos_geral')
+          .from('veiculos')
           .select('placa, tanques')
           .ilike('placa', '%$termoBusca%')
           .order('placa')
@@ -195,12 +194,12 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         });
       }
       
-      // Adicionar resultados de veiculos_geral
+      // Adicionar resultados de veiculos
       for (var item in responseVeiculos) {
         resultadosCombinados.add({
           'placas': item['placa']?.toString().toUpperCase() ?? '',
           'tanques': item['tanques'] ?? [],
-          'origem': 'veiculos_geral'
+          'origem': 'veiculos'
         });
       }
       
@@ -256,32 +255,6 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
     setState(() {});
   }
 
-  List<Map<String, dynamic>> ordenarProdutosPorClasse(
-    List<Map<String, dynamic>> produtos,
-  ) {
-    const ordemPorId = {
-      '82c348c8-efa1-4d1a-953a-ee384d5780fc': 1,
-      '93686e9d-6ef5-4f7c-a97d-b058b3c2c693': 2,
-      'c77a6e31-52f0-4fe1-bdc8-685dff83f3a1': 3,
-      '58ce20cf-f252-4291-9ef6-f4821f22c29e': 4,
-      '66ca957a-5698-4a02-8c9e-987770b6a151': 5,
-      'f8e95435-471a-424c-947f-def8809053a0': 6,
-      '4da89784-301f-4abe-b97e-c48729969e3d': 7,
-      '3c26a7e5-8f3a-4429-a8c7-2e0e72f1b80a': 8,
-      'cecab8eb-297a-4640-81ae-e88335b88d8b': 9,
-      'ecd91066-e763-42e3-8a0e-d982ea6da535': 10,
-    };
-
-    produtos.sort((a, b) {
-      final idA = a['id'].toString().toLowerCase();
-      final idB = b['id'].toString().toLowerCase();
-
-      return (ordemPorId[idA] ?? 999)
-          .compareTo(ordemPorId[idB] ?? 999);
-    });
-
-    return produtos;
-  }
 
   Future<void> _salvarVenda() async {
     if (widget.filialId.isEmpty) {
@@ -1136,6 +1109,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                         style: const TextStyle(fontSize: 13),
                         enabled: !_modoEdicao,
                         inputFormatters: [PlacaMascaraFormatter()],
+                        onSubmitted: _modoEdicao ? null : (value) => _buscarPlacas(placa, value),
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 10,

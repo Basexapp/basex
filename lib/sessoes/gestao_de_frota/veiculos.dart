@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 import 'dialog_cadastro_placas.dart';
 import 'veiculos_geral_page.dart';
 
@@ -26,7 +27,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
   late TextEditingController _renavamController;
   late TextEditingController _transportadoraController;
   late TextEditingController _transportadoraIdController;
-  List<int> _tanques = [];
+  List<double> _tanques = [];
   String? _selectedTransportadoraId;
   List<Map<String, dynamic>> _transportadoras = [];
   bool _carregandoTransportadoras = false;
@@ -40,7 +41,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
     _transportadoraController = TextEditingController(text: _getNomeTransportadora(widget.veiculo));
     _transportadoraIdController = TextEditingController();
     _selectedTransportadoraId = widget.veiculo['transportadora_id']?.toString();
-    _tanques = List<int>.from(widget.veiculo['tanques'] ?? []);
+    _tanques = (widget.veiculo['tanques'] as List?)?.map((t) => double.tryParse(t.toString()) ?? 0.0).toList() ?? [];
     _carregarTransportadoras();
   }
 
@@ -81,7 +82,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
 
   void _adicionarTanque() {
     setState(() {
-      _tanques.add(0);
+      _tanques.add(0.0);
     });
   }
 
@@ -92,12 +93,22 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
   }
 
   void _atualizarTanque(int index, String valor) {
-    final numero = int.tryParse(valor);
+    // Remove o ponto de milhar para converter corretamente
+    final stringLimpa = valor.replaceAll('.', '');
+    final numero = double.tryParse(stringLimpa);
     if (numero != null) {
       setState(() {
-        _tanques[index] = numero;
+        // Converte de Litros digitados para m3 no array
+        _tanques[index] = numero / 1000;
       });
     }
+  }
+
+  String _formatarCampo(String valor) {
+    if (valor.isEmpty) return '';
+    final numero = int.tryParse(valor.replaceAll('.', ''));
+    if (numero == null) return valor;
+    return NumberFormat('#,##0', 'pt_BR').format(numero);
   }
 
   Future<void> _salvar() async {
@@ -435,15 +446,27 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                             ...List.generate(
                               _tanques.length,
                               (index) {
+                                // Formata o valor bruto (m3) para exibição em Litros com ponto
+                                final valorLitros = (_tanques[index] * 1000).toInt();
+                                final controller = TextEditingController(
+                                  text: valorLitros > 0 ? NumberFormat('#,##0', 'pt_BR').format(valorLitros) : '',
+                                );
+                                
+                                // Posiciona o cursor no final
+                                controller.selection = TextSelection.fromPosition(
+                                  TextPosition(offset: controller.text.length),
+                                );
+
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: Row(
                                     children: [
                                       Expanded(
                                         child: TextField(
+                                          controller: controller,
                                           style: const TextStyle(fontSize: 13),
                                           decoration: InputDecoration(
-                                            label: Text('Compartimento ${index + 1} (m³)', 
+                                            label: Text('Compartimento ${index + 1} (L)', 
                                                 style: TextStyle(fontSize: 11, color: Colors.grey[700])),
                                             border: OutlineInputBorder(
                                               borderRadius: BorderRadius.circular(4),
@@ -461,7 +484,16 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                                             isDense: true,
                                           ),
                                           keyboardType: TextInputType.number,
-                                          onChanged: (value) => _atualizarTanque(index, value),
+                                          onChanged: (value) {
+                                            _atualizarTanque(index, value);
+                                            final formatado = _formatarCampo(value);
+                                            if (formatado != value) {
+                                              controller.text = formatado;
+                                              controller.selection = TextSelection.fromPosition(
+                                                TextPosition(offset: controller.text.length),
+                                              );
+                                            }
+                                          },
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -749,6 +781,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
   String _filtroTerceiros = '';
   late int _abaAtual; // 0 = Veículos, 1 = Conjuntos, 2 = Geral/Terceiros
   int _terceirosRefreshToken = 0;
+  int _conjuntosRefreshToken = 0;
   final TextEditingController _buscaVeiculosController = TextEditingController();
   final TextEditingController _buscaConjuntosController = TextEditingController();
   final TextEditingController _buscaTerceirosController = TextEditingController();
@@ -797,6 +830,22 @@ class _VeiculosPageState extends State<VeiculosPage> {
   Future<void> _carregarVeiculos() async {
     setState(() => _carregando = true);
     try {
+      // Se estiver na aba de Conjuntos (1), atualiza o token para forçar reload do widget
+      if (_abaAtual == 1) {
+        setState(() {
+          _conjuntosRefreshToken++;
+        });
+        return;
+      }
+
+      // Se estiver na aba de Terceiros (2), atualiza o token para forçar reload do widget
+      if (_abaAtual == 2) {
+        setState(() {
+          _terceirosRefreshToken++;
+        });
+        return;
+      }
+
       final data = await Supabase.instance.client
           .from('equipamentos')
           .select('''
@@ -820,30 +869,35 @@ class _VeiculosPageState extends State<VeiculosPage> {
   }
 
 
-  List<int> _parsetanques(dynamic tanquesData) {
-    if (tanquesData is List) return tanquesData.cast<int>();
+  List<double> _parsetanques(dynamic tanquesData) {
+    if (tanquesData is List) return tanquesData.map((t) => double.tryParse(t.toString()) ?? 0.0).toList();
     return [];
   }
 
-  int _calcularTotaltanques(List<int> tanques) {
-    return tanques.isNotEmpty ? tanques.reduce((a, b) => a + b) : 0;
+  double _calcularTotaltanques(List<double> tanques) {
+    return tanques.isNotEmpty ? tanques.reduce((a, b) => a + b) : 0.0;
   }
 
   List<Map<String, dynamic>> get _veiculosFiltrados {
     if (_filtroVeiculos.isEmpty) return _veiculos;
 
     final filtro = _filtroVeiculos.trim().toLowerCase();
-    final capacidadeBuscada = int.tryParse(filtro);
+    
+    // Converte filtro "11.500" para 11500 (Litros) ou 11.5 (m3) se necessário
+    final filtroLimpo = filtro.replaceAll('.', '');
+    final capacidadeBuscadaLitros = double.tryParse(filtroLimpo);
 
     return _veiculos.where((v) {
       final placa = v['placa']?.toString().toLowerCase() ?? '';
       final transportadora = _getNomeTransportadora(v).toLowerCase();
       final tanques = _parsetanques(v['tanques']);
-      final capacidadeTotal = _calcularTotaltanques(tanques);
-      final capacidadeComoTexto = capacidadeTotal.toString();
+      final capacidadeTotalM3 = _calcularTotaltanques(tanques);
+      final capacidadeTotalLitros = capacidadeTotalM3 * 1000;
+      
+      final capacidadeComoTexto = NumberFormat('#,##0', 'pt_BR').format(capacidadeTotalLitros.toInt());
 
-      final bateCapacidade = capacidadeBuscada != null
-          ? capacidadeTotal == capacidadeBuscada
+      final bateCapacidade = capacidadeBuscadaLitros != null
+          ? (capacidadeTotalLitros >= capacidadeBuscadaLitros - 100 && capacidadeTotalLitros <= capacidadeBuscadaLitros + 100) // Margem para filtro aproximado
           : capacidadeComoTexto.contains(filtro);
 
       return placa.contains(filtro) ||
@@ -873,12 +927,14 @@ class _VeiculosPageState extends State<VeiculosPage> {
     });
   }
 
-  Color _getCorBoca(int capacidade) {
+  Color _getCorBoca(num capacidade) {
     final cores = [
       Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red,
       Colors.teal, Colors.indigo, Colors.deepOrange, Colors.cyan, Colors.lime,
     ];
-    return cores[capacidade % cores.length];
+    // Usa o valor em Litros (inteiro) para escolher a cor
+    final indexCor = (capacidade * 1000).toInt();
+    return cores[indexCor % cores.length];
   }
 
   String _getNomeTransportadora(Map<String, dynamic> veiculo) {
@@ -1011,11 +1067,13 @@ class _VeiculosPageState extends State<VeiculosPage> {
                 ? _buildVeiculosList()
                 : _abaAtual == 1
                     ? ConjuntosPage(
+                        key: ValueKey('conjuntos-$_conjuntosRefreshToken'),
                         buscaController: _buscaConjuntosController,
                       )
                     : VeiculosGeralPage(
                         key: ValueKey('terceiros-$_terceirosRefreshToken'),
                         filtro: _filtroTerceiros,
+                        onRefresh: _carregarVeiculos,
                       ),
           ),
         ],
@@ -1304,7 +1362,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
                                                     borderRadius: BorderRadius.circular(10),
                                                   ),
                                                   child: Text(
-                                                    '$capacidade',
+                                                    NumberFormat('#,##0', 'pt_BR').format((capacidade * 1000).toInt()),
                                                     style: TextStyle(
                                                       color: _getCorBoca(capacidade),
                                                       fontSize: 10,
@@ -1341,7 +1399,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
                                                   size: 12, color: Colors.blueGrey),
                                               const SizedBox(width: 4),
                                               Text(
-                                                '$totalTanques',
+                                                NumberFormat('#,##0', 'pt_BR').format((totalTanques * 1000).toInt()),
                                                 style: const TextStyle(
                                                   color: Colors.blueGrey,
                                                   fontSize: 11,

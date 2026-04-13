@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
 enum TipoCadastroVeiculo { proprios, terceiros }
 
@@ -48,6 +49,8 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
   final List<TextEditingController> _renavamControllers = [];
   final List<TextEditingController> _transportadoraControllers = [];
   final _transportadoraIdController = TextEditingController();
+  final _searchController = TextEditingController();
+  final LayerLink _layerLink = LayerLink();
   bool _carregandoTransportadoras = false;
   List<Map<String, dynamic>> _transportadoras = [];
   String? _selectedTransportadoraId;
@@ -78,6 +81,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
       controller.dispose();
     }
     _transportadoraIdController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -152,7 +156,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
     if (widget.tipoCadastro == TipoCadastroVeiculo.proprios && _placas.length >= 1) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('No cadastro de veículos, apenas 1 placa por vez.'),
+          content: const Text('No cadastro de veículos próprios, apenas 1 placa por vez.'),
           backgroundColor: Colors.orange[700],
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -164,7 +168,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
     if (_placas.length >= 3) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Limite máximo de 3 placas por veículo'),
+          content: const Text('Limite máximo de 3 placas por cadastro'),
           backgroundColor: Colors.orange[700],
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
@@ -178,7 +182,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
         'placa': '',
         'renavam': '',
         'transportadora': '',
-        'tanques': <int>[],
+        'tanques': <double>[], // Alterado para double
       };
       _placas.add(novaPlaca);
       _placaControllers.add(TextEditingController());
@@ -222,6 +226,27 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
     });
   }
 
+  // Método auxiliar para converter vírgula para ponto
+  // Método auxiliar para converter vírgula para ponto e agora tratar o ponto de milhar
+  String _normalizeDecimal(String value) {
+    // Para compartimentos, agora digitamos em litros com ponto de milhar "12.345"
+    // Removemos os pontos para ter o valor numérico puro
+    return value.replaceAll('.', '').replaceAll(',', '.');
+  }
+
+  // Método auxiliar para formatar número para exibição
+  String _formatDecimal(double value) {
+    // Se o valor for litros (ex: 12345), formatamos com ponto pt_BR
+    return NumberFormat('#,##0', 'pt_BR').format(value.toInt());
+  }
+
+  String _formatarCampo(String valor) {
+    if (valor.isEmpty) return '';
+    final numero = int.tryParse(valor.replaceAll('.', ''));
+    if (numero == null) return valor;
+    return NumberFormat('#,##0', 'pt_BR').format(numero);
+  }
+
   Future<void> _salvarPlacas() async {
     // Validação básica
     for (var i = 0; i < _placas.length; i++) {
@@ -237,7 +262,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
         return;
       }
 
-      final tanques = List<int>.from(_placas[i]['tanques'] ?? []);
+      final tanques = List<double>.from(_placas[i]['tanques'] ?? []);
       final possuiCompartimentoPreenchido = tanques.any((valor) => valor > 0);
 
       if (!possuiCompartimentoPreenchido) {
@@ -325,25 +350,29 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
         return;
       }
 
-      final tabelaDestino = widget.tipoCadastro == TipoCadastroVeiculo.proprios
-          ? 'equipamentos'
-          : 'veiculos_geral';
+      // Alterado: agora usa 'veiculos' para ambos os tipos
+      final tabelaDestino = 'veiculos';
 
       for (var i = 0; i < _placas.length; i++) {
+        // Converte os tanques de Litros (Interface) para m3 (Banco de Dados)
+        final tanquesLitros = List<double>.from(_placas[i]['tanques'] ?? []);
+        final tanquesM3 = tanquesLitros.map((l) => l / 1000).toList();
+
         final dados = {
           'placa': _placaControllers[i].text.toUpperCase(),
-          'tanques': _placas[i]['tanques'] ?? [],
+          'tanques': tanquesM3, // Salva em m³
           'transportadora_id': _selectedTransportadoraId,
           'renavam': _renavamControllers[i].text.isNotEmpty 
               ? _renavamControllers[i].text 
               : null,
+          'status': 'ativo', // Status padrão
         };
 
         await Supabase.instance.client
-      .from(tabelaDestino)
-      .insert(dados)
-      .select('id')
-      .single();
+          .from(tabelaDestino)
+          .insert(dados)
+          .select('id')
+          .single();
       }
 
       if (mounted) {
@@ -378,9 +407,9 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
   void _adicionarTanque(int placaIndex) {
     setState(() {
       if (_placas[placaIndex]['tanques'] == null) {
-        _placas[placaIndex]['tanques'] = <int>[];
+        _placas[placaIndex]['tanques'] = <double>[];
       }
-      (_placas[placaIndex]['tanques'] as List).add(0);
+      (_placas[placaIndex]['tanques'] as List).add(0.0);
     });
   }
 
@@ -391,8 +420,10 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
   }
 
   void _atualizarTanque(int placaIndex, int tanqueIndex, String valor) {
-    final numero = int.tryParse(valor);
-    if (numero != null) {
+    // Normaliza vírgula para ponto
+    valor = _normalizeDecimal(valor);
+    final numero = double.tryParse(valor);
+    if (numero != null && numero >= 0) {
       setState(() {
         _placas[placaIndex]['tanques'][tanqueIndex] = numero;
       });
@@ -491,59 +522,121 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: _carregandoTransportadoras
-                          ? const Padding(
-                              padding: EdgeInsets.all(10),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text('Carregando...', style: TextStyle(fontSize: 12)),
-                                ],
-                              ),
-                            )
-                          : DropdownButtonFormField<String>(
-                              value: _selectedTransportadoraId,
-                              hint: const Text('Selecionar transportadora', style: TextStyle(fontSize: 13)),
-                              isExpanded: true,
-                              decoration: const InputDecoration(
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              ),
-                              items: _transportadoras.map((t) {
-                                return DropdownMenuItem<String>(
-                                  value: t['id'].toString(),
-                                  child: Text(
-                                    t['nome'] ?? '--',
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return CompositedTransformTarget(
+                          link: _layerLink,
+                          child: RawAutocomplete<Map<String, dynamic>>(
+                            optionsBuilder: (TextEditingValue textEditingValue) {
+                              if (_transportadoras.isEmpty) return const Iterable.empty();
+                              return _transportadoras.where((t) {
+                                return (t['nome'] ?? '')
+                                    .toString()
+                                    .toLowerCase()
+                                    .contains(textEditingValue.text.toLowerCase());
+                              });
+                            },
+                            displayStringForOption: (option) => (option['nome'] ?? '').toString(),
+                            onSelected: (option) {
+                              final id = option['id'].toString();
+                              final nome = (option['nome'] ?? '').toString();
+                              setState(() {
+                                _selectedTransportadoraId = id;
+                                for (final controller in _transportadoraControllers) {
+                                  controller.text = nome;
+                                }
+                              });
+                            },
+                            fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+                              // Sincroniza o texto inicial se já houver seleção
+                              if (_selectedTransportadoraId != null && textController.text.isEmpty) {
+                                final selected = _transportadoras.firstWhere(
+                                  (t) => t['id'].toString() == _selectedTransportadoraId,
+                                  orElse: () => {'nome': ''},
                                 );
-                              }).toList(),
-                              onChanged: (value) {
-                                final nomeSelecionado = _transportadoras
-                                    .firstWhere(
-                                      (t) => t['id'].toString() == value,
-                                      orElse: () => {'nome': ''},
-                                    )['nome']
-                                    .toString();
+                                textController.text = (selected['nome'] ?? '').toString();
+                              }
 
-                                setState(() {
-                                  _selectedTransportadoraId = value;
-                                  for (final controller in _transportadoraControllers) {
-                                    controller.text = nomeSelecionado;
-                                  }
-                                });
-                              },
-                            ),
+                              return Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.grey[300]!),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  children: [
+                                    if (_carregandoTransportadoras)
+                                      const Padding(
+                                        padding: EdgeInsets.only(left: 12),
+                                        child: SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                      ),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: textController,
+                                        focusNode: focusNode,
+                                        style: const TextStyle(fontSize: 13),
+                                        decoration: InputDecoration(
+                                          hintText: _carregandoTransportadoras ? 'Carregando...' : 'Selecionar transportadora',
+                                          border: InputBorder.none,
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                          constraints: const BoxConstraints(maxWidth: 300),
+                                        ),
+                                        onSubmitted: (value) => onFieldSubmitted(),
+                                      ),
+                                    ),
+                                    const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                                    const SizedBox(width: 8),
+                                  ],
+                                ),
+                              );
+                            },
+                            optionsViewBuilder: (context, onSelected, options) {
+                              return Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 4,
+                                  color: Colors.white,
+                                  borderRadius: const BorderRadius.only(
+                                    bottomLeft: Radius.circular(4),
+                                    bottomRight: Radius.circular(4),
+                                  ),
+                                  child: Container(
+                                    width: constraints.maxWidth,
+                                    constraints: const BoxConstraints(
+                                      maxHeight: 400,
+                                      maxWidth: 300,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(color: Colors.grey[300]!),
+                                    ),
+                                    child: ListView.builder(
+                                      padding: EdgeInsets.zero,
+                                      shrinkWrap: true,
+                                      itemCount: options.length,
+                                      itemBuilder: (BuildContext context, int index) {
+                                        final option = options.elementAt(index);
+                                        return InkWell(
+                                          onTap: () => onSelected(option),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: Text(
+                                              (option['nome'] ?? '').toString(),
+                                              style: const TextStyle(fontSize: 13),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -727,7 +820,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
                 ),
                 const SizedBox(height: 12),
                 
-                // Documentos - Renavan e Transportadora específica
+                // Documentos - Renavam e Transportadora específica
                 Text(
                   'Documentos',
                   style: TextStyle(
@@ -748,7 +841,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
                         maxLength: 15,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         decoration: InputDecoration(
-                          label: Text('Renavan', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                          label: Text('Renavam', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(4),
                             borderSide: BorderSide(color: Colors.grey[300]!),
@@ -817,7 +910,7 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Compartimentos',
+                      'Compartimentos (L)',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -857,20 +950,42 @@ class _DialogCadastroPlacasState extends State<DialogCadastroPlacas>
                   ...List.generate(
                     (_placas[index]['tanques'] as List).length,
                     (tanqueIndex) {
+                      final valorAtual = _placas[index]['tanques'][tanqueIndex] as double;
+                      final controller = TextEditingController(
+                        text: valorAtual > 0 ? _formatDecimal(valorAtual) : '',
+                      );
+                      
+                      // Posiciona o cursor no final
+                      controller.selection = TextSelection.fromPosition(
+                        TextPosition(offset: controller.text.length),
+                      );
+
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: Row(
                           children: [
                             Expanded(
                               child: TextField(
+                                controller: controller,
                                 style: const TextStyle(fontSize: 13),
                                 keyboardType: TextInputType.number,
-                                maxLength: 2,
-                                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                                onChanged: (value) => _atualizarTanque(index, tanqueIndex, value),
+                                maxLength: 5, // Limite de 6 caracteres (ex: 12.345)
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                onChanged: (value) {
+                                  final formatado = _formatarCampo(value);
+                                  if (formatado != value) {
+                                    controller.text = formatado;
+                                    controller.selection = TextSelection.fromPosition(
+                                      TextPosition(offset: controller.text.length),
+                                    );
+                                  }
+                                  _atualizarTanque(index, tanqueIndex, formatado);
+                                },
                                 decoration: InputDecoration(
                                   label: Text(
-                                    'Compartimento ${tanqueIndex + 1} (m³)',
+                                    'Compartimento ${tanqueIndex + 1}',
                                     style: TextStyle(fontSize: 11, color: Colors.grey[700]),
                                   ),
                                   border: OutlineInputBorder(
