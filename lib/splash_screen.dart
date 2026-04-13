@@ -109,38 +109,102 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _mostrarDialogAtualizacao() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text(
-            'Atualização Disponível',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: const Text(
-            'Uma nova versão do aplicativo está disponível.\n\n'
-            'Por favor, atualize para continuar usando o app.',
-            style: TextStyle(fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _recarregarApp();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF0A4B78),
-              ),
-              child: const Text(
-                'ATUALIZAR AGORA',
-                style: TextStyle(fontWeight: FontWeight.bold),
+    // Tenta obter a versão do servidor novamente para exibir no dialog
+    _verificarVersaoServidor().then((versaoServidor) {
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1E1E1E),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Colors.white24, width: 1),
+            ),
+            title: const Text(
+              'Atualização Disponível',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
-          ],
-        );
-      },
-    );
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Uma nova versão do aplicativo está disponível.',
+                  style: TextStyle(fontSize: 14, color: Colors.white70),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.system_update_alt, color: Colors.white24, size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Nova versão: v$versaoServidor',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _recarregarApp();
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF0A4B78),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'ATUALIZAR AGORA',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    });
+  }
+
+  /// Helper para pegar a versão do servidor sem cache
+  Future<String> _verificarVersaoServidor() async {
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final baseUrl = Uri.base.origin;
+      final response = await http.get(
+        Uri.parse('$baseUrl/version.json?t=$timestamp'),
+      ).timeout(const Duration(seconds: 3));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['versao']?.toString() ?? '...';
+      }
+    } catch (_) {}
+    return '...';
   }
 
   void _recarregarApp() {
