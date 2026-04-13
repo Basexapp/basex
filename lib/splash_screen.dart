@@ -125,45 +125,24 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             title: const Text(
               'Atualização Disponível',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
-            content: Column(
+            content: const Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   'Uma nova versão do aplicativo está disponível.',
+                  textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 14, color: Colors.white70),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white10),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.system_update_alt, color: Colors.white24, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Nova versão: v$versaoServidor',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white54,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ],
             ),
+            actionsAlignment: MainAxisAlignment.center,
             actions: [
               TextButton(
                 onPressed: () {

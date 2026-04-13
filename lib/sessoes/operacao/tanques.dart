@@ -67,7 +67,90 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     return int.tryParse(match.group(1) ?? '') ?? 0;
   }
 
-  Future<void> _carregarDados() async {
+  void _mostrarAviso(String mensagem, {bool erro = true}) {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 350),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 10.0,
+                    offset: const Offset(0.0, 10.0),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: erro ? Colors.red.shade50 : Colors.green.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      erro ? Icons.error_outline : Icons.check_circle_outline,
+                      color: erro ? Colors.red : Colors.green,
+                      size: 40,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                Text(
+                  erro ? 'Atenção' : 'Sucesso',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: _ink,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  mensagem,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: _muted),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: erro ? Colors.red : Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _carregarDados() async {
     try {
       final supabase = Supabase.instance.client;
       final usuario = UsuarioAtual.instance!;
@@ -294,12 +377,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao carregar CACLs: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _mostrarAviso('Erro ao carregar CACLs: $e');
       }
     } finally {
       if (mounted) {
@@ -520,9 +598,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
 
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao preparar CACL Verificação: $e'), backgroundColor: Colors.red),
-        );
+        _mostrarAviso('Erro ao preparar CACL Verificação: $e');
       }
     } finally {
       if (mounted) setState(() => _carregandoCacls = false);
@@ -627,12 +703,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     
     if (valorNumerico < 1000) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('A capacidade deve ser de no mínimo 1.000 litros'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _mostrarAviso('A capacidade deve ser de no mínimo 1.000 litros');
       }
       return;
     }
@@ -650,14 +721,94 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
 
       if (idTerminal == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('Erro: Não foi possível determinar o terminal'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          _mostrarAviso('Erro: Não foi possível determinar o terminal');
         }
         return;
+      }
+
+      // Validação: verificar CACL pendente
+      if (_tanqueEditando != null) {
+        final tanqueId = _tanqueEditando!['id'];
+
+        final caclPendente = await supabase
+            .from('cacl')
+            .select('id')
+            .eq('tanque_id', tanqueId)
+            .eq('status', 'pendente')
+            .limit(1);
+
+        if (caclPendente.isNotEmpty) {
+          if (mounted) {
+            _mostrarAviso('Não é possível realizar a alteração: existe um CACL pendente para este tanque.');
+          }
+          return;
+        }
+
+        // Validação: verificar estoque > 0 se o produto está sendo alterado
+        final produtoOriginal = _tanqueEditando!['id_produto']?.toString();
+        final produtoNovo = _produtoSelecionado?.toString();
+        final produtoAlterado = produtoOriginal != produtoNovo;
+
+        if (produtoAlterado) {
+          final agora = DateTime.now();
+          final inicioMes = DateTime(agora.year, agora.month, 1);
+          final fimMes = DateTime(agora.year, agora.month + 1, 0, 23, 59, 59);
+          final dataRefStr = inicioMes.toIso8601String().split('T')[0];
+
+          num estoqueInicial = 0;
+          try {
+            final responseEstoque = await supabase.rpc(
+              'fn_estoque_inicial_mes_tanque',
+              params: {
+                'p_tanque_id': tanqueId,
+                'p_data': dataRefStr,
+              },
+            );
+            estoqueInicial = (responseEstoque['estoque_inicial'] ?? 0) as num;
+          } catch (_) {
+            estoqueInicial = 0;
+          }
+
+          final movimentacoes = await supabase
+              .from('movimentacoes_tanque')
+              .select('entrada_vinte, saida_vinte, tipo_mov, descricao, cliente')
+              .eq('tanque_id', tanqueId)
+              .gte('data_mov', inicioMes.toIso8601String())
+              .lte('data_mov', fimMes.toIso8601String());
+
+          num totalEntradas = 0;
+          num totalSaidas = 0;
+          num totalSobraPerda = 0;
+
+          for (final mov in movimentacoes) {
+            final num entradaVinte = (mov['entrada_vinte'] ?? 0) as num;
+            final num saidaVinte = (mov['saida_vinte'] ?? 0) as num;
+            final String tipo = (mov['tipo_mov']?.toString() ?? '').toLowerCase();
+            final String desc = (mov['descricao']?.toString() ?? '').toLowerCase();
+            final String cli = (mov['cliente']?.toString() ?? '').toLowerCase();
+
+            final bool eSobra = tipo.contains('sobra') || desc.contains('sobra') || cli.contains('sobra');
+            final bool ePerda = tipo.contains('perda') || desc.contains('perda') || cli.contains('perda');
+
+            if (eSobra) {
+              totalSobraPerda += entradaVinte;
+            } else if (ePerda) {
+              totalSobraPerda -= saidaVinte;
+            } else {
+              totalEntradas += entradaVinte;
+              totalSaidas += saidaVinte;
+            }
+          }
+
+          final saldoFinal = estoqueInicial + totalEntradas - totalSaidas + totalSobraPerda;
+
+          if (saldoFinal > 0) {
+            if (mounted) {
+              _mostrarAviso('Não é possível realizar a alteração');
+            }
+            return;
+          }
+        }
       }
 
       final Map<String, dynamic> dadosAtualizados = {
@@ -682,23 +833,13 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         final String referencia = _referenciaController.text.trim();
         final String acao = _tanqueEditando != null ? 'editado' : 'criado';
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Tanque $referencia $acao com sucesso!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        _mostrarAviso('Tanque $referencia $acao com sucesso!', erro: false);
       }
 
       _cancelarEdicao();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao salvar tanque: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _mostrarAviso('Erro ao salvar tanque: $e');
       }
     }
   }
@@ -2123,16 +2264,91 @@ class _SelecaoTipoVisualizacaoBottomSheetState extends State<_SelecaoTipoVisuali
 
   void _visualizar() {
     if (!_tipoDataEspecifica && !_tipoMensal) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecione um tipo de visualização'),
-          backgroundColor: Colors.orange,
-        ),
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return Dialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 0,
+              backgroundColor: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 350),
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.rectangle,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 10.0,
+                        offset: const Offset(0.0, 10.0),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.error_outline,
+                        color: Colors.red,
+                        size: 40,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Atenção',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0E1C2F),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Selecione um tipo de visualização',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Color(0xFF5A6B7A)),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'OK',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       );
-      return;
     }
+    return;
+  }
 
-    Navigator.pop(context);
+  Navigator.pop(context);
 
     if (_tipoDataEspecifica) {
       Navigator.of(context).push(
