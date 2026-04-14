@@ -53,6 +53,30 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
   String? _produtoSelecionado;
   String? _statusSelecionado;
 
+  bool _houveAlteracao() {
+    if (_tanqueEditando == null) {
+      // Caso de criação de novo tanque (se as variáveis estiverem vazias, não houve alteração)
+      return _referenciaController.text.isNotEmpty ||
+          _capacidadeController.text.isNotEmpty ||
+          _produtoSelecionado != null ||
+          _statusSelecionado != null ||
+          _lastroController.text.isNotEmpty;
+    }
+
+    // Comparação para edição de tanque existente
+    final refOriginal = _tanqueEditando!['referencia']?.toString() ?? '';
+    final capOriginal = _formatarMilhar(_tanqueEditando!['capacidade']);
+    final prodOriginal = _tanqueEditando!['id_produto']?.toString();
+    final statusOriginal = _tanqueEditando!['status']?.toString();
+    final lastroOriginal = _formatarMilhar(_tanqueEditando!['lastro']);
+
+    return _referenciaController.text != refOriginal ||
+        _capacidadeController.text != capOriginal ||
+        _produtoSelecionado != prodOriginal ||
+        _statusSelecionado != statusOriginal ||
+        _lastroController.text != lastroOriginal;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -386,6 +410,210 @@ Future<void> _carregarDados() async {
         });
       }
     }
+  }
+
+  Future<void> _cancelarCacl(String caclId) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Primeiro, verificar se existe registro na tabela movimentacoes_tanque
+      final movimentacaoExistente = await supabase
+          .from('movimentacoes_tanque')
+          .select('id')
+          .eq('cacl_id', caclId)
+          .maybeSingle();
+
+      // Se existir, remover o registro
+      if (movimentacaoExistente != null) {
+        await supabase
+            .from('movimentacoes_tanque')
+            .delete()
+            .eq('cacl_id', caclId);
+      }
+
+      // Depois, atualizar o status do CACL para cancelado
+      await supabase
+          .from('cacl')
+          .update({'status': 'cancelado'}).eq('id', caclId);
+
+      if (mounted) {
+        _showDialogSucessoCancelamento();
+        final tanqueId = _tanqueSelecionadoParaAcoes?['id']?.toString();
+        if (tanqueId != null && tanqueId.isNotEmpty) {
+          await _carregarCaclsDoTanque(tanqueId);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao cancelar CACL: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _showDialogSucessoCancelamento() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: _accent, width: 1),
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.check_circle_outline,
+                      color: Colors.green, size: 48),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'CACL cancelado com sucesso.',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _ink,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _accent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showDialogConfirmarCancelamento(Map<String, dynamic> cacl) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: _accent, width: 1),
+          ),
+          elevation: 8,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 400,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.red.shade700,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Confirmar Cancelamento',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: _ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Tem certeza que quer cancelar o CACL já emitido?\n\n'
+                    'Esta ação também removerá todas as movimentações de tanque associadas a este CACL.',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.black87,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Voltar',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color.fromARGB(255, 102, 102, 102),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          await _cancelarCacl(cacl['id'].toString());
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 2,
+                        ),
+                        child: const Text(
+                          'Sim, cancelar.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   String _formatarInicio(dynamic data, dynamic horarioInicial) {
@@ -726,30 +954,36 @@ Future<void> _carregarDados() async {
         return;
       }
 
-      // Validação: verificar CACL pendente
+      // Validação: verificar se o produto está sendo alterado
       if (_tanqueEditando != null) {
         final tanqueId = _tanqueEditando!['id'];
-
-        final caclPendente = await supabase
-            .from('cacl')
-            .select('id')
-            .eq('tanque_id', tanqueId)
-            .eq('status', 'pendente')
-            .limit(1);
-
-        if (caclPendente.isNotEmpty) {
-          if (mounted) {
-            _mostrarAviso('Não é possível realizar a alteração: existe um CACL pendente para este tanque.');
-          }
-          return;
-        }
-
-        // Validação: verificar estoque > 0 se o produto está sendo alterado
         final produtoOriginal = _tanqueEditando!['id_produto']?.toString();
         final produtoNovo = _produtoSelecionado?.toString();
         final produtoAlterado = produtoOriginal != produtoNovo;
 
         if (produtoAlterado) {
+          // Validação: verificar CACL pendente
+          final caclPendente = await supabase
+              .from('cacl')
+              .select('id')
+              .eq('tanque_id', tanqueId)
+              .eq('status', 'pendente')
+              .limit(1);
+
+          if (caclPendente.isNotEmpty) {
+            if (mounted) {
+              _mostrarAviso(
+                  'Não é possível alterar o produto: existe um CACL pendente para este tanque.');
+
+              // Retorna o produto ao estado anterior
+              setState(() {
+                _produtoSelecionado = produtoOriginal;
+              });
+            }
+            return;
+          }
+
+          // Validação: verificar estoque > 0
           final agora = DateTime.now();
           final inicioMes = DateTime(agora.year, agora.month, 1);
           final fimMes = DateTime(agora.year, agora.month + 1, 0, 23, 59, 59);
@@ -783,12 +1017,18 @@ Future<void> _carregarDados() async {
           for (final mov in movimentacoes) {
             final num entradaVinte = (mov['entrada_vinte'] ?? 0) as num;
             final num saidaVinte = (mov['saida_vinte'] ?? 0) as num;
-            final String tipo = (mov['tipo_mov']?.toString() ?? '').toLowerCase();
-            final String desc = (mov['descricao']?.toString() ?? '').toLowerCase();
+            final String tipo =
+                (mov['tipo_mov']?.toString() ?? '').toLowerCase();
+            final String desc =
+                (mov['descricao']?.toString() ?? '').toLowerCase();
             final String cli = (mov['cliente']?.toString() ?? '').toLowerCase();
 
-            final bool eSobra = tipo.contains('sobra') || desc.contains('sobra') || cli.contains('sobra');
-            final bool ePerda = tipo.contains('perda') || desc.contains('perda') || cli.contains('perda');
+            final bool eSobra = tipo.contains('sobra') ||
+                desc.contains('sobra') ||
+                cli.contains('sobra');
+            final bool ePerda = tipo.contains('perda') ||
+                desc.contains('perda') ||
+                cli.contains('perda');
 
             if (eSobra) {
               totalSobraPerda += entradaVinte;
@@ -800,11 +1040,18 @@ Future<void> _carregarDados() async {
             }
           }
 
-          final saldoFinal = estoqueInicial + totalEntradas - totalSaidas + totalSobraPerda;
+          final saldoFinal =
+              estoqueInicial + totalEntradas - totalSaidas + totalSobraPerda;
 
           if (saldoFinal > 0) {
             if (mounted) {
-              _mostrarAviso('Não é possível realizar a alteração');
+              _mostrarAviso(
+                  'Não é possível alterar o produto porque o tanque ainda possui estoque residual.');
+
+              // Retorna o produto ao estado anterior
+              setState(() {
+                _produtoSelecionado = produtoOriginal;
+              });
             }
             return;
           }
@@ -1244,11 +1491,11 @@ Future<void> _carregarDados() async {
                             const SizedBox(width: 12),
                             Expanded(
                               child: ElevatedButton(
-                                onPressed: _salvarTanque,
+                                onPressed: _houveAlteracao() ? _salvarTanque : null,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _ink,
+                                  backgroundColor: _houveAlteracao() ? _ink : Colors.grey.shade300,
                                   padding: const EdgeInsets.symmetric(vertical: 12),
-                                  foregroundColor: Colors.white,
+                                  foregroundColor: _houveAlteracao() ? Colors.white : Colors.grey.shade500,
                                 ),
                                 child: const Text('Salvar'),
                               ),
@@ -1635,6 +1882,8 @@ Future<void> _carregarDados() async {
                                         Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.end,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
                                             Container(
                                               padding:
@@ -1651,12 +1900,30 @@ Future<void> _carregarDados() async {
                                                 statusText,
                                                 style: TextStyle(
                                                   fontSize: 11,
-                                                  fontWeight:
-                                                      FontWeight.w600,
+                                                  fontWeight: FontWeight.w600,
                                                   color: statusColor,
                                                 ),
                                               ),
                                             ),
+                                            if (!isCancelado)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                    top: 8.0),
+                                                child: IconButton(
+                                                  icon: const Icon(
+                                                    Icons.cancel_outlined,
+                                                    color: Colors.red,
+                                                    size: 20,
+                                                  ),
+                                                  onPressed: () =>
+                                                      _showDialogConfirmarCancelamento(
+                                                          cacl),
+                                                  tooltip: 'Cancelar CACL',
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                  padding: EdgeInsets.zero,
+                                                ),
+                                              ),
                                           ],
                                         ),
                                       ],

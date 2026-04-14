@@ -303,18 +303,19 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                         });
                       },
                       child: SizedBox(
-                        height: 62,
-                        width: 100,
+                        height: 70,
+                        width: 110,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 180),
                           curve: Curves.easeOut,
+                          alignment: Alignment.center,
                           transform:
                               _hoverIndex == -1 && tanqueSelecionadoIndex != -1
-                              ? (Matrix4.identity()..scale(1.0, 1.08))
+                              ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
                               : Matrix4.identity(),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 9,
+                            horizontal: 8,
+                            vertical: 6,
                           ),
                           decoration: BoxDecoration(
                             color: tanqueSelecionadoIndex == -1
@@ -341,6 +342,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                             children: [
                               Text(
                                 'Todos',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: tanqueSelecionadoIndex == -1
                                       ? const Color(0xFFF8F9FA)
@@ -389,17 +391,18 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                           });
                         },
                         child: SizedBox(
-                          height: 62,
-                          width: 100,
+                          height: 70, // Aumentado para acomodar quebras de linha
+                          width: 110, // Aumentado levemente para dar mais espaço lateral
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
                             curve: Curves.easeOut,
+                            alignment: Alignment.center, // Centraliza o conteúdo internally
                             transform: isHovered && !isSelected
-                                ? (Matrix4.identity()..scale(1.0, 1.08))
+                                ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
                                 : Matrix4.identity(),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 9,
+                              horizontal: 8, // Reduzido o padding horizontal para favorecer o texto
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: isSelected
@@ -433,6 +436,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                               children: [
                                 Text(
                                   tanque.nome.split(' - ').first,
+                                  textAlign: TextAlign.center, // Centraliza o texto
                                   style: TextStyle(
                                     color: isSelected
                                         ? const Color(0xFFF8F9FA)
@@ -441,10 +445,13 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                if (tanque.nome.contains(' - '))
+                                if (tanque.nome.contains(' - ')) ...[
+                                  const SizedBox(height: 2),
                                   Text(
                                     tanque.nome.split(' - ').last,
+                                    textAlign: TextAlign.center, // Alinhamento central para quebra de linha
+                                    maxLines: 2, // Permite quebra em até 2 linhas para o nome do produto
+                                    overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color: isSelected
                                           ? const Color(0xFFBFC8E6)
@@ -457,6 +464,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                                           : FontWeight.w400,
                                     ),
                                   ),
+                                ],
                               ],
                             ),
                           ),
