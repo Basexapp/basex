@@ -672,7 +672,7 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                 child: Text(
-                  "Total de entradas no período:",
+                  "Total de entradas no período (20°):",
                   style: const TextStyle(fontSize: 11),
                 ),
               ),
@@ -699,7 +699,7 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                 child: Text(
-                  "Total de saídas no período:",
+                  "Total de saídas no período (20°):",
                   style: const TextStyle(fontSize: 11),
                 ),
               ),
@@ -726,7 +726,7 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                 child: Text(
-                  "Estoque final calculado:",
+                  "Estoque final calculado (20°C):",
                   style: const TextStyle(fontSize: 11),
                 ),
               ),

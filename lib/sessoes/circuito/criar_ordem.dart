@@ -253,6 +253,7 @@ class _CriarOrdemPageState extends State<CriarOrdemPage> {
       final agoraSaoPaulo = DateTime.now().toUtc().subtract(const Duration(hours: 3));
       final usuario = UsuarioAtual.instance;
       final quantidadeAmb = int.tryParse(_qtdAmbCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+      final quantidadeVinte = int.tryParse(_qtd20Ctrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
 
       final ordem = await supabase.from('ordens').insert({
         'empresa_id': usuario!.empresaId,
@@ -279,7 +280,7 @@ class _CriarOrdemPageState extends State<CriarOrdemPage> {
         'filial_id': usuario.filialId,
         'descricao': '$_tipoOp - ${_origemCtrl.text}',
         'cliente': _origemCtrl.text,
-        'quantidade': quantidadeAmb,
+        'qtd_faturada': quantidadeVinte,
         'entrada_amb': _tipoOperacao == 'Entrada' ? quantidadeAmb : null,
         'entrada_vinte': null,
         'saida_amb': _tipoOperacao == 'Saída' ? quantidadeAmb : null,

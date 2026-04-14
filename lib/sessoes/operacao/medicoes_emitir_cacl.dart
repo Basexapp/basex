@@ -185,23 +185,8 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
 
         _focusNodes.add(List.generate(19, (_) => FocusNode()));
 
-        // Listeners para os 6 campos obrigatórios da 1ª medição (0-5)
-        for (int j = 0; j < 6; j++) {
-          _focusNodes[i][j].addListener(() {
-            if (!_focusNodes[i][j].hasFocus && mounted) {
-              _verificarCamposObrigatorios();
-            }
-          });
-
-          _controllers[i][j].addListener(() {
-            if (mounted) {
-              _verificarCamposObrigatorios();
-            }
-          });
-        }
-
-        // Listeners para os campos da segunda medição (posições 9-17) para detectar início do preenchimento
-        for (int j = 9; j <= 17; j++) {
+        // Escutar TODOS os campos para garantir validação em tempo real
+        for (int j = 0; j < 19; j++) {
           _focusNodes[i][j].addListener(() {
             if (!_focusNodes[i][j].hasFocus && mounted) {
               _verificarCamposObrigatorios();
@@ -893,12 +878,15 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Text(
-                                    'Preencha os campos obrigatórios (*) da 1ª medição e selecione um tipo de CACL',
+                                    _caclVerificacao
+                                        ? 'No modo Verificação, complete integralmente cada bloco iniciado (exceto Água/Obs/Faturado).'
+                                        : 'Preencha os campos obrigatórios (*) da 1ª medição e o faturado.',
                                     style: TextStyle(
                                       fontSize: 10,
                                       color: Colors.orange[700],
                                       fontStyle: FontStyle.italic,
                                     ),
+                                    textAlign: TextAlign.center,
                                   ),
                                 ),
                             ],
@@ -1600,33 +1588,53 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
 
   void _verificarCamposObrigatorios() {
     if (tanques.isEmpty || _controllers.isEmpty) {
-      setState(() => _botaoHabilitado = false);
+      if (mounted) setState(() => _botaoHabilitado = false);
       return;
     }
 
     try {
-      final camposObrigatorios = _controllers[_tanqueSelecionadoIndex].sublist(
-        0,
-        6,
-      );
-      final camposPreenchidos = camposObrigatorios.every(
-        (controller) => controller.text.trim().isNotEmpty,
-      );
+      final controllers = _controllers[_tanqueSelecionadoIndex];
 
-      final checkboxMarcada = _caclVerificacao || _caclMovimentacao;
+      bool verificado = false;
 
-      bool faturadoValido = true;
-      if (_caclMovimentacao) {
-        final faturadoTexto = _controllers[_tanqueSelecionadoIndex][17].text
-            .trim();
-        faturadoValido = _parseFaturado(faturadoTexto) > 0;
+      if (_caclVerificacao) {
+        // --- LÓGICA CACL VERIFICAÇÃO ---
+        // Blocos: 1ª Medição (0-5) e 2ª Medição (9-14)
+        // Se algum campo de um bloco for preenchido, o bloco todo torna-se obrigatório.
+        // Campos obrigatórios do bloco: Horário, cm, mm, Temp Tanque, Densidade, Temp Amostra.
+
+        final indicesBloco1 = [0, 1, 2, 3, 4, 5];
+        final indicesBloco2 = [9, 10, 11, 12, 13, 14];
+
+        final bloco1Iniciado = indicesBloco1.any((idx) => controllers[idx].text.trim().isNotEmpty);
+        final bloco2Iniciado = indicesBloco2.any((idx) => controllers[idx].text.trim().isNotEmpty);
+
+        final bloco1Completo = indicesBloco1.every((idx) => controllers[idx].text.trim().isNotEmpty);
+        final bloco2Completo = indicesBloco2.every((idx) => controllers[idx].text.trim().isNotEmpty);
+
+        // Se o usuário começou o bloco 1, ele tem que terminar. Idem para o bloco 2.
+        // E ao menos um bloco deve estar completo para habilitar.
+        final erroBloco1 = bloco1Iniciado && !bloco1Completo;
+        final erroBloco2 = bloco2Iniciado && !bloco2Completo;
+
+        verificado = (bloco1Completo || bloco2Completo) && !erroBloco1 && !erroBloco2;
+      } else if (_caclMovimentacao) {
+        // --- LÓGICA CACL MOVIMENTAÇÃO ---
+        // Exige 1ª medição completa (0-5) + Faturado (17) > 0
+        final camposObrigatorios1 = controllers.sublist(0, 6);
+        final primeiraCompleta = camposObrigatorios1.every((c) => c.text.trim().isNotEmpty);
+        final faturadoTexto = controllers[17].text.trim();
+        final faturadoValido = _parseFaturado(faturadoTexto) > 0;
+
+        verificado = primeiraCompleta && faturadoValido;
+      } else {
+        // Caso nenhum tipo selecionado, exige ao menos a 1ª medição básica para segurança? 
+        // Na verdade, sem tipo selecionado o botão deveria ficar off.
+        verificado = false;
       }
 
-      final botaoPodeHabilitar =
-          camposPreenchidos && checkboxMarcada && faturadoValido;
-
       if (mounted) {
-        setState(() => _botaoHabilitado = botaoPodeHabilitar);
+        setState(() => _botaoHabilitado = verificado);
       }
     } catch (e) {
       print('Erro na verificação: $e');

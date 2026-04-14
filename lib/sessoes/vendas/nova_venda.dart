@@ -617,7 +617,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'descricao': 'venda comum',
             'data_mov': dataMov,
             'ts_mov': hoje.toIso8601String(),
-            'quantidade': capacidadeLitros,
+            'qtd_faturada': capacidadeLitros,
             'anp': false,
             'status_circuito_orig': 1,
             'entrada_amb': 0,
@@ -712,7 +712,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         'placa': [placaVenda.controller.text.trim().toUpperCase()],
         'cliente': tanque.clienteController.text.trim(),
         'forma_pagamento': tanque.pagamentoController.text.trim(),
-        'quantidade': capacidadeLitros,
+        'qtd_faturada': capacidadeLitros,
         'saida_amb': capacidadeLitros,
         'terminal_orig_id': widget.terminalId,
       };
