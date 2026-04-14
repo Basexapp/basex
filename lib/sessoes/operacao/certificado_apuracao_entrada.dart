@@ -1179,7 +1179,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                               }
                                               _calcularDiferenca20C();
                                             },
-                                      decoration: _decoration('Quantidade de origem').copyWith(
+                                      decoration: _decoration('Quantidade faturada').copyWith(
                                         fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
                                       ),
                                     ),
@@ -1190,7 +1190,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       enabled: false,
                                       focusNode: _modoVisualizacao ? null : _focusDestino20,
                                       keyboardType: TextInputType.number,
-                                      decoration: _decoration('Quantidade de destino').copyWith(
+                                      decoration: _decoration('Quantidade apurada (20ºC)').copyWith(
                                         fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
                                       ),
                                     ),
@@ -2140,11 +2140,14 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       if (widget.idMovimentacao != null) {
         final volume20C =
             _converterParaInteiro(campos['destino20']!.text) ?? 0;
+        final volumeAmbiente =
+            _converterParaInteiro(campos['destinoAmb']!.text) ?? 0;
 
         await _atualizarMovimentacaoCompleta(
           movimentacaoId: widget.idMovimentacao!,
           produtoId: produtoId,
           volume20C: volume20C,
+          volumeAmbiente: volumeAmbiente,
         );
       }
 
@@ -2209,15 +2212,25 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     required String movimentacaoId,
     required String produtoId,
     required int volume20C,
+    required int volumeAmbiente,
   }) async {
     try {
       final supabase = Supabase.instance.client;
       final timestampBrasilia = _obterTimestampBrasilia();
       
-      // Usa apenas as 4 colunas padrão: entrada_amb, entrada_vinte, entrada_amb, saida_vinte
+      // 1 - Update na tabela movimentacoes_tanque
+      await supabase
+          .from('movimentacoes_tanque')
+          .update({
+            'entrada_amb': volumeAmbiente,
+          })
+          .eq('movimentacao_id', movimentacaoId);
+
+      // 2 - Update na tabela movimentacoes
       await supabase
           .from('movimentacoes')
           .update({
+            'entrada_amb': volumeAmbiente,
             'entrada_vinte': volume20C,
             'data_descarga': timestampBrasilia,
             'status_circuito_dest': '5',

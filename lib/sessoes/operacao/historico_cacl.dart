@@ -94,14 +94,28 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
       final supabase = Supabase.instance.client;
       final user = supabase.auth.currentUser;
 
-      if (user == null) return null;
+      if (user == null) {
+        print('DEBUG: Supabase auth user is null');
+        return null;
+      }
 
-      return await supabase
+      print('DEBUG: Supabase auth user id: ${user.id}');
+
+      final data = await supabase
           .from('usuarios')
-          .select('id, nome, nivel, id_filial, senha_temporaria, Nome_apelido')
+          .select('id, nome, nivel, id_filial, senha_temporaria, Nome_apelido, terminal_id, empresa_id')
           .eq('id', user.id)
           .maybeSingle();
-    } catch (_) {
+      
+      if (data == null) {
+        print('DEBUG: No user data found in "usuarios" table for id: ${user.id}');
+      } else {
+        print('DEBUG: User data found: $data');
+      }
+
+      return data;
+    } catch (e) {
+      print('DEBUG: Error in _obterDadosUsuario: $e');
       return null;
     }
   }
@@ -118,16 +132,14 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
       _usuarioData = await _obterDadosUsuario();
       
       if (_usuarioData == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Usuário não autenticado'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        print('DEBUG: _usuarioData is null after _obterDadosUsuario');
+        if (mounted) {
+          setState(() => carregando = false);
+        }
         return;
       }
       
-      // Carregar todos os produtos
+      // Carregar produtos
       final produtosResponse = await supabase
           .from('produtos')
           .select('id, nome')
@@ -136,14 +148,55 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
         produtosDisponiveis = List<Map<String, dynamic>>.from(produtosResponse);
       });
 
-      // Carregar todos os terminais
-      final terminaisResponse = await supabase
-          .from('terminais')
-          .select('id, nome')
-          .order('nome');
-      setState(() {
-        terminais = List<Map<String, dynamic>>.from(terminaisResponse);
-      });
+      // Lógica de Terminais baseada no usuário
+      // Prioridade 1: Usuário tem terminal_id fixo
+      if (_usuarioData!['terminal_id'] != null) {
+        terminalSelecionadoId = _usuarioData!['terminal_id'].toString();
+        final terminalResponse = await supabase
+            .from('terminais')
+            .select('id, nome')
+            .eq('id', terminalSelecionadoId!)
+            .single();
+        setState(() {
+          terminais = [terminalResponse];
+        });
+      } 
+      // Prioridade 2: Usuário tem empresa_id (vê terminais da empresa)
+      else if (_usuarioData!['empresa_id'] != null) {
+        final relacoesResponse = await supabase
+            .from('relacoes_terminais')
+            .select('terminal_id')
+            .eq('empresa_id', _usuarioData!['empresa_id']);
+        
+        final listTerminalIds = (relacoesResponse as List)
+            .map((r) => r['terminal_id'].toString())
+            .toList();
+
+        if (listTerminalIds.isNotEmpty) {
+          final terminaisResponse = await supabase
+              .from('terminais')
+              .select('id, nome')
+              .filter('id', 'in', listTerminalIds)
+              .order('nome');
+          setState(() {
+            terminais = List<Map<String, dynamic>>.from(terminaisResponse);
+          });
+        } else {
+          setState(() {
+            terminais = [];
+          });
+        }
+      } 
+      // Prioridade 3: Comportamento padrão (administrador ou sem vínculos específicos)
+      else {
+        final terminaisResponse = await supabase
+            .from('terminais')
+            .select('id, nome')
+            .order('nome');
+        setState(() {
+          terminais = List<Map<String, dynamic>>.from(terminaisResponse);
+        });
+      }
 
       // Carregar todos os tanques
       final tanquesResponse = await supabase
@@ -155,14 +208,18 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
       await _aplicarFiltros();
       
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erro ao carregar dados: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar dados: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
-      setState(() => carregando = false);
+      if (mounted) {
+        setState(() => carregando = false);
+      }
     }
   }
 
@@ -401,7 +458,11 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
                         value: null,
                         child: Text('Todos os tanques', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13)),
                       ),
-                      ...tanquesDisponiveis.map((tanque) {
+                      ...tanquesDisponiveis
+                          .where((tanque) =>
+                              terminalSelecionadoId == null ||
+                              tanque['terminal_id']?.toString() == terminalSelecionadoId)
+                          .map((tanque) {
                         return DropdownMenuItem(
                           value: tanque['id']?.toString(),
                           child: Text(
@@ -435,10 +496,11 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
                     ),
                     isExpanded: true,
                     items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('Todos os terminais', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13)),
-                      ),
+                      if (_usuarioData!['terminal_id'] == null)
+                        const DropdownMenuItem(
+                          value: null,
+                          child: Text('Todos os terminais', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13)),
+                        ),
                       ...terminais.map((terminal) {
                         return DropdownMenuItem(
                           value: terminal['id']?.toString(),
@@ -450,12 +512,14 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
                         );
                       }).toList(),
                     ],
-                    onChanged: (value) {
-                      setState(() {
-                        terminalSelecionadoId = value;
-                      });
-                      _aplicarFiltros();
-                    },
+                    onChanged: _usuarioData!['terminal_id'] != null
+                        ? null // Indisponível para alteração se fixado
+                        : (value) {
+                            setState(() {
+                              terminalSelecionadoId = value;
+                            });
+                            _aplicarFiltros();
+                          },
                   ),
                 ),
 

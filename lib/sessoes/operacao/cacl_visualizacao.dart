@@ -203,8 +203,8 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
       final double totalEntradasBancoAmb = (resultado['total_entradas_ambiente'] ?? 0.0).toDouble();
       final double totalSaidasBancoAmb = (resultado['total_saidas_ambiente'] ?? 0.0).toDouble();
 
-      _totalSaidasAmbienteReal = totalEntradasBancoAmb - totalSaidasBancoAmb;
-      _totalSaidas20Real = totalEntradasBanco20 - totalSaidasBanco20;
+      _totalSaidasAmbienteReal = totalSaidasBancoAmb;
+      _totalSaidas20Real = totalSaidasBanco20;
 
       // 6. MEDIÇÕES - Mapear campos do banco para o formato de exibição
       final medicoesAtualizadas = <String, dynamic>{};
@@ -1046,13 +1046,16 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
       }
 
       setState(() {
-        // ✅ Retornando o saldo ambiente para o cálculo dinâmico do histórico (como solicitado)
-        _totalSaidasAmbienteReal = totalEntradasAmb - totalSaidasAmb;
+        // ✅ CORRETO: Total de saídas é simplesmente totalSaidas20
+        _totalSaidas20Real = totalSaidas20;
+        
+        // Para ambiente, também é simplesmente totalSaidasAmb
+        _totalSaidasAmbienteReal = totalSaidasAmb;
         
         _dadosFormulario['medicoes']['entradaSaidaAmbiente'] =
-            _totalSaidasAmbienteReal.toString();
+            totalSaidasAmb.toString();
         _dadosFormulario['medicoes']['entradaSaida20'] =
-            _totalSaidas20Real.toString();
+            totalSaidas20.toString();
             
         _dadosFormulario['medicoes']['totalEntradasPeriodo'] =
             _formatarVolumeLitros(totalEntradas20);
