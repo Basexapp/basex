@@ -198,9 +198,7 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
       _volumeTotalLiquidoInicial = resultado['volume_total_liquido_inicial']?.toDouble() ?? 0.0;
       _volumeTotalLiquidoFinal = resultado['volume_total_liquido_final']?.toDouble() ?? 0.0;
       
-      final double totalEntradasBanco20 = (resultado['total_entradas'] ?? 0.0).toDouble();
       final double totalSaidasBanco20 = (resultado['total_saidas'] ?? 0.0).toDouble();
-      final double totalEntradasBancoAmb = (resultado['total_entradas_ambiente'] ?? 0.0).toDouble();
       final double totalSaidasBancoAmb = (resultado['total_saidas_ambiente'] ?? 0.0).toDouble();
 
       _totalSaidasAmbienteReal = totalSaidasBancoAmb;
@@ -1033,13 +1031,11 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
           .gte('data_mov', inicioDoDia)
           .lte('data_mov', fimDoDia);
 
-      double totalEntradasAmb = 0;
       double totalSaidasAmb = 0;
       double totalEntradas20 = 0;
       double totalSaidas20 = 0;
 
       for (final m in response) {
-        totalEntradasAmb += (m['entrada_amb'] ?? 0).toDouble();
         totalSaidasAmb += (m['saida_amb'] ?? 0).toDouble();
         totalEntradas20 += (m['entrada_vinte'] ?? 0).toDouble();
         totalSaidas20 += (m['saida_vinte'] ?? 0).toDouble();
