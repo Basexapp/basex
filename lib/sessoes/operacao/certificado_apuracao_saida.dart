@@ -977,6 +977,14 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                 icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
                 onPressed: _voltar,
               ),
+              const Text(
+                'Certificado de Apuração de Volumes - SAÍDA',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0D47A1),
+                ),
+              ),
               if (_modoVisualizacao)
                 Container(
                   margin: const EdgeInsets.only(left: 12),

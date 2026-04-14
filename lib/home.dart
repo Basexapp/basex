@@ -27,7 +27,7 @@ import 'sessoes/gestao_de_frota/veiculos.dart';
 import 'sessoes/gestao_de_frota/transportadoras.dart';
 import 'sessoes/circuito/acompanhamento_ordens.dart';
 import 'sessoes/estoques/transferencias.dart';
-import 'sessoes/operacao/listar_ordens.dart';
+import 'sessoes/operacao/ordens_analises.dart';
 import 'sessoes/laboratorio/temp_dens_media.dart';
 import 'sessoes/suporte/desenvolvedor.dart';
 import 'sessoes/suporte/suporte.dart';

@@ -597,7 +597,7 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
     // ===== SE ESTÁ MOSTRANDO CERTIFICADO =====
     if (_mostrandoCertificado) {
       // Mostrar a página adequada em modo somente visualização
-      if (_ordemTipoOperacao != null && _ordemTipoOperacao == 'entrada') {
+      if (_ordemTipoOperacao != null && _ordemTipoOperacao == 'destino') {
         return Scaffold(
           body: EmitirCertificadoEntrada(
             onVoltar: _voltarParaLista,
@@ -746,7 +746,7 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
                         itemCount: lista.length,
                         itemBuilder: (context, index) {
                           final o = lista[index];
-                          final cor = o['tipo_analise'] == 'entrada' 
+                          final cor = o['tipo_analise'] == 'destino' 
                               ? const Color(0xFF2E7D32) // Verde para entrada
                               : const Color(0xFF0D47A1); // Azul para saída
 
