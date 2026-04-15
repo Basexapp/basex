@@ -1071,7 +1071,7 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
 
         if (!todasApuracoesRealizadas) {
           return Tooltip(
-            message: 'Complete apurações pendentes!\nO fechamento do tanque só é permitido com todas as apurações a 20ºC realizadas.',
+            message: 'Há veículos pendentes no circuito!\nO fechamento do tanque só é permitido com todas as apurações a 20ºC realizadas.',
             preferBelow: false,
             verticalOffset: 30,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

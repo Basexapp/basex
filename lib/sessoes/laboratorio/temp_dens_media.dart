@@ -523,6 +523,15 @@ class _TemperaturaDensidadeMediaPageState
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
+            bool camposPreenchidos() {
+              return _selectedProdutoId != null &&
+                  _horarioController.text.trim().isNotEmpty &&
+                  _placaDialogController.text.trim().isNotEmpty &&
+                  _tempAmostraController.text.trim().isNotEmpty &&
+                  _densidadeObsController.text.trim().isNotEmpty &&
+                  _tempCtController.text.trim().isNotEmpty;
+            }
+
             return Dialog(
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
@@ -642,6 +651,7 @@ class _TemperaturaDensidadeMediaPageState
                   controller: _placaDialogController,
                   inputFormatters: [PlacaMascaraFormatter()],
                   maxLength: 8,
+                  onChanged: (_) => setStateDialog(() {}),
                   decoration: InputDecoration(
                     counterText: '',
                     border: OutlineInputBorder(
@@ -670,6 +680,7 @@ class _TemperaturaDensidadeMediaPageState
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [VirgulaAutomaticaFormatter()],
                   maxLength: 4,
+                  onChanged: (_) => setStateDialog(() {}),
                   decoration: InputDecoration(
                     counterText: '',
                     border: OutlineInputBorder(
@@ -699,6 +710,7 @@ class _TemperaturaDensidadeMediaPageState
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9,]')),
                   ],
                   maxLength: 6,
+                  onChanged: (_) => setStateDialog(() {}),
                   decoration: InputDecoration(
                     counterText: '',
                     border: OutlineInputBorder(
@@ -726,6 +738,7 @@ class _TemperaturaDensidadeMediaPageState
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [VirgulaAutomaticaFormatter()],
                   maxLength: 4,
+                  onChanged: (_) => setStateDialog(() {}),
                   decoration: InputDecoration(
                     counterText: '',
                     border: OutlineInputBorder(
@@ -749,13 +762,15 @@ class _TemperaturaDensidadeMediaPageState
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton(
-                      onPressed: () async {
+                      onPressed: camposPreenchidos() ? () async {
                         Navigator.of(context).pop();
                         await _salvarRegistro();
-                      },
+                      } : null,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D47A1),
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: Colors.grey.shade300,
+                        disabledForegroundColor: Colors.grey.shade500,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 24,
                           vertical: 12,

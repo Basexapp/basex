@@ -36,7 +36,9 @@ class _CalcPageState extends State<CalcPage> {
   double volumeTotalLiquidoInicial = 0;
   double volumeTotalLiquidoFinal = 0;
   double totalSaidasAmbienteReal = 0;
+  double totalEntradasAmbienteReal = 0;
   double totalSaidas20Real = 0;
+  double totalEntradas20Real = 0;
   double _estoqueInicialRPC = 0;
   bool _isGeneratingPDF = false;
   bool _isEmittingCACL = false;
@@ -291,10 +293,16 @@ class _CalcPageState extends State<CalcPage> {
 
         final num totalSaidasRecAmb =
             widget.dadosFormulario['total_saidas_ambiente'] ?? 0;
+        final num totalEntradasRecAmb =
+            widget.dadosFormulario['total_entradas_ambiente'] ?? 0;
         final num totalSaidasRec20 =
             widget.dadosFormulario['total_saidas_periodo'] ?? 0;
+        final num totalEntradasRec20 =
+            widget.dadosFormulario['total_entradas_periodo'] ?? 0;
         totalSaidasAmbienteReal = totalSaidasRecAmb.toDouble();
+        totalEntradasAmbienteReal = totalEntradasRecAmb.toDouble();
         totalSaidas20Real = totalSaidasRec20.toDouble();
+        totalEntradas20Real = totalEntradasRec20.toDouble();
 
         setState(() {
           _caclJaEmitido = true;
@@ -512,6 +520,7 @@ class _CalcPageState extends State<CalcPage> {
                   resultado['total_entradas'];
               medicoesAtualizadas['totalEntradasPeriodo'] =
                   _formatarVolumeLitros(resultado['total_entradas'].toDouble());
+              totalEntradas20Real = resultado['total_entradas'].toDouble();
             }
 
             // ✅ NOVO: Carregar total_saidas_ambiente do banco para o histórico
@@ -527,17 +536,29 @@ class _CalcPageState extends State<CalcPage> {
                 if (tanqueId != null && dataOriginal.isNotEmpty) {
                   final responseMovs = await supabase
                       .from('movimentacoes_tanque')
-                      .select('saida_amb')
+                      .select('entrada_amb, saida_amb, entrada_vinte, saida_vinte')
                       .eq('tanque_id', tanqueId)
                       .gte('data_mov', '$dataOriginal 00:00:00')
                       .lte('data_mov', '$dataOriginal 23:59:59');
 
                   double somaSaidasAmb = 0;
+                  double somaEntradasAmb = 0;
+                  double somaEntradas20 = 0;
+                  double somaSaidas20 = 0;
                   for (final m in responseMovs) {
                     final num sAmb = (m['saida_amb'] ?? 0) as num;
+                    final num eAmb = (m['entrada_amb'] ?? 0) as num;
+                    final num eVinte = (m['entrada_vinte'] ?? 0) as num;
+                    final num sVinte = (m['saida_vinte'] ?? 0) as num;
                     somaSaidasAmb += sAmb.toDouble();
+                    somaEntradasAmb += eAmb.toDouble();
+                    somaEntradas20 += eVinte.toDouble();
+                    somaSaidas20 += sVinte.toDouble();
                   }
                   totalSaidasAmbienteReal = somaSaidasAmb;
+                  totalEntradasAmbienteReal = somaEntradasAmb;
+                  if (totalEntradas20Real == 0) totalEntradas20Real = somaEntradas20;
+                  if (totalSaidas20Real == 0) totalSaidas20Real = somaSaidas20;
                 }
               } catch (e) {
                 debugPrint('Erro ao buscar saídas ambiente no Histórico: $e');
@@ -715,7 +736,9 @@ class _CalcPageState extends State<CalcPage> {
     final volumeTotalFinal = volProdutoFinal;
 
     // ✅ BUSCAR TOTAL DE SAÍDAS AMBIENTE E 20ºC DO DIA (Lógica EstonqueTanquePage)
+    double totalEntradasAmb = 0;
     double totalSaidasAmb = 0;
+    double totalEntradas20 = 0;
     double totalSaidas20 = 0;
     try {
       final supabase = Supabase.instance.client;
@@ -734,15 +757,19 @@ class _CalcPageState extends State<CalcPage> {
       if (tanqueId != null && dataBusca.isNotEmpty) {
         final response = await supabase
             .from('movimentacoes_tanque')
-            .select('saida_amb, saida_vinte')
+            .select('entrada_amb, saida_amb, entrada_vinte, saida_vinte')
             .eq('tanque_id', tanqueId)
             .gte('data_mov', '$dataBusca 00:00:00')
             .lte('data_mov', '$dataBusca 23:59:59');
 
         for (final m in response) {
+          final num entradaAmb = (m['entrada_amb'] ?? 0) as num;
           final num saidaAmb = (m['saida_amb'] ?? 0) as num;
+          final num entradaVinte = (m['entrada_vinte'] ?? 0) as num;
           final num saidaVinte = (m['saida_vinte'] ?? 0) as num;
+          totalEntradasAmb += entradaAmb.toDouble();
           totalSaidasAmb += saidaAmb.toDouble();
+          totalEntradas20 += entradaVinte.toDouble();
           totalSaidas20 += saidaVinte.toDouble();
         }
       }
@@ -756,6 +783,8 @@ class _CalcPageState extends State<CalcPage> {
       this.volumeTotalLiquidoInicial = volumeTotalLiquidoInicial;
       this.volumeTotalLiquidoFinal = volumeTotalLiquidoFinal;
       this.totalSaidasAmbienteReal = totalSaidasAmb;
+      this.totalEntradasAmbienteReal = totalEntradasAmb;
+      this.totalEntradas20Real = totalEntradas20;
       this.totalSaidas20Real = totalSaidas20;
     });
 
@@ -1815,10 +1844,10 @@ class _CalcPageState extends State<CalcPage> {
                       volume20Final: _extrairNumero(
                         medicoes['volume20Final']?.toString(),
                       ),
-                      entradaSaidaAmbiente: totalSaidasAmbienteReal,
+                      entradaSaidaAmbiente: totalEntradasAmbienteReal - totalSaidasAmbienteReal,
                       entradaSaida20: (widget.modo == CaclModo.visualizacao)
-                          ? _extrairNumero(medicoes['totalSaidasPeriodo']?.toString())
-                          : totalSaidas20Real,
+                          ? _extrairNumero(medicoes['totalEntradasPeriodo']?.toString()) - _extrairNumero(medicoes['totalSaidasPeriodo']?.toString())
+                          : totalEntradas20Real - totalSaidas20Real,
                     ),
 
                     // BLOCO FATURADO
@@ -2492,7 +2521,7 @@ class _CalcPageState extends State<CalcPage> {
             Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 6.0),
               child: Text(
-                fmt(volumeAmbienteFinal + entradaSaidaAmbiente - volumeAmbienteInicial),
+                fmt(volumeAmbienteFinal - entradaSaidaAmbiente - volumeAmbienteInicial),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 10),
               ),
@@ -2534,7 +2563,7 @@ class _CalcPageState extends State<CalcPage> {
             Padding(
               padding: EdgeInsets.symmetric(vertical: 8.0, horizontal: 6.0),
               child: Text(
-                fmt(volume20Final + entradaSaida20 - volume20Inicial),
+                fmt(volume20Final - entradaSaida20 - volume20Inicial),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 10),
               ),

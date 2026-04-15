@@ -1046,7 +1046,7 @@ Future<void> _carregarDados() async {
           if (saldoFinal > 0) {
             if (mounted) {
               _mostrarAviso(
-                  'Não é possível alterar o produto porque o tanque ainda possui estoque residual.');
+                  'Não é possível alterar o produto. O tanque ainda possui estoque residual.');
 
               // Retorna o produto ao estado anterior
               setState(() {

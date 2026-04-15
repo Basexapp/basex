@@ -287,11 +287,12 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
   bool _modoVisualizacao = false;
   bool _carregandoDadosMovimentacao = false;
   bool _salvandoCertificado = false;
-  bool _origemAmbBloqueado = false;
 
   final TextEditingController dataCtrl = TextEditingController();
   final TextEditingController horaCtrl = TextEditingController();
   
+  final FocusNode _focusTempAmostra = FocusNode();
+  final FocusNode _focusDensidadeAmostra = FocusNode();
   final FocusNode _focusTempCT = FocusNode();
   final FocusNode _focusDestinoAmb = FocusNode();
   final FocusNode _focusDestino20 = FocusNode();
@@ -320,6 +321,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     'origem20': TextEditingController(),
     'destino20': TextEditingController(),
     'dif20': TextEditingController(),
+    'qtdFaturada': TextEditingController(),
   };
 
   List<String> produtos = [];
@@ -332,9 +334,24 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     _setarDataHoraAtual();
     _carregarProdutos();
 
+    _focusTempAmostra.addListener(() {
+      if (!_modoVisualizacao && !_focusTempAmostra.hasFocus) {
+        _calcularResultadosObtidos();
+        _calcularDiferenca20C();
+      }
+    });
+
+    _focusDensidadeAmostra.addListener(() {
+      if (!_modoVisualizacao && !_focusDensidadeAmostra.hasFocus) {
+        _calcularResultadosObtidos();
+        _calcularDiferenca20C();
+      }
+    });
+
     _focusTempCT.addListener(() {
       if (!_modoVisualizacao && !_focusTempCT.hasFocus) {
         _calcularResultadosObtidos();
+        _calcularDiferenca20C();
       }
     });
     
@@ -342,6 +359,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       if (!_modoVisualizacao && !_focusDestinoAmb.hasFocus) {
         _calcularDiferencaAmbiente();
         _calcularDestino20CAutomatico();
+        _calcularDiferenca20C();
       }
     });
 
@@ -394,7 +412,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           .from('ordens_analises')
           .select('''
             *,
-            produtos:produto_id(nome)
+            produtos:produto_id(nome),
+            movimentacoes:movimentacao_id(qtd_faturada)
           ''')
           .eq('id', idAnalise)
           .maybeSingle();
@@ -405,6 +424,10 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         campos['transportadora']!.text = analise['transportadora']?.toString() ?? '';
         campos['motorista']!.text = analise['motorista']?.toString() ?? '';
         campos['notas']!.text = analise['notas_fiscais']?.toString() ?? '';
+        
+        if (analise['movimentacoes'] != null && analise['movimentacoes']['qtd_faturada'] != null) {
+          campos['qtdFaturada']!.text = _formatarInteiroParaTela(analise['movimentacoes']['qtd_faturada']);
+        }
         
         campos['placaCavalo']!.text = analise['placa_cavalo']?.toString() ?? '';
         campos['carreta1']!.text = analise['carreta1']?.toString() ?? '';
@@ -477,7 +500,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
             produtos:produto_id(nome),
             motoristas:motorista_id(nome),
             transportadoras:transportadora_id(nome),
-            nota_fiscal
+            nota_fiscal,
+            qtd_faturada
           ''')
           .eq('id', idMovimentacao)
           .maybeSingle();
@@ -495,6 +519,11 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
 
       // APENAS OS CAMPOS ESPECIFICADOS
+      if (movimentacao['qtd_faturada'] != null) {
+        campos['qtdFaturada']!.text =
+            _formatarInteiroParaTela(movimentacao['qtd_faturada']);
+      }
+
       if (movimentacao['nota_fiscal'] != null) {
         campos['notas']!.text = movimentacao['nota_fiscal'].toString();
       }
@@ -532,7 +561,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         try {
             campos['origemAmb']!.text =
               _aplicarMascaraMilhar(movimentacao['entrada_amb'].toString());
-            _origemAmbBloqueado = true;
         } catch (_) {}
       }
 
@@ -593,10 +621,14 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     final densObs = campos['densidadeAmostra']!.text;
     final tempCT = campos['tempCT']!.text;
 
-    campos['densidade20']!.text = '';
-    campos['fatorCorrecao']!.text = '';
-
-    if (tempAmostra.isEmpty || densObs.isEmpty) return;
+    if (tempAmostra.isEmpty || densObs.isEmpty) {
+      campos['densidade20']!.text = '';
+      campos['fatorCorrecao']!.text = '';
+      campos['destino20']!.text = ''; // Limpa destino20C se dados básicos sumirem
+      _calcularDiferenca20C();
+      setState(() {});
+      return;
+    }
 
     final dens20 = await _buscarDensidade20C(
       temperaturaAmostra: tempAmostra,
@@ -608,6 +640,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
     if (dens20 == '-' || dens20.isEmpty || tempCT.isEmpty) {
       campos['fatorCorrecao']!.text = '-';
+      campos['destino20']!.text = ''; // Limpa se FCV não puder ser calculado
+      _calcularDiferenca20C();
       setState(() {});
       return;
     }
@@ -620,12 +654,12 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
     if (fcv != '-' && fcv.isNotEmpty) {
       campos['fatorCorrecao']!.text = fcv;
+      // Força o recálculo do volume a 20°C sempre que o FCV for atualizado
+      _calcularDestino20CAutomatico();
     } else {
       campos['fatorCorrecao']!.text = '-';
-    }
-
-    if (fcv != '-' && fcv.isNotEmpty) {
-      _calcularDestino20CAutomatico();
+      campos['destino20']!.text = '';
+      _calcularDiferenca20C();
     }
 
     setState(() {});
@@ -732,23 +766,23 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
   void _calcularDiferenca20C() {
     try {
-      final origemText = campos['origem20']!.text;
-      final destinoText = campos['destino20']!.text;
+      final faturadaText = campos['qtdFaturada']!.text;
+      final destino20Text = campos['destino20']!.text;
       
-      if (origemText.isEmpty || destinoText.isEmpty) {
+      if (faturadaText.isEmpty || destino20Text.isEmpty) {
         campos['dif20']!.text = '';
         setState(() {});
         return;
       }
       
-      final origemLimpa = origemText.replaceAll('.', '');
-      final destinoLimpa = destinoText.replaceAll('.', '');
+      final faturadaLimpa = faturadaText.replaceAll('.', '');
+      final destino20Limpa = destino20Text.replaceAll('.', '');
       
-      final origem = double.tryParse(origemLimpa);
-      final destino = double.tryParse(destinoLimpa);
+      final faturada = double.tryParse(faturadaLimpa);
+      final destino20 = double.tryParse(destino20Limpa);
       
-      if (origem != null && destino != null) {
-        final diferenca = destino - origem;
+      if (faturada != null && destino20 != null) {
+        final diferenca = destino20 - faturada;
         final resultadoFormatado = _formatarDiferencaComSinal(diferenca);
         campos['dif20']!.text = resultadoFormatado;
       } else {
@@ -782,26 +816,29 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     return sinal + valorFormatado;
   }
 
-  Color _obterCorDiferenca(String texto) {
+  Color _obterCorDiferencaAmb(String texto) {
     if (texto.isEmpty) return Colors.black87;
-    
+    if (texto.startsWith('-')) {
+      return Colors.orange;
+    } else if (texto.startsWith('+')) {
+      return const Color.fromARGB(255, 0, 81, 255);
+    }
+    return Colors.black87;
+  }
+
+  Color _obterCorDiferenca20(String texto) {
+    if (texto.isEmpty) return Colors.black87;
     if (texto.startsWith('-')) {
       return Colors.red;
     } else if (texto.startsWith('+')) {
-      return Colors.blue;
+      return const Color.fromARGB(255, 0, 81, 255);
     }
-    
     return Colors.black87;
   }
 
   FontWeight _obterPesoDiferenca(String texto) {
     if (texto.isEmpty) return FontWeight.normal;
-    
-    if (texto.startsWith('-')) {
-      return FontWeight.bold;
-    }
-    
-    return FontWeight.normal;
+    return FontWeight.bold;
   }
 
   @override
@@ -879,52 +916,47 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                               absorbing: _modoVisualizacao || _carregandoDadosMovimentacao,
                               child: Column(
                                 children: [
-                                  _linha([
-                                    Material(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(6),
+                                  _linhaFlexivel([
+                                    {
+                                      'flex': 7,
+                                      'widget': Material(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: TextFormField(
+                                          controller: campos['numeroControle'],
+                                          enabled: false,
+                                          decoration: _decoration('Nº Controle do Certificado').copyWith(
+                                            hintText: _modoVisualizacao ? '' : 'A ser gerado automaticamente',
+                                            filled: true,
+                                            fillColor: const Color(0xFFF5F5F5),
+                                          ),
+                                          style: const TextStyle(
+                                            fontStyle: FontStyle.italic,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
                                       ),
-                                      child: TextFormField(
-                                        controller: campos['numeroControle'],
+                                    },
+                                    {
+                                      'flex': 3,
+                                      'widget': TextFormField(
+                                        controller: campos['notas'],
+                                        keyboardType: TextInputType.number,
                                         enabled: false,
-                                        decoration: _decoration('Nº Controle do Certificado').copyWith(
-                                          hintText: _modoVisualizacao ? '' : 'A ser gerado automaticamente',
-                                          filled: true,
-                                          fillColor: Colors.grey[200],
-                                        ),
-                                        style: const TextStyle(
-                                          fontStyle: FontStyle.italic,
-                                          color: Colors.grey,
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        decoration: _decoration('Notas Fiscais').copyWith(
+                                          hintText: '',
+                                          fillColor: const Color(0xFFF5F5F5),
                                         ),
                                       ),
-                                    ),
+                                    },
                                   ]),
                                   const SizedBox(height: 12),
                                   _linhaFlexivel([
                                     {
-                                      'flex': 5,
-                                      'widget': TextFormField(
-                                                  controller: campos['notas'],
-                                                  keyboardType: TextInputType.number,
-                                                  onChanged: _modoVisualizacao ? null : (value) {
-                                                    final cursorPosition = campos['notas']!.selection.baseOffset;
-                                                    final maskedValue = _aplicarMascaraNotasFiscais(value);
-
-                                                    if (maskedValue != value) {
-                                                      campos['notas']!.value = TextEditingValue(
-                                                        text: maskedValue,
-                                                        selection: TextSelection.collapsed(
-                                                          offset: cursorPosition + (maskedValue.length - value.length),
-                                                        ),
-                                                      );
-                                                    }
-                                                  },
-                                                  enabled: !_modoVisualizacao,
-                                                  decoration: _decoration('Notas Fiscais').copyWith(
-                                                    hintText: '',
-                                                    fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
-                                                  ),
-                                                ),
+                                      'flex': 3,
+                                      'widget': _campo('Quantidade faturada', campos['qtdFaturada']!, enabled: false),
                                     },
                                     {
                                       'flex': 5,
@@ -939,24 +971,21 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                                 ),
                                               ),
                                             )
-                                          : DropdownButtonFormField<String>(
-                                              value: produtoSelecionado,
-                                              items: produtos
-                                                  .map(
-                                                    (p) => DropdownMenuItem(
-                                                      value: p,
-                                                      child: Text(p),
-                                                    ),
-                                                  )
-                                                  .toList(),
-                                              onChanged: _modoVisualizacao ? null : (valor) {
-                                                setState(() {
-                                                  produtoSelecionado = valor;
-                                                });
-                                                _calcularResultadosObtidos();
-                                              },
-                                              decoration: _decoration('Produto').copyWith(
-                                                fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                          : IgnorePointer(
+                                              child: DropdownButtonFormField<String>(
+                                                value: produtoSelecionado,
+                                                items: produtos
+                                                    .map(
+                                                      (p) => DropdownMenuItem(
+                                                        value: p,
+                                                        child: Text(p),
+                                                      ),
+                                                    )
+                                                    .toList(),
+                                                onChanged: null,
+                                                decoration: _decoration('Produto').copyWith(
+                                                  fillColor: const Color(0xFFF5F5F5),
+                                                ),
                                               ),
                                             ),
                                     },
@@ -979,7 +1008,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                         enabled: !_modoVisualizacao,
                                         decoration: _decoration('Motorista').copyWith(
                                           counterText: '',
-                                          fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                          fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
                                         ),
                                       ),
                                     },
@@ -988,10 +1017,11 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       'widget': TextFormField(
                                         controller: campos['transportadora'],
                                         maxLength: 50,
-                                        enabled: !_modoVisualizacao,
+                                        enabled: false,
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
                                         decoration: _decoration('Transportadora').copyWith(
                                           counterText: '',
-                                          fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                          fillColor: const Color(0xFFF5F5F5),
                                         ),
                                       ),
                                     },
@@ -1003,7 +1033,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       'widget': PlacaAutocompleteField(
                                         controller: campos['placaCavalo']!,
                                         label: 'Placa do cavalo',
-                                        enabled: !_modoVisualizacao,
+                                        enabled: false,
                                       ),
                                     },
                                     {
@@ -1011,7 +1041,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       'widget': PlacaAutocompleteField(
                                         controller: campos['carreta1']!,
                                         label: 'Carreta 1',
-                                        enabled: !_modoVisualizacao,
+                                        enabled: false,
                                       ),
                                     },
                                     {
@@ -1019,7 +1049,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       'widget': PlacaAutocompleteField(
                                         controller: campos['carreta2']!,
                                         label: 'Carreta 2',
-                                        enabled: !_modoVisualizacao,
+                                        enabled: false,
                                       ),
                                     },
                                   ]),
@@ -1028,6 +1058,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                   _linha([
                                     TextFormField(
                                       controller: campos['tempAmostra'],
+                                      focusNode: _modoVisualizacao ? null : _focusTempAmostra,
                                       keyboardType: TextInputType.number,
                                       enabled: !_modoVisualizacao,
                                       onChanged: _modoVisualizacao ? null : (value) {
@@ -1042,12 +1073,13 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       },
                                       decoration: _decoration('Temperatura da amostra (°C)').copyWith(
                                         hintText: '00,0',
-                                        fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                        fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
                                       ),
                                     ),
 
                                     TextFormField(
                                       controller: campos['densidadeAmostra'],
+                                      focusNode: _modoVisualizacao ? null : _focusDensidadeAmostra,
                                       keyboardType: TextInputType.number,
                                       enabled: !_modoVisualizacao,
                                       onChanged: _modoVisualizacao ? null : (value) {
@@ -1062,7 +1094,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       },
                                       decoration: _decoration('Densidade observada').copyWith(
                                         hintText: '0,0000',
-                                        fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                        fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
                                       ),
                                     ),
 
@@ -1083,7 +1115,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       },
                                       decoration: _decoration('Temperatura do CT (°C)').copyWith(
                                         hintText: '00,0',
-                                        fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                        fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
                                       ),
                                     ),
                                   ]),
@@ -1101,23 +1133,10 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                     TextFormField(
                                       controller: campos['origemAmb'],
                                       keyboardType: TextInputType.number,
-                                      enabled: !_modoVisualizacao && !_origemAmbBloqueado,
-                                      onChanged: _modoVisualizacao
-                                          ? null
-                                          : (value) {
-                                              final ctrl = campos['origemAmb']!;
-                                              final masked = _aplicarMascaraNotasFiscais(value);
-
-                                              if (masked != value) {
-                                                ctrl.value = TextEditingValue(
-                                                  text: masked,
-                                                  selection: TextSelection.collapsed(offset: masked.length),
-                                                );
-                                              }
-                                              _calcularDiferencaAmbiente();
-                                            },
+                                      enabled: false,
+                                      onChanged: null,
                                       decoration: _decoration('Quantidade de origem').copyWith(
-                                        fillColor: (!_modoVisualizacao && !_origemAmbBloqueado) ? Colors.white : Colors.grey[300],
+                                        fillColor: const Color(0xFFF5F5F5),
                                       ),
                                     ),
 
@@ -1140,7 +1159,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                               }
                                             },
                                       decoration: _decoration('Quantidade de destino').copyWith(
-                                        fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                        fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
                                       ),
                                     ),
                                     
@@ -1149,11 +1168,19 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       enabled: false,
                                       keyboardType: TextInputType.number,
                                       style: TextStyle(
-                                        color: _obterCorDiferenca(campos['difAmb']!.text),
+                                        color: _obterCorDiferencaAmb(campos['difAmb']!.text),
                                         fontWeight: _obterPesoDiferenca(campos['difAmb']!.text),
                                       ),
-                                      decoration: _decoration('Complemento/Retirada').copyWith(
-                                        fillColor: Colors.grey[200],
+                                      decoration: _decoration(
+                                        campos['difAmb']!.text.startsWith('-') 
+                                          ? 'Abaixo do nível:' 
+                                          : (campos['difAmb']!.text.startsWith('+') ? 'Acima do nível:' : 'Complemento/Retirada'),
+                                        disabled: true
+                                      ).copyWith(
+                                        fillColor: const Color(0xFFF5F5F5),
+                                        labelStyle: TextStyle(
+                                          color: _obterCorDiferencaAmb(campos['difAmb']!.text),
+                                        ),
                                       ),
                                     ),
                                   ]),
@@ -1161,26 +1188,11 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                   _secao('Volumes apurados a 20 ºC'),
                                   _linha([
                                     TextFormField(
-                                      controller: campos['origem20'],
-                                      focusNode: _modoVisualizacao ? null : _focusOrigem20,
+                                      controller: campos['qtdFaturada'],
                                       keyboardType: TextInputType.number,
-                                      enabled: !_modoVisualizacao,
-                                      onChanged: _modoVisualizacao
-                                          ? null
-                                          : (value) {
-                                              final ctrl = campos['origem20']!;
-                                              final masked = _aplicarMascaraNotasFiscais(value);
-
-                                              if (masked != value) {
-                                                ctrl.value = TextEditingValue(
-                                                  text: masked,
-                                                  selection: TextSelection.collapsed(offset: masked.length),
-                                                );
-                                              }
-                                              _calcularDiferenca20C();
-                                            },
+                                      enabled: false,
                                       decoration: _decoration('Quantidade faturada').copyWith(
-                                        fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                        fillColor: const Color(0xFFF5F5F5),
                                       ),
                                     ),
 
@@ -1191,7 +1203,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       focusNode: _modoVisualizacao ? null : _focusDestino20,
                                       keyboardType: TextInputType.number,
                                       decoration: _decoration('Quantidade apurada (20ºC)').copyWith(
-                                        fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                        fillColor: const Color(0xFFF5F5F5),
                                       ),
                                     ),
                                     
@@ -1200,11 +1212,15 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                       enabled: false,
                                       keyboardType: TextInputType.number,
                                       style: TextStyle(
-                                        color: _obterCorDiferenca(campos['dif20']!.text),
+                                        color: _obterCorDiferenca20(campos['dif20']!.text),
                                         fontWeight: _obterPesoDiferenca(campos['dif20']!.text),
                                       ),
-                                      decoration: _decoration('Diferença').copyWith(
-                                        fillColor: Colors.grey[200],
+                                      decoration: _decoration('Sobra/Falta').copyWith(
+                                        fillColor: const Color(0xFFF5F5F5),
+                                        labelStyle: TextStyle(
+                                          color: _obterCorDiferenca20(campos['dif20']!.text),
+                                          fontWeight: _obterPesoDiferenca(campos['dif20']!.text),
+                                        ),
                                       ),
                                     ),
                                   ]),
@@ -1258,7 +1274,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
                               if (!_modoVisualizacao)
                                 ElevatedButton.icon(
-                                    onPressed: (_salvandoCertificado || (_converterParaInteiro(campos['origem20']!.text) ?? 0) <= 0)
+                                    onPressed: (_salvandoCertificado || (_converterParaInteiro(campos['destino20']!.text) ?? 0) <= 0)
                                       ? null
                                       : _confirmarEmissaoCertificado,
                                   icon: _salvandoCertificado 
@@ -1350,8 +1366,9 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       child: TextFormField(
         controller: c,
         enabled: enabled,
+        style: const TextStyle(fontWeight: FontWeight.bold),
         decoration: _decoration(label, disabled: !enabled).copyWith(
-          fillColor: enabled ? Colors.white : Colors.grey[200],
+          fillColor: enabled ? Colors.white : const Color(0xFFF5F5F5),
         ),
       ),
     );
@@ -1362,7 +1379,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: disabled ? Colors.grey[200] : Colors.white,
+        fillColor: disabled ? const Color(0xFFF5F5F5) : Colors.white,
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(6)),
       );
@@ -2268,6 +2285,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
   
   @override
   void dispose() {
+    _focusTempAmostra.dispose();
+    _focusDensidadeAmostra.dispose();
     _focusTempCT.dispose();
     _focusDestinoAmb.dispose();
     _focusDestino20.dispose();
@@ -2284,11 +2303,12 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           .from('ordens_analises')
           .select('''
             *,
-            produtos:produto_id(nome)
+            produtos:produto_id(nome),
+            movimentacoes:movimentacao_id(qtd_faturada)
           ''')
           .eq('movimentacao_id', idMovimentacao)
           .eq('tipo_analise', 'destino')  // Exatamente "destino"
-          .order('created_at', ascending: false)
+          .order('data_criacao', ascending: false)
           .limit(1)
           .maybeSingle();
 
@@ -2298,6 +2318,10 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
 
       // Preencher TODOS os campos da ordem_analises
+      
+      if (ordemAnalise['movimentacoes'] != null && ordemAnalise['movimentacoes']['qtd_faturada'] != null) {
+        campos['qtdFaturada']!.text = _formatarInteiroParaTela(ordemAnalise['movimentacoes']['qtd_faturada']);
+      }
       
       // Cabeçalho
       campos['numeroControle']!.text = ordemAnalise['numero_controle']?.toString() ?? '';
