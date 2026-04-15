@@ -229,6 +229,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         filialId: widget.filialId!,
         filialNome: widget.filialNome,
         terminalId: widget.terminalId,
+        dataFiltro: _dataFiltro,
       ),
     );
 

@@ -10,6 +10,7 @@ class NovaVendaDialog extends StatefulWidget {
   final String? terminalId;
   final Map<String, dynamic>? movimentacaoParaEdicao;
   final String? ordemId;
+  final DateTime? dataFiltro;
 
   const NovaVendaDialog({
     super.key,
@@ -19,6 +20,7 @@ class NovaVendaDialog extends StatefulWidget {
     this.terminalId,
     this.movimentacaoParaEdicao,
     this.ordemId,
+    this.dataFiltro,
   });
 
   @override
@@ -569,7 +571,11 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
       }
 
       final hoje = _getHorarioBrasilia();
-      final dataMov = hoje.toIso8601String();
+      final dataRef = widget.dataFiltro != null
+          ? DateTime(widget.dataFiltro!.year, widget.dataFiltro!.month, widget.dataFiltro!.day)
+          : hoje;
+      final dataMov =
+          '${dataRef.year}-${dataRef.month.toString().padLeft(2, '0')}-${dataRef.day.toString().padLeft(2, '0')}';
 
       final ordemResponse = await supabase
           .from('ordens')
@@ -616,7 +622,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'tipo_mov_orig': 'saida',
             'descricao': 'venda comum',
             'data_mov': dataMov,
-            'ts_mov': hoje.toIso8601String(),
+            'ts_mov': dataRef.toIso8601String(),
             'qtd_faturada': capacidadeLitros,
             'anp': false,
             'status_circuito_orig': 1,
