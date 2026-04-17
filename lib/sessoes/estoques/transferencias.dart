@@ -209,7 +209,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
       return (t['descricao']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['placa']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['data_mov']?.toString().toLowerCase() ?? '').contains(query) ||
-          (t['quantidade']?.toString().toLowerCase() ?? '').contains(query) ||
+          (t['qtd_faturada']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['motoristas']?['nome']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['produtos']?['nome']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['transportadoras']?['nome_dois']?.toString().toLowerCase() ?? '').contains(query) ||
@@ -377,7 +377,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
                             final destinoNome =
                                 t['terminal_destino']?['nome_dois']?.toString() ?? '';
 
-                            final quantidade = t['quantidade']?.toString() ?? '';
+                            final quantidade = t['qtd_faturada']?.toString() ?? '';
                             final quantidadeFormatada =
                                 quantidade.isNotEmpty && quantidade != '0'
                                     ? _formatarQuantidade(quantidade)

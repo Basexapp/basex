@@ -1075,25 +1075,12 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                         {
                                           'flex': 5,
                                           'widget': TextFormField(
-                                            controller: campos['notas'],
+                                            controller: TextEditingController(text: '(aguardando)'),
                                             keyboardType: TextInputType.number,
-                                            onChanged: _modoVisualizacao ? null : (value) {
-                                              final cursorPosition = campos['notas']!.selection.baseOffset;
-                                              final maskedValue = _aplicarMascaraNotasFiscais(value);
-
-                                              if (maskedValue != value) {
-                                                campos['notas']!.value = TextEditingValue(
-                                                  text: maskedValue,
-                                                  selection: TextSelection.collapsed(
-                                                    offset: cursorPosition + (maskedValue.length - value.length),
-                                                  ),
-                                                );
-                                              }
-                                            },
-                                            enabled: !_modoVisualizacao,
+                                            enabled: false,
                                             decoration: _decoration('Notas Fiscais').copyWith(
                                               hintText: '',
-                                              fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                              fillColor: Colors.grey[100],
                                             ),
                                           ),
                                         },
@@ -1110,27 +1097,22 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                                     ),
                                                   ),
                                                 )
-                                              : DropdownButtonFormField<String>(
-                                                  value: produtoSelecionado,
-                                                  items: produtos
-                                                      .map(
-                                                        (p) => DropdownMenuItem(
-                                                          value: p,
-                                                          child: Text(p),
-                                                        ),
-                                                      )
-                                                      .toList(),
-                                                  onChanged: _modoVisualizacao
-                                                      ? null
-                                                      : (valor) {
-                                                          setState(() {
-                                                            produtoSelecionado = valor;
-                                                          });
-                                                          // Recarregar dados de temperatura/densidade ao trocar produto
-                                                          _carregarDadosTempEDens();
-                                                        },
-                                                  decoration: _decoration('Produto').copyWith(
-                                                    fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                              : IgnorePointer(
+                                                  ignoring: true,
+                                                  child: DropdownButtonFormField<String>(
+                                                    value: produtoSelecionado,
+                                                    items: produtos
+                                                        .map(
+                                                          (p) => DropdownMenuItem(
+                                                            value: p,
+                                                            child: Text(p),
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                    onChanged: null,
+                                                    decoration: _decoration('Produto').copyWith(
+                                                      fillColor: Colors.grey[100],
+                                                    ),
                                                   ),
                                                 ),
                                         },
@@ -1150,10 +1132,10 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                           'widget': TextFormField(
                                             controller: campos['motorista'],
                                             maxLength: 50,
-                                            enabled: !_modoVisualizacao,
+                                            enabled: false,
                                             decoration: _decoration('Motorista').copyWith(
                                               counterText: '',
-                                              fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                              fillColor: Colors.grey[100],
                                             ),
                                           ),
                                         },
@@ -1162,10 +1144,10 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                           'widget': TextFormField(
                                             controller: campos['transportadora'],
                                             maxLength: 50,
-                                            enabled: !_modoVisualizacao,
+                                            enabled: false,
                                             decoration: _decoration('Transportadora').copyWith(
                                               counterText: '',
-                                              fillColor: _modoVisualizacao ? Colors.grey[200] : Colors.white,
+                                              fillColor: Colors.grey[100],
                                             ),
                                           ),
                                         },
@@ -1177,7 +1159,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                           'widget': PlacaAutocompleteField(
                                             controller: campos['placaCavalo']!,
                                             label: 'Placa do cavalo',
-                                            enabled: !_modoVisualizacao,
+                                            enabled: false,
                                           ),
                                         },
                                         {
@@ -1185,7 +1167,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                           'widget': PlacaAutocompleteField(
                                             controller: campos['carreta1']!,
                                             label: 'Carreta 1',
-                                            enabled: !_modoVisualizacao,
+                                            enabled: false,
                                           ),
                                         },
                                         {
@@ -1193,7 +1175,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                           'widget': PlacaAutocompleteField(
                                             controller: campos['carreta2']!,
                                             label: 'Carreta 2',
-                                            enabled: !_modoVisualizacao,
+                                            enabled: false,
                                           ),
                                         },
                                       ]),
@@ -1571,10 +1553,10 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                   child: TextFormField(
                     controller: tanque.volumeAmbCtrl,
                     keyboardType: TextInputType.number,
-                    enabled: !_modoVisualizacao,
+                    enabled: false,
                     onChanged: (value) => _calcularVolume20CTanque(tanque),
                     decoration: _decoration('Volume carregado (ambiente)').copyWith(
-                      fillColor: _modoVisualizacao ? Colors.grey[100] : Colors.white,
+                      fillColor: Colors.grey[100],
                     ),
                   ),
                 ),
@@ -2745,8 +2727,10 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         };
 
         if (tanque != null) {
+          final volumeVinte = _converterParaInteiro(tanque.volume20CCtrl.text);
           dadosUpdate['saida_amb'] = _converterParaInteiro(tanque.volumeAmbCtrl.text);
-          dadosUpdate['saida_vinte'] = _converterParaInteiro(tanque.volume20CCtrl.text);
+          dadosUpdate['saida_vinte'] = volumeVinte;
+          dadosUpdate['qtd_faturada'] = volumeVinte;
         }
 
         await supabase

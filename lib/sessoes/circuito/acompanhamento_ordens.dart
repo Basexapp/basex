@@ -611,7 +611,7 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.cancel_outlined, color: Color(0xFFFFFDF5), size: 22),
+                    Icon(Icons.warning_amber_rounded, color: Color(0xFFFFFDF5), size: 22),
                     SizedBox(width: 10),
                     Text(
                       'Cancelar ordem',
@@ -629,7 +629,7 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
               const Padding(
                 padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
                 child: Text(
-                  'Tem certeza que deseja cancelar esta ordem?',
+                  'Alerta de consequência permanente:',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -640,7 +640,7 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
               const Padding(
                 padding: EdgeInsets.fromLTRB(20, 4, 20, 20),
                 child: Text(
-                  'Esta ação não pode ser desfeita.',
+                  'Esta ação gera efeitos em cascata no terminal de origem, alterando estoque e processos. Uma vez confirmada, não será possível revertê-la.',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.black54,

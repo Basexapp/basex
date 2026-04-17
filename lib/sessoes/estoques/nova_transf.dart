@@ -427,7 +427,7 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
       final supabase = Supabase.instance.client;
       final response = await supabase
           .from('relacoes_terminais')
-          .select('terminal_id, terminais!inner(id, nome)')
+          .select('terminal_id, terminais!inner(id, nome_dois)')
           .eq('empresa_id', _empresaId!);
 
       final lista = List<Map<String, dynamic>>.from(response);
@@ -439,7 +439,7 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
         if (terminalId != null && terminalData != null && !uniqueMap.containsKey(terminalId)) {
           uniqueMap[terminalId] = {
             'id': terminalId,
-            'nome': terminalData['nome']?.toString() ?? '',
+            'nome': terminalData['nome_dois']?.toString() ?? '',
           };
         }
       }
@@ -874,7 +874,7 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
         'ordem_id': ordemId,
         'tipo_op': 'transf',
         'produto_id': _produtoId,
-        'quantidade': quantidade,
+        'qtd_faturada': quantidade,
         'saida_amb': quantidade,
         'entrada_amb': quantidade,
         'descricao': '$origemNome → $destinoNome',
