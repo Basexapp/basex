@@ -281,7 +281,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '© Norton Technology - 550 California St, W-325, San Francisco, CA - EUA.',
+                    'Licenciado e comercializado por Metabots Business Intelligence - Rua Leais Paulistanos, 416 - Ipiranga - São Paulo, SP | Uma iniciativa © Norton Technology',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 13,

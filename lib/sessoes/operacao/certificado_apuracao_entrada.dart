@@ -297,6 +297,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
   final FocusNode _focusDestinoAmb = FocusNode();
   final FocusNode _focusDestino20 = FocusNode();
   final FocusNode _focusOrigem20 = FocusNode();
+  final FocusNode _focusQtdFaturada = FocusNode();
 
   final Map<String, TextEditingController?> campos = {
     'numeroControle': TextEditingController(),
@@ -372,6 +373,12 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     _focusOrigem20.addListener(() {
       if (!_modoVisualizacao && !_focusOrigem20.hasFocus) {
         _calcularDestino20CAutomatico();
+      }
+    });
+
+    _focusQtdFaturada.addListener(() {
+      if (!_modoVisualizacao && !_focusQtdFaturada.hasFocus) {
+        _calcularDiferenca20C();
       }
     });
 
@@ -956,7 +963,23 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                   _linhaFlexivel([
                                     {
                                       'flex': 3,
-                                      'widget': _campo('Quantidade faturada', campos['qtdFaturada']!, enabled: false),
+                                      'widget': TextFormField(
+                                        controller: campos['qtdFaturada'],
+                                        keyboardType: TextInputType.number,
+                                        enabled: !_modoVisualizacao,
+                                        focusNode: _modoVisualizacao ? null : _focusQtdFaturada,
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        onChanged: (v) {
+                                          final masc = _aplicarMascaraMilhar(v);
+                                          if (masc != v) {
+                                            campos['qtdFaturada']!.text = masc;
+                                            campos['qtdFaturada']!.selection =
+                                                TextSelection.fromPosition(
+                                                    TextPosition(offset: masc.length));
+                                          }
+                                        },
+                                        decoration: _decoration('Quantidade faturada'),
+                                      ),
                                     },
                                     {
                                       'flex': 5,
@@ -1190,10 +1213,19 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                     TextFormField(
                                       controller: campos['qtdFaturada'],
                                       keyboardType: TextInputType.number,
-                                      enabled: false,
-                                      decoration: _decoration('Quantidade faturada').copyWith(
-                                        fillColor: const Color(0xFFF5F5F5),
-                                      ),
+                                      enabled: !_modoVisualizacao,
+                                      focusNode: _modoVisualizacao ? null : _focusQtdFaturada,
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      onChanged: (v) {
+                                        final masc = _aplicarMascaraMilhar(v);
+                                        if (masc != v) {
+                                          campos['qtdFaturada']!.text = masc;
+                                          campos['qtdFaturada']!.selection =
+                                              TextSelection.fromPosition(
+                                                  TextPosition(offset: masc.length));
+                                        }
+                                      },
+                                      decoration: _decoration('Quantidade faturada'),
                                     ),
 
                                     TextFormField(
@@ -2291,6 +2323,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     _focusDestinoAmb.dispose();
     _focusDestino20.dispose();
     _focusOrigem20.dispose();
+    _focusQtdFaturada.dispose();
     super.dispose();
   }
 
