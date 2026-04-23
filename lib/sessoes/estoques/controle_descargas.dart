@@ -28,12 +28,16 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
   
   DateTime? dataInicialEmissao;
   DateTime? dataFinalEmissao;
+  DateTime? dataInicialDescarga;
+  DateTime? dataFinalDescarga;
   String? terminalSelecionadoId;
   String? produtoSelecionado;
   int? _hoverIndex;
   
   final TextEditingController dataInicialEmissaoController = TextEditingController();
   final TextEditingController dataFinalEmissaoController = TextEditingController();
+  final TextEditingController dataInicialDescargaController = TextEditingController();
+  final TextEditingController dataFinalDescargaController = TextEditingController();
   final TextEditingController buscaGeralController = TextEditingController();
 
   Map<String, dynamic>? _usuarioData;
@@ -59,6 +63,8 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
     WidgetsBinding.instance.removeObserver(this);
     dataInicialEmissaoController.dispose();
     dataFinalEmissaoController.dispose();
+    dataInicialDescargaController.dispose();
+    dataFinalDescargaController.dispose();
     buscaGeralController.dispose();
     super.dispose();
   }
@@ -106,8 +112,8 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
       // Carregar terminais reais para o filtro
       final terminaisResponse = await supabase
           .from('terminais')
-          .select('id, nome')
-          .order('nome');
+          .select('id, nome_dois')
+          .order('nome_dois');
       
       // Carregar produtos reais para o filtro
       final produtosResponse = await supabase
@@ -144,27 +150,61 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
     setState(() => buscando = true);
 
     try {
-      // Simulação de dados fictícios conforme solicitado
-      await Future.delayed(const Duration(milliseconds: 500));
+      final supabase = Supabase.instance.client;
       
-      final List<Map<String, dynamic>> dadosFicticios = List.generate(15, (index) => {
-        'id': index,
-        'data_emissao': DateTime.now().subtract(Duration(days: index)).toIso8601String(),
-        'nota_fiscal': 'NF-${1000 + index}',
-        'qtd_amb': (10000.50 + index * 100).toStringAsFixed(2),
-        'qtd_20': (9950.25 + index * 100).toStringAsFixed(2),
-        'produto': index % 2 == 0 ? 'Diesel S10' : 'Gasolina C',
-        'motorista': index % 2 == 0 ? 'João da Silva' : 'Pedro Santos',
-        'transportadora': index % 2 == 0 ? 'TransLog Ltda' : 'Express Cargo',
-        'placas': 'ABC-${1000 + index} / XYZ-${2000 + index}',
-        'origem': index % 3 == 0 ? 'Refinaria Duque de Caxias' : 'Terminal Betim',
-        'data_descarga': DateTime.now().subtract(Duration(hours: index * 2)).toIso8601String(),
-        'perda_sobra': (100 - (index * 13) % 181).toString(), // Números inteiros entre 100 e -80
-        'obs': index % 4 == 0 ? 'Liberação OK' : '-',
-      });
+      // Iniciar a query SEM .order() para manter o tipo PostgrestFilterBuilder
+      // e poder encadear filtros antes de executar
+      var query = supabase
+          .from('movimentacoes')
+          .select('''
+            *,
+            motoristas!motorista_id(nome),
+            produtos!produto_id(nome),
+            transportadoras!transportadora_id(nome_dois),
+            terminal_orig:terminais!terminal_orig_id(nome_dois),
+            terminal_dest:terminais!terminal_dest_id(nome_dois)
+          ''')
+          .eq('tipo_mov_dest', 'entrada');
+
+      // Filtros de Data de Emissão (usando data_mov como emissão/data do movimento)
+      if (dataInicialEmissao != null) {
+        query = query.gte('data_mov', dataInicialEmissao!.toIso8601String());
+      }
+      if (dataFinalEmissao != null) {
+        final fimDia = DateTime(dataFinalEmissao!.year, dataFinalEmissao!.month, dataFinalEmissao!.day, 23, 59, 59);
+        query = query.lte('data_mov', fimDia.toIso8601String());
+      }
+
+      // Filtros de Data de Descarga
+      if (dataInicialDescarga != null) {
+        query = query.gte('data_descarga', dataInicialDescarga!.toIso8601String());
+      }
+      if (dataFinalDescarga != null) {
+        final fimDia = DateTime(dataFinalDescarga!.year, dataFinalDescarga!.month, dataFinalDescarga!.day, 23, 59, 59);
+        query = query.lte('data_descarga', fimDia.toIso8601String());
+      }
+
+      // Filtro de Terminal (Destino, onde ocorre a descarga)
+      if (terminalSelecionadoId != null) {
+        query = query.eq('terminal_dest_id', terminalSelecionadoId!);
+      }
+
+      // Filtro de Produto
+      if (produtoSelecionado != null) {
+        final produtoObj = produtosDisponiveis.firstWhere(
+          (p) => p['nome'] == produtoSelecionado,
+          orElse: () => {},
+        );
+        if (produtoObj.isNotEmpty) {
+          query = query.eq('produto_id', produtoObj['id']);
+        }
+      }
+
+      // .order() aplicado no final, após todos os filtros
+      final response = await query.order('data_descarga', ascending: true);
 
       setState(() {
-        descargas = dadosFicticios;
+        descargas = List<Map<String, dynamic>>.from(response);
         _filtrarResultadosLocais();
       });
 
@@ -185,37 +225,43 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
   void _filtrarResultadosLocais() {
     final search = buscaGeralController.text.toLowerCase().trim();
     
-    if (search.isEmpty) {
-      descargasFiltradas = List.from(descargas);
-    } else {
-      descargasFiltradas = descargas.where((item) {
-        final dataEmissao = _formatarData(item['data_emissao']).toLowerCase();
-        final notaFiscal = (item['nota_fiscal'] ?? '').toString().toLowerCase();
-        final qtdAmb = (item['qtd_amb'] ?? '').toString().toLowerCase();
-        final qtd20 = (item['qtd_20'] ?? '').toString().toLowerCase();
-        final produto = (item['produto'] ?? '').toString().toLowerCase();
-        final motorista = (item['motorista'] ?? '').toString().toLowerCase();
-        final transportadora = (item['transportadora'] ?? '').toString().toLowerCase();
-        final placas = (item['placas'] ?? '').toString().toLowerCase();
-        final origem = (item['origem'] ?? '').toString().toLowerCase();
-        final dataDescarga = _formatarData(item['data_descarga']).toLowerCase();
-        final perdaSobra = (item['perda_sobra'] ?? '').toString().toLowerCase();
-        final obs = (item['obs'] ?? '').toString().toLowerCase();
+    descargasFiltradas = descargas.where((item) {
+      // Nota: Os filtros de data, terminal e produto já foram aplicados na query do Supabase.
+      // Aqui aplicamos apenas a Pesquisa Geral sobre os dados retornados e mapeados.
 
-        return dataEmissao.contains(search) ||
-               notaFiscal.contains(search) ||
-               qtdAmb.contains(search) ||
-               qtd20.contains(search) ||
-               produto.contains(search) ||
-               motorista.contains(search) ||
-               transportadora.contains(search) ||
-               placas.contains(search) ||
-               origem.contains(search) ||
-               dataDescarga.contains(search) ||
-               perdaSobra.contains(search) ||
-               obs.contains(search);
-      }).toList();
-    }
+      if (search.isEmpty) return true;
+
+      // Mapeamento dos campos para busca textual (seguindo a estrutura do Supabase)
+      final dataEmissaoText = _formatarData(item['data_mov']).toLowerCase();
+      final notaFiscal = (item['nota_fiscal'] ?? '').toString().toLowerCase();
+      final qtdAmb = (item['entrada_amb'] ?? '').toString().toLowerCase();
+      final qtd20 = (item['entrada_vinte'] ?? '').toString().toLowerCase();
+      final produto = (item['produtos']?['nome'] ?? '').toString().toLowerCase();
+      final motorista = (item['motoristas']?['nome'] ?? '').toString().toLowerCase();
+      final transportadora = (item['transportadoras']?['nome_dois'] ?? '').toString().toLowerCase();
+      final placas = (item['placa']?.toString() ?? '').toLowerCase();
+      
+      // Capturar valor da coluna Origem conforme lógica exibida na tabela
+      final origemValor = item['tipo_op'] == 'compra' 
+          ? (item['cliente'] ?? '') 
+          : (item['terminal_orig']?['nome_dois'] ?? '');
+      final origem = origemValor.toString().toLowerCase();
+      
+      final dataDescargaText = _formatarData(item['data_descarga']).toLowerCase();
+      final obs = (item['observacoes'] ?? '').toString().toLowerCase();
+
+      return dataEmissaoText.contains(search) ||
+             notaFiscal.contains(search) ||
+             qtdAmb.contains(search) ||
+             qtd20.contains(search) ||
+             produto.contains(search) ||
+             motorista.contains(search) ||
+             transportadora.contains(search) ||
+             placas.contains(search) ||
+             origem.contains(search) ||
+             dataDescargaText.contains(search) ||
+             obs.contains(search);
+    }).toList();
 
     setState(() {
       totalRegistros = descargasFiltradas.length;
@@ -233,6 +279,19 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
           '${d.year}';
     } catch (_) {
       return data.toString();
+    }
+  }
+
+  String _formatarNumero(dynamic valor) {
+    if (valor == null) return '0';
+    try {
+      double numero = double.parse(valor.toString());
+      // Formata com ponto de milhar e remove decimais (arredondando para inteiro conforme solicitação "123.456")
+      String parteInteira = numero.round().toString();
+      final RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+      return parteInteira.replaceAllMapped(reg, (Match m) => '${m[1]}.');
+    } catch (_) {
+      return valor.toString();
     }
   }
 
@@ -279,7 +338,7 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
                         return DropdownMenuItem(
                           value: terminal['id']?.toString(),
                           child: Text(
-                            terminal['nome']?.toString() ?? '',
+                            terminal['nome_dois']?.toString() ?? '',
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 13),
                           ),
@@ -339,6 +398,8 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
                   child: _buildDatePicker(
                     label: 'Data inicial (emissão)',
                     value: dataInicialEmissao,
+                    borderColor: Colors.blue.shade700,
+                    borderWidth: 1.5,
                     onChanged: (data) {
                       setState(() {
                         dataInicialEmissao = data;
@@ -355,10 +416,48 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
                   child: _buildDatePicker(
                     label: 'Data final (emissão)',
                     value: dataFinalEmissao,
+                    borderColor: Colors.blue.shade700,
+                    borderWidth: 1.5,
                     onChanged: (data) {
                       setState(() {
                         dataFinalEmissao = data;
                         dataFinalEmissaoController.text = _formatarData(data);
+                      });
+                      _aplicarFiltros();
+                    },
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                Expanded(
+                  child: _buildDatePicker(
+                    label: 'Data inicial (descarga)',
+                    value: dataInicialDescarga,
+                    borderColor: Colors.brown.shade700,
+                    borderWidth: 1.5,
+                    onChanged: (data) {
+                      setState(() {
+                        dataInicialDescarga = data;
+                        dataInicialDescargaController.text = _formatarData(data);
+                      });
+                      _aplicarFiltros();
+                    },
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                Expanded(
+                  child: _buildDatePicker(
+                    label: 'Data final (descarga)',
+                    value: dataFinalDescarga,
+                    borderColor: Colors.brown.shade700,
+                    borderWidth: 1.5,
+                    onChanged: (data) {
+                      setState(() {
+                        dataFinalDescarga = data;
+                        dataFinalDescargaController.text = _formatarData(data);
                       });
                       _aplicarFiltros();
                     },
@@ -399,6 +498,8 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
     required String label,
     required DateTime? value,
     required Function(DateTime) onChanged,
+    Color? borderColor,
+    double borderWidth = 1.0,
   }) {
     final texto = value != null ? _formatarData(value) : '';
 
@@ -518,7 +619,7 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
         padding: const EdgeInsets.symmetric(horizontal: 12),
         alignment: Alignment.centerLeft,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade400),
+          border: Border.all(color: borderColor ?? Colors.grey.shade400, width: borderWidth),
           borderRadius: BorderRadius.circular(4),
           color: Colors.white,
         ),
@@ -697,7 +798,11 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
                                 itemCount: descargasFiltradas.length,
                                 itemBuilder: (context, index) {
                                   final item = descargasFiltradas[index];
-                                  final bool isNegative = double.tryParse(item['perda_sobra'].toString()) != null && double.parse(item['perda_sobra'].toString()) < 0;
+                                  
+                                  // Cálculo de perda/sobra (opcional conforme estrutura)
+                                  final double entAmb = double.tryParse(item['entrada_amb']?.toString() ?? '0') ?? 0;
+                                  final double saiAmb = double.tryParse(item['saida_amb']?.toString() ?? '0') ?? 0;
+                                  final double diff = entAmb - saiAmb;
                                   
                                   return MouseRegion(
                                     cursor: SystemMouseCursors.click,
@@ -719,23 +824,28 @@ class _ControleDescargasPageState extends State<ControleDescargasPage> with Widg
                                       ),
                                       child: Row(
                                         children: [
-                                          _buildDataCell(_formatarData(item['data_emissao']), 1),
-                                          _buildDataCell(item['nota_fiscal'], 1),
-                                          _buildDataCell(item['qtd_amb'], 1),
-                                          _buildDataCell(item['qtd_20'], 1),
-                                          _buildDataCell(item['produto'], 1),
-                                          _buildDataCell(item['motorista'], 1),
-                                          _buildDataCell(item['transportadora'], 1),
-                                          _buildDataCell(item['placas'], 1),
-                                          _buildDataCell(item['origem'], 1),
+                                          _buildDataCell(_formatarData(item['data_mov']), 1),
+                                          _buildDataCell(item['nota_fiscal'] ?? '-', 1),
+                                          _buildDataCell(_formatarNumero(item['entrada_amb']), 1),
+                                          _buildDataCell(_formatarNumero(item['entrada_vinte']), 1),
+                                          _buildDataCell(item['produtos']?['nome'] ?? '-', 1),
+                                          _buildDataCell(item['motoristas']?['nome'] ?? '-', 1),
+                                          _buildDataCell(item['transportadoras']?['nome_dois'] ?? '-', 1),
+                                          _buildDataCell((item['placa'] as List?)?.join(' / ') ?? '-', 1),
+                                          _buildDataCell(
+                                            item['tipo_op'] == 'compra' 
+                                              ? (item['cliente'] ?? '-') 
+                                              : (item['terminal_orig']?['nome_dois'] ?? '-'), 
+                                            1
+                                          ),
                                           _buildDataCell(_formatarData(item['data_descarga']), 1),
                                           _buildDataCell(
-                                            item['perda_sobra'], 
+                                            diff == 0 ? '0' : _formatarNumero(diff), 
                                             1, 
-                                            color: isNegative ? Colors.red : Colors.green,
+                                            color: diff < 0 ? Colors.red : (diff > 0 ? Colors.green : Colors.black87),
                                             weight: FontWeight.bold,
                                           ),
-                                          _buildDataCell(item['obs'], 1),
+                                          _buildDataCell(item['observacoes'] ?? '-', 1),
                                         ],
                                       ),
                                     ),
