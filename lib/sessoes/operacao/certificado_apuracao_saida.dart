@@ -370,6 +370,7 @@ class EmitirCertificadoPage extends StatefulWidget {
   final bool modoSomenteVisualizacao;
   final String? terminalId;
   final String? tipoOp;
+  final String? dataFiltro;
 
   const EmitirCertificadoPage({
     super.key,
@@ -380,6 +381,7 @@ class EmitirCertificadoPage extends StatefulWidget {
     this.modoSomenteVisualizacao = false,
     this.terminalId,
     this.tipoOp,
+    this.dataFiltro,
   });
 
   @override
@@ -654,8 +656,15 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
 
   void _setarDataHoraAtual() {
     final agora = DateTime.now();
-    dataCtrl.text =
-        '${agora.day.toString().padLeft(2, '0')}/${agora.month.toString().padLeft(2, '0')}/${agora.year}';
+    
+    // Se dataFiltro estiver presente, usa essa data, senão usa a data atual
+    if (widget.dataFiltro != null && widget.dataFiltro!.isNotEmpty) {
+      dataCtrl.text = widget.dataFiltro!;
+    } else {
+      dataCtrl.text =
+          '${agora.day.toString().padLeft(2, '0')}/${agora.month.toString().padLeft(2, '0')}/${agora.year}';
+    }
+    
     horaCtrl.text =
         '${agora.hour.toString().padLeft(2, '0')}:${agora.minute.toString().padLeft(2, '0')}';
   }
@@ -2673,7 +2682,25 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
   }) async {
     try {
       final supabase = Supabase.instance.client;
-      final timestampBrasilia = _obterTimestampBrasilia();
+      String timestampBrasilia = _obterTimestampBrasilia();
+
+      // Ajustar data_carga se dataFiltro estiver presente (dd/mm/aaaa)
+      if (widget.dataFiltro != null && widget.dataFiltro!.isNotEmpty) {
+        try {
+          final partes = widget.dataFiltro!.split('/');
+          if (partes.length == 3) {
+            final dia = int.parse(partes[0]);
+            final mes = int.parse(partes[1]);
+            final ano = int.parse(partes[2]);
+            
+            final agora = DateTime.now();
+            final dataCarga = DateTime(ano, mes, dia, agora.hour, agora.minute, agora.second);
+            timestampBrasilia = dataCarga.toIso8601String();
+          }
+        } catch (e) {
+          print('Erro ao formatar data do filtro: $e');
+        }
+      }
 
       final movimentacaoRef = await supabase
           .from('movimentacoes')

@@ -259,6 +259,18 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
         final dataMovStr = item['data_mov']?.toString();
         final dataDescargaStr = item['data_descarga']?.toString();
 
+        bool d_mov_valida = true;
+        if (dataFim != null && dataMovStr != null) {
+          try {
+            final dataMov = DateTime.parse(dataMovStr);
+            // Verifica se data_mov <= data selecionada (limite superior do dia selecionado)
+            if (dataMov.isAfter(dataFim)) {
+              d_mov_valida = false;
+            }
+          } catch (_) {}
+        }
+        if (!d_mov_valida) return false;
+
         bool dentroDaData = true;
 
         if (dataInicio != null && dataFim != null) {

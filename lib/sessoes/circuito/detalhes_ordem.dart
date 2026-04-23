@@ -579,6 +579,7 @@ class _DetalhesOrdemViewState extends State<DetalhesOrdemView>
                 Navigator.of(context).pop(true);
               },
               modoSomenteVisualizacao: modoSomenteVisualizacao,
+              dataFiltro: widget.dataFiltro,
             ),
           ),
         );

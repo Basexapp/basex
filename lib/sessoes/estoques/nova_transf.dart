@@ -220,8 +220,8 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
 
   void _gerarDatasDisponiveis() {
     final hoje = DateTime.now();
-    final inicio = hoje.subtract(const Duration(days: 5));
-    _datasDisponiveis = List.generate(10, (i) => inicio.add(Duration(days: i)));
+    final inicio = hoje.subtract(const Duration(days: 7));
+    _datasDisponiveis = List.generate(14, (i) => inicio.add(Duration(days: i)));
     _datasFormatadas = _datasDisponiveis.map(_formatarData).toList();
   }
 
@@ -1123,6 +1123,7 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
+                                    dropdownColor: Colors.white,
                                     value: _formatarData(_dataSelecionada),
                                     isExpanded: true,
                                     icon: const Icon(Icons.arrow_drop_down, size: 20),
