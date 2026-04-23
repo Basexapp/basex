@@ -96,6 +96,7 @@ class _TemperaturaDensidadeMediaPageState
   final TextEditingController _tempCtController = TextEditingController();
   final TextEditingController _placaDialogController = TextEditingController();
   final TextEditingController _horarioController = TextEditingController();
+  final TextEditingController _dataController = TextEditingController();
   
   // Variáveis para os dropdowns do diálogo
   String? _selectedProdutoId;
@@ -118,6 +119,7 @@ class _TemperaturaDensidadeMediaPageState
     _tempCtController.dispose();
     _placaDialogController.dispose();
     _horarioController.dispose();
+    _dataController.dispose();
     super.dispose();
   }
 
@@ -244,6 +246,16 @@ class _TemperaturaDensidadeMediaPageState
       return;
     }
 
+    if (_dataController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Informe a data'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (_placaDialogController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -299,15 +311,19 @@ class _TemperaturaDensidadeMediaPageState
 
     try {
       // Processar data e hora
-      final agora = DateTime.now();
+      final partesData = _dataController.text.split('/');
+      final dia = int.parse(partesData[0]);
+      final mes = int.parse(partesData[1]);
+      final ano = int.parse(partesData[2]);
+
       final partesHorario = _horarioController.text.split(':');
       final hora = int.parse(partesHorario[0]);
       final minuto = int.parse(partesHorario[1]);
       
       final dataHoraMedicao = DateTime(
-        agora.year,
-        agora.month,
-        agora.day,
+        ano,
+        mes,
+        dia,
         hora,
         minuto,
       );
@@ -336,6 +352,7 @@ class _TemperaturaDensidadeMediaPageState
       _tempCtController.clear();
       _placaDialogController.clear();
       _horarioController.clear();
+      _dataController.clear();
       _selectedProdutoId = null;
 
       // Recarregar dados
@@ -512,7 +529,9 @@ class _TemperaturaDensidadeMediaPageState
     _densidadeObsController.clear();
     _tempCtController.clear();
     _placaDialogController.clear();
-    _horarioController.text = "${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}";
+    final agora = DateTime.now();
+    _horarioController.text = "${agora.hour.toString().padLeft(2, '0')}:${agora.minute.toString().padLeft(2, '0')}";
+    _dataController.text = "${agora.day.toString().padLeft(2, '0')}/${agora.month.toString().padLeft(2, '0')}/${agora.year}";
     setState(() {
       _selectedProdutoId = null;
     });
@@ -525,6 +544,7 @@ class _TemperaturaDensidadeMediaPageState
           builder: (context, setStateDialog) {
             bool camposPreenchidos() {
               return _selectedProdutoId != null &&
+                  _dataController.text.trim().isNotEmpty &&
                   _horarioController.text.trim().isNotEmpty &&
                   _placaDialogController.text.trim().isNotEmpty &&
                   _tempAmostraController.text.trim().isNotEmpty &&
@@ -538,7 +558,7 @@ class _TemperaturaDensidadeMediaPageState
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Container(
-            width: 500,
+            width: 600,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFF0D47A1), width: 1),
@@ -568,12 +588,12 @@ class _TemperaturaDensidadeMediaPageState
                 ),
                 const SizedBox(height: 20),
                 
-                // Produto e Horário da Medição
+                // Produto, Data e Horário
                 Row(
                   children: [
                     // Campo Produto
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -589,35 +609,217 @@ class _TemperaturaDensidadeMediaPageState
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    // Campo Horário da Medição
+                    const SizedBox(width: 12),
+                    // Campo Data
                     Expanded(
-                      flex: 1,
+                      flex: 2,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Horário da medição *',
+                            'Data *',
                             style: TextStyle(
                               fontWeight: FontWeight.w500,
                               fontSize: 14,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          TextField(
-                            controller: _horarioController,
-                            readOnly: true,
-                            decoration: InputDecoration(
-                              hintText: '00:00',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
+                          InkWell(
+                            onTap: () async {
+                              DateTime inicial = DateTime.now();
+                              try {
+                                final partes = _dataController.text.split('/');
+                                if (partes.length == 3) {
+                                  inicial = DateTime(
+                                    int.parse(partes[2]),
+                                    int.parse(partes[1]),
+                                    int.parse(partes[0]),
+                                  );
+                                }
+                              } catch (_) {}
+
+                              DateTime tempDate = inicial;
+
+                              final picked = await showDialog<DateTime>(
+                                context: context,
+                                builder: (BuildContext context) {
+                                  return Dialog(
+                                    backgroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                    child: Container(
+                                      width: 350,
+                                      padding: const EdgeInsets.all(20),
+                                      child: StatefulBuilder(
+                                        builder: (context, setStateCalendar) {
+                                          int? hoveredDay;
+                                          return Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  const Icon(Icons.calendar_today, color: Color(0xFF0D47A1), size: 24),
+                                                  const SizedBox(width: 12),
+                                                  const Text('Selecionar data', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
+                                                  const Spacer(),
+                                                  IconButton(
+                                                    icon: const Icon(Icons.close),
+                                                    onPressed: () => Navigator.of(context).pop(),
+                                                    color: Colors.grey,
+                                                    padding: EdgeInsets.zero,
+                                                    constraints: const BoxConstraints(),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 10),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    IconButton(
+                                                      icon: const Icon(Icons.chevron_left, color: Color(0xFF0D47A1)),
+                                                      onPressed: () {
+                                                        setStateCalendar(() {
+                                                          tempDate = DateTime(tempDate.year, tempDate.month - 1, 1);
+                                                        });
+                                                      },
+                                                    ),
+                                                    Text(
+                                                      '${_getMonthName(tempDate.month)} ${tempDate.year}',
+                                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1)),
+                                                    ),
+                                                    IconButton(
+                                                      icon: const Icon(Icons.chevron_right, color: Color(0xFF0D47A1)),
+                                                      onPressed: () {
+                                                        setStateCalendar(() {
+                                                          tempDate = DateTime(tempDate.year, tempDate.month + 1, 1);
+                                                        });
+                                                      },
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              GridView.count(
+                                                shrinkWrap: true,
+                                                crossAxisCount: 7,
+                                                childAspectRatio: 1.0,
+                                                children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day) {
+                                                  return Center(child: Text(day, style: const TextStyle(color: Color(0xFF0D47A1), fontWeight: FontWeight.bold)));
+                                                }).toList(),
+                                              ),
+                                              GridView.count(
+                                                shrinkWrap: true,
+                                                crossAxisCount: 7,
+                                                childAspectRatio: 1.0,
+                                                children: _getDaysInMonth(tempDate).map((day) {
+                                                  final isSelected = day != null && day == tempDate.day;
+                                                  final isToday = day != null && day == DateTime.now().day && tempDate.month == DateTime.now().month && tempDate.year == DateTime.now().year;
+                                                  return StatefulBuilder(
+                                                    builder: (context, setDayState) {
+                                                      return MouseRegion(
+                                                        cursor: day != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                                                        onEnter: (_) { if (day != null) { setDayState(() => hoveredDay = day); } },
+                                                        onExit: (_) { if (day != null) { setDayState(() => hoveredDay = null); } },
+                                                        child: GestureDetector(
+                                                          onTap: day != null ? () { setStateCalendar(() { tempDate = DateTime(tempDate.year, tempDate.month, day); }); } : null,
+                                                          child: Container(
+                                                            margin: const EdgeInsets.all(2),
+                                                            decoration: BoxDecoration(
+                                                              color: isSelected ? const Color(0xFF0D47A1)
+                                                                  : (day != null && hoveredDay == day) ? const Color(0xFF0D47A1).withOpacity(0.1)
+                                                                  : isToday ? const Color(0x220D47A1) : Colors.transparent,
+                                                              shape: BoxShape.circle,
+                                                            ),
+                                                            child: Center(child: Text(
+                                                              day != null ? day.toString() : '',
+                                                              style: TextStyle(
+                                                                color: isSelected ? Colors.white : isToday || (day != null && hoveredDay == day) ? const Color(0xFF0D47A1) : Colors.black87,
+                                                                fontWeight: isSelected || isToday || (day != null && hoveredDay == day) ? FontWeight.bold : FontWeight.normal,
+                                                              ),
+                                                            )),
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  );
+                                                }).toList(),
+                                              ),
+                                              const SizedBox(height: 20),
+                                              Row(
+                                                mainAxisAlignment: MainAxisAlignment.end,
+                                                children: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.of(context).pop(),
+                                                    style: TextButton.styleFrom(foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(horizontal: 16)),
+                                                    child: const Text('CANCELAR'),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  ElevatedButton(
+                                                    onPressed: () => Navigator.of(context).pop(tempDate),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: const Color(0xFF0D47A1),
+                                                      foregroundColor: Colors.white,
+                                                      elevation: 0,
+                                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                    ),
+                                                    child: const Text('SELECIONAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+
+                              if (picked != null) {
+                                setStateDialog(() {
+                                  _dataController.text =
+                                      "${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}";
+                                });
+                              }
+                            },
+                            child: AbsorbPointer(
+                              child: TextField(
+                                controller: _dataController,
+                                decoration: InputDecoration(
+                                  hintText: 'DD/MM/AAAA',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 12,
+                                  ),
+                                  suffixIcon: const Icon(Icons.calendar_today, size: 18),
+                                ),
+                                style: const TextStyle(fontSize: 13, color: Colors.black87),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                              suffixIcon: const Icon(Icons.access_time),
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Campo Horário da Medição
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Horário *',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
                             onTap: () async {
                               final TimeOfDay? picked = await showTimePicker(
                                 context: context,
@@ -630,6 +832,23 @@ class _TemperaturaDensidadeMediaPageState
                                 });
                               }
                             },
+                            child: AbsorbPointer(
+                              child: TextField(
+                                controller: _horarioController,
+                                decoration: InputDecoration(
+                                  hintText: '00:00',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 12,
+                                  ),
+                                  suffixIcon: const Icon(Icons.access_time, size: 18),
+                                ),
+                                style: const TextStyle(fontSize: 13, color: Colors.black87),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -662,6 +881,7 @@ class _TemperaturaDensidadeMediaPageState
                       vertical: 12,
                     ),
                   ),
+                  style: const TextStyle(fontSize: 13),
                   textCapitalization: TextCapitalization.characters,
                 ),
                 const SizedBox(height: 16),
@@ -691,6 +911,7 @@ class _TemperaturaDensidadeMediaPageState
                       vertical: 12,
                     ),
                   ),
+                  style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 
@@ -721,6 +942,7 @@ class _TemperaturaDensidadeMediaPageState
                       vertical: 12,
                     ),
                   ),
+                  style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 16),
                 
@@ -749,6 +971,7 @@ class _TemperaturaDensidadeMediaPageState
                       vertical: 12,
                     ),
                   ),
+                  style: const TextStyle(fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 
@@ -992,12 +1215,48 @@ class _TemperaturaDensidadeMediaPageState
             'Clique no botão + para adicionar',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade500,
+              color: Colors.grey.shade50,
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro'
+    ];
+    return months[month - 1];
+  }
+
+  List<int?> _getDaysInMonth(DateTime date) {
+    final firstDay = DateTime(date.year, date.month, 1);
+    final lastDay = DateTime(date.year, date.month + 1, 0);
+    final firstWeekday = firstDay.weekday;
+    final startOffset = firstWeekday == 7 ? 0 : firstWeekday;
+    List<int?> days = [];
+    for (int i = 0; i < startOffset; i++) {
+      days.add(null);
+    }
+    for (int i = 1; i <= lastDay.day; i++) {
+      days.add(i);
+    }
+    while (days.length < 42) {
+      days.add(null);
+    }
+    return days;
   }
 
   Widget _buildPlacaSearchField() {

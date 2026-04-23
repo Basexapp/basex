@@ -43,6 +43,7 @@ import 'sessoes/estoques/controle_descargas.dart';
 import 'sessoes/bombeios/ordem_bombeio.dart';
 import 'sessoes/financeiro/conta_corrente_refinarias.dart';
 import 'sessoes/operacao/presets.dart';
+import 'sessoes/operacao/calculadora_arqueacao.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -118,6 +119,7 @@ class _HomePageState extends State<HomePage>
   bool _mostrarGestaoBombeios = false;
   bool _mostrarResultadoMensal = false;
   bool _mostrarRegistroPreset = false;
+  bool _mostrarCalculadoraArqueacao = false;
   bool _mostrarCardsFilial = false;
   bool _mostrarContaCorrenteRefinarias = false;
   bool _voltarParaTanquesApoCACL = false; // ← RASTREIA SE VEIO DE TANQUES
@@ -583,6 +585,15 @@ class _HomePageState extends State<HomePage>
         'label': 'Gestão de Bombeios',
         'descricao': 'Controle e acompanhamento de bombeios',
         'tipo': '0bc9a8ec-40a0-41c1-a44a-405c64c233a5',
+        'sessao_pai': 'Operação',
+        'favorito': false,
+      },
+      {
+        'id': '1ea5e5b8-498b-489b-b02a-b0a3f0aa7c87',
+        'icon': Icons.calculate_outlined,
+        'label': 'Calculadora de Arqueação',
+        'descricao': 'Cálculo de arqueação de tanques e embarcações',
+        'tipo': 'calculadora_arqueacao',
         'sessao_pai': 'Operação',
         'favorito': false,
       },
@@ -1138,6 +1149,7 @@ class _HomePageState extends State<HomePage>
       _mostrarContaCorrenteRefinarias = false;
       _voltarParaTanquesApoCACL = false;
       _mostrarGestaoBombeios = false;
+      _mostrarCalculadoraArqueacao = false;
       _resetarTodasFlagsGestaoFrota();
       _mostrarFilhosSessao = false;
       _sessaoAtual = null;
@@ -2400,6 +2412,18 @@ class _HomePageState extends State<HomePage>
         );
       }
 
+      if (_mostrarCalculadoraArqueacao) {
+        return CalculadoraArqueacaoPage(
+          key: const ValueKey('calculadora-arqueacao-page'),
+          onVoltar: () {
+            setState(() {
+              _mostrarCalculadoraArqueacao = false;
+              _mostrarFilhosDaSessao('Operação');
+            });
+          },
+        );
+      }
+
       if (_sessaoAtual == 'Perdas e Sobras') {
         return _buildFilhosSessaoPage();
       }
@@ -3438,6 +3462,11 @@ class _HomePageState extends State<HomePage>
       case 'registro_preset':
         setState(() {
           _mostrarRegistroPreset = true;
+        });
+        break;
+      case 'calculadora_arqueacao':
+        setState(() {
+          _mostrarCalculadoraArqueacao = true;
         });
         break;
     }

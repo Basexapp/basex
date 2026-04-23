@@ -341,18 +341,14 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Todos',
+                                'Visão Geral',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: tanqueSelecionadoIndex == -1
                                       ? const Color(0xFFF8F9FA)
                                       : const Color(0xFF0D47A1),
                                   fontSize: 12,
-                                  fontWeight:
-                                      tanqueSelecionadoIndex == -1 ||
-                                          _hoverIndex == -1
-                                      ? FontWeight.w600
-                                      : FontWeight.w500,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ],
@@ -522,7 +518,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                             terminalId: terminalId,
                             nomeTerminal: nomeTerminal,
                             onVoltar: () {
-                              _carregarDadosTanques();
+                              // Não recarrega tudo se apenas fechou o modal
                             },
                           ),
                     );
