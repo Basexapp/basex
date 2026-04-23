@@ -2228,25 +2228,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         ),
       );
     }
-  }
-
-  String _aplicarMascaraNotasFiscais(String texto) {
-    String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
-
-    if (apenasNumeros.length > 6) {
-      apenasNumeros = apenasNumeros.substring(0, 6);
-    }
-
-    if (apenasNumeros.isEmpty) return '';
-
-    if (apenasNumeros.length > 3) {
-      String parteMilhar = apenasNumeros.substring(0, apenasNumeros.length - 3);
-      String parteCentena = apenasNumeros.substring(apenasNumeros.length - 3);
-      return '$parteMilhar.$parteCentena';
-    }
-
-    return apenasNumeros;
-  }  
+  }    
 
   // ================= BOTÃO VOLTAR =================
   void _voltar() {

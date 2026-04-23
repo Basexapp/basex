@@ -262,12 +262,30 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
         bool dentroDaData = true;
 
         if (dataInicio != null && dataFim != null) {
-          // Verifica se a movimentação está dentro do período selecionado pela data_mov
-          if (dataMovStr != null) {
+          // PRIORIDADE 1: Usar data_descarga se existir
+          if (dataDescargaStr != null && dataDescargaStr.isNotEmpty) {
+            try {
+              final dataDescarga = DateTime.parse(dataDescargaStr);
+              final dataDescargaDate = DateTime(dataDescarga.year, dataDescarga.month, dataDescarga.day);
+              final dataInicioDate = DateTime(dataInicio.year, dataInicio.month, dataInicio.day);
+              final dataFimDate = DateTime(dataFim.year, dataFim.month, dataFim.day);
+              
+              dentroDaData = dataDescargaDate.isAfter(dataInicioDate.subtract(const Duration(days: 1))) && 
+                            dataDescargaDate.isBefore(dataFimDate.add(const Duration(days: 1)));
+            } catch (_) {
+              dentroDaData = false;
+            }
+          } 
+          // PRIORIDADE 2: Se não tem data_descarga, usar data_mov
+          else if (dataMovStr != null) {
             try {
               final dataMov = DateTime.parse(dataMovStr);
               dentroDaData = !(dataMov.isBefore(dataInicio) || dataMov.isAfter(dataFim));
-            } catch (_) {}
+            } catch (_) {
+              dentroDaData = false;
+            }
+          } else {
+            dentroDaData = false;
           }
         }
 
@@ -288,7 +306,6 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
         if (!deveAparecerSempre && dataDescargaStr != null && dataInicio != null && dataFim != null) {
           try {
             final dataDescarga = DateTime.parse(dataDescargaStr);
-            // Considera apenas a data (ignora hora) para comparar com o período selecionado
             final dataDescargaDate = DateTime(dataDescarga.year, dataDescarga.month, dataDescarga.day);
             final dataInicioDate = DateTime(dataInicio.year, dataInicio.month, dataInicio.day);
             final dataFimDate = DateTime(dataFim.year, dataFim.month, dataFim.day);
@@ -379,8 +396,9 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
       }
 
       ordensResumidas.sort((a, b) {
-        final dataA = a['data_mov']?.toString() ?? '';
-        final dataB = b['data_mov']?.toString() ?? '';
+        // PRIORIDADE: Ordenar pela data_descarga (se existir), senão por data_mov
+        final dataA = a['data_descarga']?.toString() ?? a['data_mov']?.toString() ?? '';
+        final dataB = b['data_descarga']?.toString() ?? b['data_mov']?.toString() ?? '';
         return dataB.compareTo(dataA);
       });
 
@@ -1843,6 +1861,7 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
             ? DetalhesOrdemView(
                 ordem: _ordemSelecionada!,
                 terminalAtualId: _terminalAtualId,
+                dataFiltro: _dataInicioController.text,
               )
             : _mostrarEscolherTerminal
                 ? EscolherTerminalPage(

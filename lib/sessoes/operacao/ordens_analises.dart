@@ -602,6 +602,7 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
           body: EmitirCertificadoEntrada(
             onVoltar: _voltarParaLista,
             terminalId: _terminalSelecionado ?? '',
+            dataFiltro: dataFiltroCtrl.text,
             idAnaliseExistente: _ordemSelecionadaId,
             modoSomenteVisualizacao: true,
           ),

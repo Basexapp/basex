@@ -189,7 +189,14 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
       // Soma todas as entradas do mês (20ºC e Amb)
       final entradasResp = await _supabase
           .from('movimentacoes_tanque')
-          .select('entrada_vinte, entrada_amb, tipo_mov, descricao, cliente')
+          .select('''
+            entrada_vinte, 
+            entrada_amb, 
+            tipo_mov, 
+            descricao, 
+            cliente,
+            movimentacoes(data_descarga)
+          ''')
           .eq('tanque_id', widget.tanqueId)
           .gte('data_mov', _inicioMes.toIso8601String())
           .lte('data_mov', _fimMes.toIso8601String());
@@ -286,6 +293,7 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
             saida_amb,
             saida_vinte,
             movimentacoes(
+              data_descarga,
               empresa_id,
               empresas(
                 nome_dois
@@ -300,8 +308,21 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           List<Map<String, dynamic>>.from(dados);
 
       listaOrdenadaParaUI.sort((a, b) {
-        final da = DateTime.parse(a['data_mov']);
-        final db = DateTime.parse(b['data_mov']);
+        final bool aEntrada = (a['entrada_vinte'] ?? 0) > 0 || (a['entrada_amb'] ?? 0) > 0;
+        final bool bEntrada = (b['entrada_vinte'] ?? 0) > 0 || (b['entrada_amb'] ?? 0) > 0;
+
+        String? aDataDescarga;
+        if (aEntrada && a['movimentacoes'] != null && a['movimentacoes']['data_descarga'] != null) {
+          aDataDescarga = a['movimentacoes']['data_descarga'].toString();
+        }
+        
+        String? bDataDescarga;
+        if (bEntrada && b['movimentacoes'] != null && b['movimentacoes']['data_descarga'] != null) {
+          bDataDescarga = b['movimentacoes']['data_descarga'].toString();
+        }
+
+        final da = DateTime.parse(aDataDescarga ?? a['data_mov']);
+        final db = DateTime.parse(bDataDescarga ?? b['data_mov']);
         
         final dataA = DateTime(da.year, da.month, da.day);
         final dataB = DateTime(db.year, db.month, db.day);
@@ -336,6 +357,12 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
         final num entradaVinte = (m['entrada_vinte'] ?? 0) as num;
         final num saidaAmb = (m['saida_amb'] ?? 0) as num;
         final num saidaVinte = (m['saida_vinte'] ?? 0) as num;
+
+        final bool isEntrada = entradaVinte > 0 || entradaAmb > 0;
+        String dataExibicao = m['data_mov'];
+        if (isEntrada && m['movimentacoes'] != null && m['movimentacoes']['data_descarga'] != null) {
+          dataExibicao = m['movimentacoes']['data_descarga'].toString();
+        }
 
         final String cliente = (m['cliente']?.toString().trim() ?? '');
         final String desc = (m['descricao']?.toString().trim() ?? '');
@@ -399,7 +426,7 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           'id': m['id'],
           'movimentacao_id': m['movimentacao_id'],
           'cacl_id': m['cacl_id'],
-          'data_mov': m['data_mov'],
+          'data_mov': dataExibicao,
           'empresa_nome': empresaNome,
           'descricao': descricao,
           'entrada_amb': entradaAmb,

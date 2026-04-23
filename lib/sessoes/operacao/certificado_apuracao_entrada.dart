@@ -267,11 +267,13 @@ class EmitirCertificadoEntrada extends StatefulWidget {
   final bool modoSomenteVisualizacao;
   final String? idAnaliseExistente;
   final String terminalId; // Terminal explícito, independente do usuário logado
+  final String dataFiltro; // Data selecionada no filtro de acompanhamento (dd/mm/aaaa)
 
   const EmitirCertificadoEntrada({
     super.key,
     required this.onVoltar,
     required this.terminalId,
+    required this.dataFiltro,
     this.idMovimentacao,
     this.modoSomenteVisualizacao = false,
     this.idAnaliseExistente,
@@ -458,8 +460,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           produtoSelecionado = analise['produtos']['nome'].toString();
         }
         
-        if (analise['data_analise'] != null) {
-          dataCtrl.text = _formatarDataParaTela(analise['data_analise'].toString());
+        if (analise['data_criacao'] != null) {
+          dataCtrl.text = _formatarDataParaTela(analise['data_criacao'].toString());
         }
         if (analise['hora_analise'] != null) {
           horaCtrl.text = analise['hora_analise'].toString();
@@ -597,8 +599,9 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
   void _setarDataHoraAtual() {
     final agora = DateTime.now();
-    dataCtrl.text =
-        '${agora.day.toString().padLeft(2, '0')}/${agora.month.toString().padLeft(2, '0')}/${agora.year}';
+    dataCtrl.text = widget.dataFiltro.isNotEmpty
+        ? widget.dataFiltro
+        : '${agora.day.toString().padLeft(2, '0')}/${agora.month.toString().padLeft(2, '0')}/${agora.year}';
     horaCtrl.text =
         '${agora.hour.toString().padLeft(2, '0')}:${agora.minute.toString().padLeft(2, '0')}';
   }
@@ -2169,6 +2172,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         'destino_ambiente': _converterParaInteiro(campos['destinoAmb']!.text),
         'origem_20c': _converterParaInteiro(campos['origem20']!.text),
         'destino_20c': _converterParaInteiro(campos['destino20']!.text),
+        'data_criacao': dataCtrl.text.split('/').reversed.join('-'),
         'usuario_id': user.id,
         'movimentacao_id': widget.idMovimentacao,
         'tipo_analise': 'destino',
@@ -2266,6 +2270,29 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     try {
       final supabase = Supabase.instance.client;
       final timestampBrasilia = _obterTimestampBrasilia();
+
+      // Formatar a data selecionada no campo 'Data' (dd/mm/aaaa -> yyyy-mm-dd)
+      // e combinar com a hora atual para o campo data_descarga
+      String dataDescargaFormatada = timestampBrasilia;
+      try {
+        if (dataCtrl.text.isNotEmpty) {
+          final partes = dataCtrl.text.split('/');
+          if (partes.length == 3) {
+            final agora = DateTime.now();
+            final dataFinal = DateTime(
+              int.parse(partes[2]),
+              int.parse(partes[1]),
+              int.parse(partes[0]),
+              agora.hour,
+              agora.minute,
+              agora.second,
+            );
+            dataDescargaFormatada = dataFinal.toIso8601String();
+          }
+        }
+      } catch (e) {
+        print('Erro ao formatar data do campo para o banco: $e');
+      }
       
       // 1 - Update na tabela movimentacoes_tanque
       await supabase
@@ -2281,7 +2308,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           .update({
             'entrada_amb': volumeAmbiente,
             'entrada_vinte': volume20C,
-            'data_descarga': timestampBrasilia,
+            'data_descarga': dataDescargaFormatada,
             'status_circuito_dest': '5',
             'updated_at': timestampBrasilia,
           })
@@ -2392,8 +2419,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
       
       // Data e Hora
-      if (ordemAnalise['data_analise'] != null) {
-        dataCtrl.text = _formatarDataParaTela(ordemAnalise['data_analise'].toString());
+      if (ordemAnalise['data_criacao'] != null) {
+        dataCtrl.text = _formatarDataParaTela(ordemAnalise['data_criacao'].toString());
       }
       if (ordemAnalise['hora_analise'] != null) {
         horaCtrl.text = ordemAnalise['hora_analise'].toString();

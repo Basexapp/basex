@@ -300,6 +300,7 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
             saida_amb,
             saida_vinte,
             movimentacoes(
+              data_descarga,
               empresa_id,
               empresas(
                 nome_dois
@@ -314,8 +315,21 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
           List<Map<String, dynamic>>.from(dados);
 
       listaOrdenadaParaUI.sort((a, b) {
-        final da = DateTime.parse(a['data_mov']);
-        final db = DateTime.parse(b['data_mov']);
+        final bool aEntrada = (a['entrada_vinte'] ?? 0) > 0 || (a['entrada_amb'] ?? 0) > 0;
+        final bool bEntrada = (b['entrada_vinte'] ?? 0) > 0 || (b['entrada_amb'] ?? 0) > 0;
+
+        String? aDataDescarga;
+        if (aEntrada && a['movimentacoes'] != null && a['movimentacoes']['data_descarga'] != null) {
+          aDataDescarga = a['movimentacoes']['data_descarga'].toString();
+        }
+        
+        String? bDataDescarga;
+        if (bEntrada && b['movimentacoes'] != null && b['movimentacoes']['data_descarga'] != null) {
+          bDataDescarga = b['movimentacoes']['data_descarga'].toString();
+        }
+
+        final da = DateTime.parse(aDataDescarga ?? a['data_mov']);
+        final db = DateTime.parse(bDataDescarga ?? b['data_mov']);
         
         final dataA = DateTime(da.year, da.month, da.day);
         final dataB = DateTime(db.year, db.month, db.day);
@@ -351,6 +365,12 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
         final num entradaVinte = (m['entrada_vinte'] ?? 0) as num;
         final num saidaAmb = (m['saida_amb'] ?? 0) as num;
         final num saidaVinte = (m['saida_vinte'] ?? 0) as num;
+
+        final bool isEntrada = entradaVinte > 0 || entradaAmb > 0;
+        String dataExibicao = m['data_mov'];
+        if (isEntrada && m['movimentacoes'] != null && m['movimentacoes']['data_descarga'] != null) {
+          dataExibicao = m['movimentacoes']['data_descarga'].toString();
+        }
 
         final String cliente = (m['cliente']?.toString().trim() ?? '');
         final String desc = (m['descricao']?.toString().trim() ?? '');
@@ -420,7 +440,7 @@ class _EstoqueTanquePageState extends State<EstoqueTanquePage> {
           'id': m['id'],
           'movimentacao_id': m['movimentacao_id'],
           'cacl_id': m['cacl_id'],
-          'data_mov': m['data_mov'],
+          'data_mov': dataExibicao,
           'empresa_nome': empresaNome,
           'descricao': descricao,
           'entrada_amb': entradaAmb,

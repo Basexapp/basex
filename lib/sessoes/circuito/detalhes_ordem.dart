@@ -20,11 +20,13 @@ enum TipoMovimentacao {
 class DetalhesOrdemView extends StatefulWidget {
   final Map<String, dynamic> ordem;
   final String terminalAtualId;
+  final String dataFiltro; // Data selecionada no filtro de acompanhamento (dd/mm/aaaa)
 
   const DetalhesOrdemView({
     super.key,
     required this.ordem,
     required this.terminalAtualId,
+    required this.dataFiltro,
   });
 
   @override
@@ -617,6 +619,7 @@ class _DetalhesOrdemViewState extends State<DetalhesOrdemView>
               idMovimentacao: movimentacaoId,
               modoSomenteVisualizacao: modoSomenteVisualizacao, // NOVO PARÂMETRO
               idAnaliseExistente: idAnaliseExistente, // ID da análise existente
+              dataFiltro: widget.dataFiltro, // Data do filtro de acompanhamento
             ),
           ),
         );
