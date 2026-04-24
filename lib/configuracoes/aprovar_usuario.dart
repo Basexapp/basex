@@ -187,7 +187,9 @@ class _AprovarUsuarioPageState extends State<AprovarUsuarioPage> {
 
             // 🔥 APENAS UM DROPDOWN – CORRETO E FUNCIONAL
             DropdownButtonFormField<String>(
-              value: filialSelecionada,
+              value: (_filiais.any((f) => f['id'].toString() == filialSelecionada))
+                  ? filialSelecionada
+                  : null,
               decoration: const InputDecoration(
                 labelText: "Filial",
                 border: OutlineInputBorder(),
@@ -206,7 +208,13 @@ class _AprovarUsuarioPageState extends State<AprovarUsuarioPage> {
             const SizedBox(height: 20),
 
             DropdownButtonFormField<String>(
-              value: nivelSelecionado,
+              value: (const [
+                "Logística / Operações ♦ Nível 1",
+                "Gerência e supervisão ♦ Nível 2",
+                "Diretoria e Administração ♦ Nível 3"
+              ].contains(nivelSelecionado))
+                  ? nivelSelecionado
+                  : null,
               decoration: const InputDecoration(
                 labelText: "Nível de acesso",
                 border: OutlineInputBorder(),

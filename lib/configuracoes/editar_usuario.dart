@@ -219,7 +219,9 @@ class _EditarUsuarioPageState extends State<EditarUsuarioPage> {
 
                       // 🔹 Filial
                       DropdownButtonFormField<String>(
-                        value: filialSelecionada,
+                        value: (_filiais.any((f) => f['id'].toString() == filialSelecionada))
+                            ? filialSelecionada
+                            : null,
                         decoration: const InputDecoration(
                           labelText: "Filial",
                           border: OutlineInputBorder(),
@@ -243,7 +245,9 @@ class _EditarUsuarioPageState extends State<EditarUsuarioPage> {
 
                       // 🔹 Nível
                       DropdownButtonFormField<String>(
-                        value: nivelSelecionado,
+                        value: (const ["1", "2", "3"].contains(nivelSelecionado))
+                            ? nivelSelecionado
+                            : null,
                         decoration: const InputDecoration(
                           labelText: "Nível de acesso",
                           border: OutlineInputBorder(),

@@ -28,6 +28,7 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
   Map<String, bool> permissoes = {};
   String? usuarioSelecionadoId;
   String? usuarioSelecionadoNome;
+  String? moduloSelecionado;
 
   @override
   void initState() {
@@ -136,12 +137,13 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
     });
 
     try {
-      // 1. Carregar todos os cards ativos do banco (apenas id e nome)
+      // 1. Carregar todos os cards ativos do banco (id, nome e modulo)
       final cardsData = await supabase
           .from('cards')
-          .select('id, nome')
+          .select('id, nome, modulo')
           .eq('ativo', true)
-          .order('nome');
+          .order('modulo', ascending: true)
+          .order('ordem', ascending: true);
 
       // 2. Carregar permissões deste usuário
       final permissoesData = await supabase
@@ -161,7 +163,7 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
         mapaPermissoes[cardId] = permissaoEncontrada['permitido'] ?? false;
       }
 
-      // 4. Preparar lista de cards
+      // 4. Preparar lista de cards com modulo
       List<Map<String, dynamic>> listaCards = [];
 
       for (var card in cardsData) {
@@ -169,19 +171,28 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
         listaCards.add({
           'id': cardId,
           'nome': card['nome'],
+          'modulo': card['modulo'] ?? 'Sem Módulo',
           'permitido': mapaPermissoes[cardId] ?? false,
         });
       }
-
-      // 5. Ordenar de A a Z de forma insensível a maiúsculas e minúsculas
-      listaCards.sort((a, b) => (a['nome'] as String).toLowerCase().compareTo((b['nome'] as String).toLowerCase()));
 
       setState(() {
         cards = listaCards;
         cardsFiltrados = listaCards;
         permissoes = mapaPermissoes;
+        
+        // Definir módulo padrão se houver
+        if (listaCards.isNotEmpty) {
+          final modulosValidos = listaCards
+              .map((c) => c['modulo'] as String)
+              .toSet()
+              .toList()
+            ..sort();
+          moduloSelecionado = modulosValidos.first;
+        } else {
+          moduloSelecionado = null;
+        }
       });
-
     } catch (e) {
       debugPrint('❌ Erro ao carregar cards: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -248,19 +259,6 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
         }
       });
 
-      // Feedback visual
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            permitido 
-              ? 'Permissão concedida!' 
-              : 'Permissão revogada!',
-          ),
-          backgroundColor: permitido ? Colors.green : Colors.orange,
-          duration: const Duration(seconds: 1),
-        ),
-      );
-
     } catch (e) {
       debugPrint("❌ Erro ao atualizar permissão do card: $e");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -274,6 +272,27 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
       setState(() {
         permissoes[cardId] = !permitido;
       });
+    }
+  }
+
+  // Marcar ou desmarcar todos os cards do módulo atual
+  Future<void> _alternarTodosModulo(bool marcar) async {
+    if (usuarioSelecionadoId == null || moduloSelecionado == null) return;
+
+    final cardsDoModulo = cardsFiltrados
+        .where((c) => c['modulo'] == moduloSelecionado)
+        .toList();
+
+    if (cardsDoModulo.isEmpty) return;
+
+    try {
+      for (var card in cardsDoModulo) {
+        if (card['permitido'] != marcar) {
+          await _atualizarPermissaoCard(card['id'], marcar);
+        }
+      }
+    } catch (e) {
+      debugPrint("❌ Erro ao alternar permissões em massa: $e");
     }
   }
 
@@ -460,7 +479,7 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
     );
   }
 
-  // Conteúdo dos cards (lista simples por nome)
+  // Conteúdo dos cards com navegação por módulos
   Widget _buildConteudoCards() {
     if (cardsFiltrados.isEmpty) {
       return const Center(
@@ -473,43 +492,94 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
               'Nenhum card encontrado',
               style: TextStyle(fontSize: 16, color: Colors.grey),
             ),
-            Text(
-              'Tente outra busca ou remova os filtros',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
           ],
         ),
       );
     }
 
-    final totalPermitidos = cardsFiltrados.where((c) => c['permitido'] == true).length;
-    final totalCards = cardsFiltrados.length;
+    // Obter lista única de módulos
+    final modulos = cardsFiltrados
+        .map((c) => c['modulo'] as String)
+        .toSet()
+        .toList()
+      ..sort();
+
+    if (moduloSelecionado == null && modulos.isNotEmpty) {
+      moduloSelecionado = modulos.first;
+    }
+
+    final cardsDoModulo = cardsFiltrados
+        .where((c) => c['modulo'] == moduloSelecionado)
+        .toList();
+
+    final todosPermitidos = cardsDoModulo.isNotEmpty && 
+                            cardsDoModulo.every((c) => c['permitido'] == true);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Text(
-            '$totalPermitidos de $totalCards cards permitidos',
-            style: TextStyle(
-              fontSize: 13,
-              color: totalPermitidos == totalCards
-                  ? Colors.green
-                  : totalPermitidos == 0
-                      ? Colors.red
-                      : Colors.orange,
-              fontWeight: FontWeight.w500,
-            ),
+        // Navegação Superior de Módulos
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: modulos.map((modulo) {
+              final isSelected = moduloSelecionado == modulo;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(modulo),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    if (selected) {
+                      setState(() => moduloSelecionado = modulo);
+                    }
+                  },
+                  selectedColor: const Color(0xFF0D47A1),
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              );
+            }).toList(),
           ),
         ),
+
+        const Divider(),
+
+        // Barra de Ações do Módulo
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Text(
+                '${cardsDoModulo.length} cards em $moduloSelecionado',
+                style: const TextStyle(fontWeight: FontWeight.w500),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _alternarTodosModulo(!todosPermitidos),
+                icon: Icon(
+                  todosPermitidos ? Icons.remove_done : Icons.done_all,
+                  size: 18,
+                ),
+                label: Text(todosPermitidos ? 'Desmarcar Todos' : 'Marcar Todos'),
+                style: TextButton.styleFrom(
+                  foregroundColor: todosPermitidos ? Colors.red : Colors.green,
+                ),
+              ),
+            ],
+          ),
+        ),
+
         Expanded(
           child: ListView.separated(
-            itemCount: cardsFiltrados.length,
+            itemCount: cardsDoModulo.length,
             separatorBuilder: (context, index) =>
                 Divider(color: Colors.grey.shade200, height: 1),
             itemBuilder: (context, index) {
-              final card = cardsFiltrados[index];
+              final card = cardsDoModulo[index];
               return _buildCardItem(card);
             },
           ),
