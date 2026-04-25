@@ -33,6 +33,7 @@ import 'sessoes/suporte/desenvolvedor.dart';
 import 'sessoes/suporte/suporte.dart';
 import 'sessoes/suporte/fila_solic.dart';
 import 'sessoes/circuito/criar_ordem.dart';
+import 'sessoes/circuito/radar.dart';
 import 'sessoes/almoxerifado/frascos_amostras.dart';
 import 'sessoes/almoxerifado/filtro_estoque_frascos.dart';
 import 'sessoes/operacao/estoque_produto.dart';
@@ -693,6 +694,14 @@ class _HomePageState extends State<HomePage>
         'label': 'Criar Ordem',
         'descricao': 'Criar uma nova ordem',
         'tipo': 'criar_ordem',
+        'sessao_pai': 'Circuito',
+      },
+      {
+        'id': 'c94451c8-2c41-49b1-9181-be3a5f1e7205',
+        'icon': Icons.radar,
+        'label': 'Radar',
+        'descricao': 'Visualização em radar das ordens',
+        'tipo': 'radar',
         'sessao_pai': 'Circuito',
       },
     ];
@@ -2836,6 +2845,14 @@ class _HomePageState extends State<HomePage>
               });
             },
           );
+        case 'radar':
+          return RadarPage(
+            onVoltar: () {
+              setState(() {
+                _filhoSelecionadoTipo = null;
+              });
+            },
+          );
         case 'ordem_bombeio':
           return _buildPaginaPadronizada(
             titulo: 'Ordem de Bombeio',
@@ -3634,6 +3651,11 @@ class _HomePageState extends State<HomePage>
           _mostrarFilhosSessao = true;
           _sessaoAtual = 'Circuito';
           _filhosSessaoAtual = List.from(_filhosPorSessao['Circuito'] ?? []);
+        });
+        break;
+      case 'radar':
+        setState(() {
+          _filhoSelecionadoTipo = 'radar';
         });
         break;
     }
