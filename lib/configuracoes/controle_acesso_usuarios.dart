@@ -275,27 +275,6 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
     }
   }
 
-  // Marcar ou desmarcar todos os cards do módulo atual
-  Future<void> _alternarTodosModulo(bool marcar) async {
-    if (usuarioSelecionadoId == null || moduloSelecionado == null) return;
-
-    final cardsDoModulo = cardsFiltrados
-        .where((c) => c['modulo'] == moduloSelecionado)
-        .toList();
-
-    if (cardsDoModulo.isEmpty) return;
-
-    try {
-      for (var card in cardsDoModulo) {
-        if (card['permitido'] != marcar) {
-          await _atualizarPermissaoCard(card['id'], marcar);
-        }
-      }
-    } catch (e) {
-      debugPrint("❌ Erro ao alternar permissões em massa: $e");
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (carregando) {
@@ -479,7 +458,7 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
     );
   }
 
-  // Conteúdo dos cards com navegação por módulos
+  // Conteúdo dos módulos como ExpansionTiles (Acordeão)
   Widget _buildConteudoCards() {
     if (cardsFiltrados.isEmpty) {
       return const Center(
@@ -504,137 +483,130 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
         .toList()
       ..sort();
 
-    if (moduloSelecionado == null && modulos.isNotEmpty) {
-      moduloSelecionado = modulos.first;
-    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: modulos.length,
+      itemBuilder: (context, index) {
+        final modulo = modulos[index];
+        final cardsDoModulo = cardsFiltrados
+            .where((c) => c['modulo'] == modulo)
+            .toList();
+        
+        final todosPermitidos = cardsDoModulo.isNotEmpty && 
+                                cardsDoModulo.every((c) => c['permitido'] == true);
 
-    final cardsDoModulo = cardsFiltrados
-        .where((c) => c['modulo'] == moduloSelecionado)
-        .toList();
-
-    final todosPermitidos = cardsDoModulo.isNotEmpty && 
-                            cardsDoModulo.every((c) => c['permitido'] == true);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Navegação Superior de Módulos
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: modulos.map((modulo) {
-              final isSelected = moduloSelecionado == modulo;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(modulo),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    if (selected) {
-                      setState(() => moduloSelecionado = modulo);
-                    }
-                  },
-                  selectedColor: const Color(0xFF0D47A1),
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              );
-            }).toList(),
+        return Card(
+          elevation: 0,
+          margin: const EdgeInsets.only(bottom: 8),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(color: Colors.grey.shade200),
           ),
-        ),
-
-        const Divider(),
-
-        // Barra de Ações do Módulo
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
+          child: ExpansionTile(
+            key: PageStorageKey(modulo),
+            title: Text(
+              modulo,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: Color(0xFF0D47A1),
+              ),
+            ),
+            subtitle: Text(
+              '${cardsDoModulo.length} cards',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            leading: Icon(
+              Icons.folder_open,
+              color: todosPermitidos ? Colors.green : const Color(0xFF0D47A1),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    todosPermitidos ? Icons.done_all : Icons.playlist_add_check,
+                    color: todosPermitidos ? Colors.green : Colors.grey,
+                    size: 20,
+                  ),
+                  tooltip: todosPermitidos ? 'Desmarcar Todos' : 'Marcar Todos',
+                  onPressed: () {
+                    // Chamamos a função passando o módulo específico
+                    _alternarTodosModuloNoExpansion(modulo, !todosPermitidos);
+                  },
+                ),
+                const Icon(Icons.expand_more),
+              ],
+            ),
             children: [
-              Text(
-                '${cardsDoModulo.length} cards em $moduloSelecionado',
-                style: const TextStyle(fontWeight: FontWeight.w500),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () => _alternarTodosModulo(!todosPermitidos),
-                icon: Icon(
-                  todosPermitidos ? Icons.remove_done : Icons.done_all,
-                  size: 18,
-                ),
-                label: Text(todosPermitidos ? 'Desmarcar Todos' : 'Marcar Todos'),
-                style: TextButton.styleFrom(
-                  foregroundColor: todosPermitidos ? Colors.red : Colors.green,
-                ),
-              ),
+              const Divider(height: 1),
+              ...cardsDoModulo.map((card) => _buildCardItem(card)).toList(),
             ],
           ),
-        ),
-
-        Expanded(
-          child: ListView.separated(
-            itemCount: cardsDoModulo.length,
-            separatorBuilder: (context, index) =>
-                Divider(color: Colors.grey.shade200, height: 1),
-            itemBuilder: (context, index) {
-              final card = cardsDoModulo[index];
-              return _buildCardItem(card);
-            },
-          ),
-        ),
-      ],
+        );
+      },
     );
+  }
+
+  // Marcar ou desmarcar todos os cards de um módulo específico
+  Future<void> _alternarTodosModuloNoExpansion(String modulo, bool marcar) async {
+    if (usuarioSelecionadoId == null) return;
+
+    final cardsDoModulo = cardsFiltrados
+        .where((c) => c['modulo'] == modulo)
+        .toList();
+
+    if (cardsDoModulo.isEmpty) return;
+
+    try {
+      for (var card in cardsDoModulo) {
+        if (card['permitido'] != marcar) {
+          await _atualizarPermissaoCard(card['id'], marcar);
+        }
+      }
+    } catch (e) {
+      debugPrint("❌ Erro ao alternar permissões em massa: $e");
+    }
   }
 
   // Widget para item individual do card
   Widget _buildCardItem(Map<String, dynamic> card) {
     final permitido = card['permitido'] ?? false;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: permitido ? Colors.green.shade50 : Colors.white,
-      child: Row(
-        children: [
-          // Indicador visual
-          Container(
-            width: 3,
-            height: 32,
-            color: permitido ? Colors.green : Colors.grey.shade300,
-          ),
-          const SizedBox(width: 12),
-
-          // Nome do card
-          Expanded(
-            child: Text(
-              card['nome'] ?? 'Sem nome',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                color: permitido
-                    ? const Color(0xFF2E7D32)
-                    : Colors.grey.shade800,
+    return InkWell(
+      onTap: () async {
+        await _atualizarPermissaoCard(card['id'], !permitido);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        color: permitido ? Colors.green.shade50.withOpacity(0.3) : Colors.transparent,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                card['nome'] ?? 'Sem nome',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: permitido ? FontWeight.w500 : FontWeight.normal,
+                  color: permitido
+                      ? const Color(0xFF2E7D32)
+                      : Colors.grey.shade800,
+                ),
               ),
             ),
-          ),
-
-          // Checkbox de permissão
-          Transform.scale(
-            scale: 0.9,
-            child: Checkbox(
-              value: permitido,
-              activeColor: const Color(0xFF2E7D32),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
+            Transform.scale(
+              scale: 0.8,
+              child: Checkbox(
+                value: permitido,
+                activeColor: const Color(0xFF2E7D32),
+                onChanged: (valor) async {
+                  if (valor == null) return;
+                  await _atualizarPermissaoCard(card['id'], valor);
+                },
               ),
-              onChanged: (valor) async {
-                if (valor == null) return;
-                await _atualizarPermissaoCard(card['id'], valor);
-              },
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
