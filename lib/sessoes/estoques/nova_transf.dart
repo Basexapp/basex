@@ -385,7 +385,8 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
 
       final response = await supabase
           .from('produtos')
-          .select('id, nome');
+          .select('id, nome, grupo')
+          .eq('lista_transf', true);
 
       final produtos = List<Map<String, dynamic>>.from(response);
 
@@ -1183,6 +1184,7 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
                                   child: DropdownButton<String>(
                                     value: _produtoSelecionado,
                                     isExpanded: true,
+                                    itemHeight: null,
                                     icon: const Icon(Icons.arrow_drop_down, size: 20),
                                     style: const TextStyle(fontSize: 13, color: Colors.black),
                                     hint: const Padding(
@@ -1195,12 +1197,31 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
                                         _produtoId = id;
                                       });
                                     },
+                                    dropdownColor: Colors.white,
                                     items: _produtos.map((produto) {
+                                      final grupo = produto['grupo']?.toString();
+                                      final isEspecial = grupo == '2' || grupo == '3';
+
                                       return DropdownMenuItem<String>(
                                         value: produto['id']?.toString(),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                                          child: Text(produto['nome']?.toString() ?? ''),
+                                        child: Container(
+                                          width: double.infinity,
+                                          height: 32, // Altura reduzida para diminuir a distância
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isEspecial ? const Color.fromARGB(255, 255, 195, 195) : null,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                            produto['nome']?.toString() ?? '',
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                            ),
+                                            overflow: TextOverflow.visible,
+                                          ),
                                         ),
                                       );
                                     }).toList(),

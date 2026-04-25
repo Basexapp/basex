@@ -803,8 +803,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
           SizedBox(
             width: 180,
             child: DropdownButtonFormField<String>(
-              initialValue: tanque.produtoId,
+              value: tanque.produtoId,
               isExpanded: true,
+              dropdownColor: Colors.white,
               items: [
                 const DropdownMenuItem<String>(
                   value: '',
@@ -812,24 +813,25 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                 ),
                 ..._produtos.map(
                   (p) {
-                    final isGrupo2 = p['grupo']?.toString() == '2';
+                    final grupo = p['grupo']?.toString();
+                    final isEspecial = grupo == '2' || grupo == '3';
                     return DropdownMenuItem<String>(
                       value: p['id'].toString(),
                       child: Container(
                         width: double.infinity,
+                        height: 32,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 4,
-                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: isGrupo2 ? Colors.grey.shade800 : null,
+                          color: isEspecial ? const Color.fromARGB(255, 255, 195, 195) : null,
                           borderRadius: BorderRadius.circular(4),
                         ),
+                        alignment: Alignment.centerLeft,
                         child: Text(
                           p['nome_dois'],
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 13,
-                            color: isGrupo2 ? Colors.white : Colors.black87,
                           ),
                           overflow: TextOverflow.visible,
                         ),
