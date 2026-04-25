@@ -538,52 +538,6 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
                     },
                   ),
                 ),
-
-                const SizedBox(width: 8),
-
-                SizedBox(
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: _refreshData,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    child: const Text('Aplicar'),
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                SizedBox(
-                  height: 40,
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      setState(() {
-                        produtoSelecionado = null;
-                        dataFiltro = null;
-                        dataFiltroCtrl.clear();
-                        
-                        final nivel = _usuarioData?['nivel'];
-                        final terminalId = UsuarioAtual.instance?.terminalId ?? _usuarioData?['terminal_id'];
-                        
-                        if (nivel != 3) {
-                          _terminalSelecionado = terminalId;
-                          _carregarNomeTerminal(_terminalSelecionado);
-                        } else {
-                          _terminalSelecionado = null;
-                          terminalController.clear();
-                        }
-                        
-                        _busca = '';
-                      });
-                      await _refreshData();
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    child: const Text('Limpar'),
-                  ),
-                ),
               ],
             ),
           ],
