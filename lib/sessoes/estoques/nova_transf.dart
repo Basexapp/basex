@@ -385,34 +385,35 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
 
       final response = await supabase
           .from('produtos')
-          .select('id, nome, grupo')
+          .select('id, nome, nome_dois, posicao, grupo')
           .eq('lista_transf', true);
 
-      final produtos = List<Map<String, dynamic>>.from(response);
+      final listaProdutos = List<Map<String, dynamic>>.from(response);
 
-      const ordemPorId = {
-        '82c348c8-efa1-4d1a-953a-ee384d5780fc': 1,
-        '93686e9d-6ef5-4f7c-a97d-b058b3c2c693': 2,
-        'c77a6e31-52f0-4fe1-bdc8-685dff83f3a1': 3,
-        '58ce20cf-f252-4291-9ef6-f4821f22c29e': 4,
-        '66ca957a-5698-4a02-8c9e-987770b6a151': 5,
-        'f8e95435-471a-424c-947f-def8809053a0': 6,
-        '4da89784-301f-4abe-b97e-c48729969e3d': 7,
-        '3c26a7e5-8f3a-4429-a8c7-2e0e72f1b80a': 8,
-        'cecab8eb-297a-4640-81ae-e88335b88d8b': 9,
-        'ecd91066-e763-42e3-8a0e-d982ea6da535': 10,
-      };
+      // Ordenação manual por posicao (double)
+      listaProdutos.sort((a, b) {
+        final valA = a['posicao'];
+        final valB = b['posicao'];
 
-      produtos.sort((a, b) {
-        final idA = a['id'].toString().toLowerCase();
-        final idB = b['id']?.toString().toLowerCase() ?? '';
+        double posA;
+        if (valA is num) {
+          posA = valA.toDouble();
+        } else {
+          posA = double.tryParse(valA?.toString() ?? '') ?? 999999.0;
+        }
 
-        return (ordemPorId[idA] ?? 999)
-            .compareTo(ordemPorId[idB] ?? 999);
+        double posB;
+        if (valB is num) {
+          posB = valB.toDouble();
+        } else {
+          posB = double.tryParse(valB?.toString() ?? '') ?? 999999.0;
+        }
+
+        return posA.compareTo(posB);
       });
 
       setState(() {
-        _produtos = produtos;
+        _produtos = listaProdutos;
       });
     } catch (e) {
       debugPrint('Erro ao carregar produtos: $e');
@@ -1205,7 +1206,6 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
                                       return DropdownMenuItem<String>(
                                         value: produto['id']?.toString(),
                                         child: Container(
-                                          width: double.infinity,
                                           height: 32, // Altura reduzida para diminuir a distância
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 12,
@@ -1216,7 +1216,7 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
                                           ),
                                           alignment: Alignment.centerLeft,
                                           child: Text(
-                                            produto['nome']?.toString() ?? '',
+                                            produto['nome_dois']?.toString() ?? produto['nome']?.toString() ?? '',
                                             style: const TextStyle(
                                               fontSize: 13,
                                             ),

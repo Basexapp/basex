@@ -174,18 +174,42 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
   );
 }
 
-Future<void> _carregarDados() async {
+  Future<void> _carregarDados() async {
     try {
       final supabase = Supabase.instance.client;
       final usuario = UsuarioAtual.instance!;
 
+      // Captura o resultado bruto para debug
       final produtosResponse = await supabase
           .from('produtos')
-          .select('id, nome')
-          .order('nome');
+          .select('id, nome, nome_dois, posicao, grupo')
+          .eq('lista_transf', true);
+      
+      var listaProdutos = List<Map<String, dynamic>>.from(produtosResponse);
+      
+      listaProdutos.sort((a, b) {
+        final valA = a['posicao'];
+        final valB = b['posicao'];
+        
+        double posA;
+        if (valA is num) {
+          posA = valA.toDouble();
+        } else {
+          posA = double.tryParse(valA?.toString() ?? '') ?? 999.0;
+        }
+
+        double posB;
+        if (valB is num) {
+          posB = valB.toDouble();
+        } else {
+          posB = double.tryParse(valB?.toString() ?? '') ?? 999.0;
+        }
+        
+        return posA.compareTo(posB);
+      });
 
       setState(() {
-        produtos = List<Map<String, dynamic>>.from(produtosResponse);
+        produtos = listaProdutos;
       });
 
       String? terminalId;
@@ -1436,9 +1460,25 @@ Future<void> _carregarDados() async {
                                     child: Text('Selecione um produto'),
                                   ),
                                   ...produtos.map((produto) {
+                                    final grupo = produto['grupo']?.toString();
+                                    final isEspecial = grupo == '2' || grupo == '3';
+
                                     return DropdownMenuItem(
                                       value: produto['id']?.toString(),
-                                      child: Text(produto['nome']?.toString() ?? ''),
+                                      child: Container(
+                                        height: 32,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: isEspecial ? const Color.fromARGB(255, 255, 195, 195) : null,
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          produto['nome_dois']?.toString() ?? produto['nome']?.toString() ?? '',
+                                          style: const TextStyle(fontSize: 13),
+                                          overflow: TextOverflow.visible,
+                                        ),
+                                      ),
                                     );
                                   }).toList(),
                                 ],
