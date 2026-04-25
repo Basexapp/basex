@@ -159,12 +159,17 @@ class _DetalhesOrdemViewState extends State<DetalhesOrdemView>
 
   // Inicializa o histórico baseado no tipo de movimentação
   void _inicializarHistorico() {
+    final tipoOp = widget.ordem['tipo_op']?.toString().toLowerCase() ?? '';
+    final isConsumo = tipoOp == 'consumo';
+
     if (_tipoMovimentacao == TipoMovimentacao.carregamento) {
       _historicoFatos = [
         {
           'data': '15/01/2024',
           'hora': '09:30',
-          'descricao': 'Programação de carregamento realizada por Carlos Silva'
+          'descricao': isConsumo 
+              ? 'Programação de consumo realizada por Carlos Silva'
+              : 'Programação de carregamento realizada por Carlos Silva'
         },
         {
           'data': '15/01/2024',
@@ -179,12 +184,16 @@ class _DetalhesOrdemViewState extends State<DetalhesOrdemView>
         {
           'data': '15/01/2024',
           'hora': '11:00',
-          'descricao': 'Check-list finalizado, início do carregamento.'
+          'descricao': isConsumo
+              ? 'Check-list finalizado, início do consumo.'
+              : 'Check-list finalizado, início do carregamento.'
         },
         {
           'data': '15/01/2024',
           'hora': '12:20',
-          'descricao': 'Veículo carregado. Aguardando emissão de nota fiscal'
+          'descricao': isConsumo
+              ? 'Veículo abastecido para consumo. Aguardando emissão de nota fiscal'
+              : 'Veículo carregado. Aguardando emissão de nota fiscal'
         },
         {
           'data': '15/01/2024',
@@ -983,7 +992,9 @@ class _DetalhesOrdemViewState extends State<DetalhesOrdemView>
         final agora = DateTime.now();
         final descricaoChecklist = isVenda
             ? 'Check-list concluído. Aguardando emissão de nota fiscal.'
-            : 'Check-list concluído, início do carregamento/descarga.';
+            : (tipoOp == 'consumo' 
+                ? 'Check-list concluído, início do consumo.'
+                : 'Check-list concluído, início do carregamento/descarga.');
         
         _historicoFatos.insert(3, {
           'data': '${agora.day.toString().padLeft(2, '0')}/${agora.month.toString().padLeft(2, '0')}/${agora.year}',
@@ -1509,6 +1520,8 @@ class _DetalhesOrdemViewState extends State<DetalhesOrdemView>
           // Fallback para cliente se descrição não existir
           informacao = (mov['cliente'] as String?)?.trim() ?? '';
         }
+      } else if (tipoOp == 'consumo') {
+        informacao = 'Consumo Próprio';
       } else {
         // Para outros tipos, usar cliente
         informacao = (mov['cliente'] as String?)?.trim() ?? '';

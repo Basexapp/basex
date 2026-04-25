@@ -120,7 +120,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
             terminal_origem:terminais!terminal_orig_id(nome_dois),
             terminal_destino:terminais!terminal_dest_id(nome_dois)
           ''')
-          .eq("tipo_op", "transf")
+          .or('tipo_op.eq.transf,tipo_op.eq.consumo')
           .gte("data_mov", inicio)
           .lte("data_mov", fim)
           .order("data_mov", ascending: false);
@@ -173,7 +173,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
             terminal_origem:terminais!terminal_orig_id(nome_dois),
             terminal_destino:terminais!terminal_dest_id(nome_dois)
           ''')
-          .eq("tipo_op", "transf")
+          .or('tipo_op.eq.transf,tipo_op.eq.consumo')
           .order("data_mov", ascending: true)
           .range(from, to);
 
@@ -206,8 +206,10 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
     if (query.isEmpty) return lista;
 
     return lista.where((t) {
+      final tipoOp = t['tipo_op']?.toString().toLowerCase() ?? '';
       return (t['descricao']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['placa']?.toString().toLowerCase() ?? '').contains(query) ||
+          tipoOp.contains(query) ||
           (t['data_mov']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['qtd_faturada']?.toString().toLowerCase() ?? '').contains(query) ||
           (t['motoristas']?['nome']?.toString().toLowerCase() ?? '').contains(query) ||
@@ -405,6 +407,10 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
                                       icon: Icon(Icons.more_vert, size: 18, color: Colors.grey.shade700),
                                       onSelected: (value) async {
                                         if (value == 'cancel') {
+                                          final isConsumo = t['tipo_op'] == 'consumo';
+                                          final tituloDialog = isConsumo ? 'Cancelar consumo' : 'Cancelar transferência';
+                                          final corpoDialog = isConsumo ? 'Tem certeza que deseja cancelar o registro de consumo?\n' : 'Tem certeza que deseja cancelar a transferência?\n';
+
                                           final confirm = await showDialog<bool>(
                                             context: context,
                                             builder: (ctx) => Dialog(
@@ -426,12 +432,12 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
                                                         borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
                                                       ),
                                                       child: Row(
-                                                        children: const [
-                                                          Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
-                                                          SizedBox(width: 8),
+                                                        children: [
+                                                          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+                                                          const SizedBox(width: 8),
                                                           Text(
-                                                            'Cancelar transferência',
-                                                            style: TextStyle(
+                                                            tituloDialog,
+                                                            style: const TextStyle(
                                                               fontSize: 15,
                                                               fontWeight: FontWeight.w600,
                                                               color: Colors.white,
@@ -446,15 +452,15 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
                                                       padding: const EdgeInsets.all(20),
                                                       child: RichText(
                                                         textAlign: TextAlign.center,
-                                                        text: const TextSpan(
-                                                          style: TextStyle(
+                                                        text: TextSpan(
+                                                          style: const TextStyle(
                                                             fontSize: 14,
                                                             height: 1.4,
                                                             color: Colors.black,
                                                           ),
                                                           children: [
-                                                            TextSpan(text: 'Tem certeza que deseja cancelar a transferência?\n'),
-                                                            TextSpan(text: 'Essa ação é irreversível.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                                                            TextSpan(text: corpoDialog),
+                                                            const TextSpan(text: 'Essa ação é irreversível.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                                                           ],
                                                         ),
                                                       ),
@@ -513,13 +519,19 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
                                           }
                                         }
                                       },
-                                      itemBuilder: (ctx) => [
-                                        PopupMenuItem<String>(
-                                          value: 'cancel',
-                                          height: 36,
-                                          child: Text('Cancelar transferência', style: TextStyle(fontSize: 13)),
-                                        ),
-                                      ],
+                                      itemBuilder: (ctx) {
+                                        final isConsumo = t['tipo_op'] == 'consumo';
+                                        return [
+                                          PopupMenuItem<String>(
+                                            value: 'cancel',
+                                            height: 36,
+                                            child: Text(
+                                              isConsumo ? 'Cancelar consumo' : 'Cancelar transferência',
+                                              style: const TextStyle(fontSize: 13),
+                                            ),
+                                          ),
+                                        ];
+                                      },
                                       offset: const Offset(0, 36),
                                     ),
                                   ),
@@ -536,7 +548,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
                                   _cell(_extrairPlacaPorIndex(t['placa'], 1), 100),
                                   _cell(_extrairPlacaPorIndex(t['placa'], 2), 100),
                                   _cell(origemNome, 140),
-                                  _cell(destinoNome, 140),
+                                  _cell(t['tipo_op'] == 'consumo' ? 'CONSUMO' : destinoNome, 140),
                                 ],
                               ),
                             );
@@ -642,11 +654,13 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
 
   Future<void> _executarCancelarTransferencia(Map<String, dynamic> t) async {
     final ordemId = t['ordem_id'];
+    final isConsumo = t['tipo_op'] == 'consumo';
+    
     if (ordemId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Ordem não encontrada para esta transferência.'),
+          SnackBar(
+            content: Text(isConsumo ? 'Ordem não encontrada para este consumo.' : 'Ordem não encontrada para esta transferência.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -672,7 +686,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
 
       final movimentacaoResponse = await supabase
           .from('movimentacoes')
-          .select('status_circuito_orig, status_circuito_dest')
+          .select('status_circuito_orig, status_circuito_dest, tipo_op')
           .eq('id', movimentacaoId)
           .single();
 
@@ -737,12 +751,14 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
                       ],
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.all(20),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
                     child: Text(
-                      'Não é possível cancelar esta transferência, pois o veículo já teve ordem de análise emitida. Entre em contato com o supervisor do terminal de origem.',
+                      isConsumo 
+                        ? 'Não é possível cancelar este consumo, pois o veículo já teve ordem de análise emitida.'
+                        : 'Não é possível cancelar esta transferência, pois o veículo já teve ordem de análise emitida. Entre em contato com o supervisor do terminal de origem.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 14,
                         height: 1.4,
                         color: Colors.black,
@@ -793,7 +809,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ordem cancelada com sucesso.')),
+        SnackBar(content: Text(isConsumo ? 'Consumo cancelado com sucesso.' : 'Ordem cancelada com sucesso.')),
       );
 
       await carregarHoje();
@@ -802,7 +818,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao cancelar ordem: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Erro ao cancelar: $e'), backgroundColor: Colors.red),
         );
       }
     }

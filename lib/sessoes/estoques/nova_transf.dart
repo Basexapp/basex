@@ -447,6 +447,8 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
       final terminais = uniqueMap.values.toList()
         ..sort((a, b) => (a['nome'] as String).compareTo(b['nome'] as String));
 
+      terminais.insert(0, {'id': 'CONSUMO', 'nome': 'Consumo próprio'});
+
       setState(() {
         _terminais = terminais;
       });
@@ -684,7 +686,9 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
       return;
     }
 
-    if (_origemId == _destinoId) {
+    final bool isConsumo = _destinoId == 'CONSUMO';
+
+    if (!isConsumo && _origemId == _destinoId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Origem e destino não podem ser iguais'),
@@ -710,18 +714,19 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
       final supabase = Supabase.instance.client;
 
       final terminalOrigId = _origemId;
-      final terminalDestId = _destinoId;
+      final terminalDestId = isConsumo ? null : _destinoId;
 
       // Buscar filiais para origem e destino
       final filialOrigemId = await _buscarFilialPorTerminal(terminalOrigId!);
-      final filialDestinoId = await _buscarFilialPorTerminal(terminalDestId!);
+      final filialDestinoId =
+          isConsumo ? null : await _buscarFilialPorTerminal(terminalDestId!);
 
       // VALIDAÇÃO: Verificar apenas se o terminal de destino possui tanques com o produto selecionado
-      if (_produtoId != null) {
+      if (!isConsumo && _produtoId != null) {
         final tanquesDestino = await supabase
             .from('tanques')
             .select('id')
-            .eq('terminal_id', terminalDestId)
+            .eq('terminal_id', terminalDestId!)
             .eq('id_produto', _produtoId!)
             .limit(1);
         
@@ -872,12 +877,12 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
 
       final transferencia = {
         'ordem_id': ordemId,
-        'tipo_op': 'transf',
+        'tipo_op': isConsumo ? 'consumo' : 'transf',
         'produto_id': _produtoId,
         'qtd_faturada': quantidade,
         'saida_amb': quantidade,
-        'entrada_amb': quantidade,
-        'descricao': '$origemNome → $destinoNome',
+        'entrada_amb': isConsumo ? 0 : quantidade,
+        'descricao': isConsumo ? 'Consumo próprio' : '$origemNome → $destinoNome',
         'placa': placas.isNotEmpty ? placas : null,
         'usuario_id': _usuarioId,
         'empresa_id': _empresaId,
@@ -885,14 +890,14 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
         'transportadora_id': _transportadoraId,
         'data_mov': _dataSelecionada.toIso8601String().split('T')[0],
         'filial_origem_id': filialOrigemId,
-        'filial_destino_id': filialDestinoId,
+        'filial_destino_id': isConsumo ? null : filialDestinoId,
         'updated_at': DateTime.now().toIso8601String(),
         'filial_id': null,
         'tipo_mov': null,
         'tipo_mov_orig': 'saida',
-        'tipo_mov_dest': 'entrada',
+        'tipo_mov_dest': isConsumo ? null : 'entrada',
         'terminal_orig_id': terminalOrigId,
-        'terminal_dest_id': terminalDestId,
+        'terminal_dest_id': isConsumo ? null : terminalDestId,
       };
 
       await supabase.from('movimentacoes').insert([transferencia]);

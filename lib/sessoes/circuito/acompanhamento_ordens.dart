@@ -346,7 +346,7 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
         }
 
         if (_tipoFiltro == 'saida') {
-          if (tipoOp == 'transf' || tipoOp == 'venda') {
+          if (tipoOp == 'transf' || tipoOp == 'venda' || tipoOp == 'consumo') {
             return origem == terminalAtualId;
           }
           return false;
@@ -578,6 +578,8 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
             informacao = 'Transferência';
           }
         }
+      } else if (tipoOp == 'consumo') {
+        informacao = 'Consumo Próprio';
       } else {
         informacao = (mov['cliente'] as String?)?.trim() ?? '';
         if (informacao.isEmpty) {
@@ -795,6 +797,8 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
       final origemNome = terminalOrigem?['nome']?.toString() ?? '';
       final destinoNome = terminalDestino?['nome']?.toString() ?? '';
       return '$origemNome $destinoNome';
+    } else if (tipoOp == 'consumo') {
+      return 'Consumo Próprio';
     } else {
       final terminal = item['terminais'] as Map<String, dynamic>?;
       return terminal?['nome']?.toString() ?? '';
@@ -955,6 +959,8 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
         return 'Empréstimo';
       case 'outras_op':
         return 'Outras Op.';
+      case 'consumo':
+        return 'Consumo Próprio';
       default:
         return tipoOpStr;
     }

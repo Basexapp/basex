@@ -692,8 +692,11 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       return;
     }
 
-    // Para transferências os campos são preenchidos manualmente pelo usuário
-    if (widget.tipoOp?.toLowerCase() == 'transf') {
+    // Transferência com destino real (entre terminais) usa preenchimento manual pelo usuário
+    // Consumo próprio usa busca automática igual à venda
+    final isTransfReal = widget.tipoOp?.toLowerCase() == 'transf' &&
+        widget.terminalId != null;
+    if (isTransfReal) {
       return;
     }
 
@@ -2630,8 +2633,8 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         );
       }
 
-      // Para transferências, registrar os dados de temp/densidade no histórico
-      if (widget.tipoOp?.toLowerCase() == 'transf') {
+      // Para transferências e consumo próprio, registrar os dados de temp/densidade no histórico
+      if (widget.tipoOp?.toLowerCase() == 'transf' || widget.tipoOp?.toLowerCase() == 'consumo') {
         try {
           await supabase.from('temp_e_dens').insert({
             'temp_amostra': _converterParaDecimal(campos['tempAmostra']!.text),
@@ -2731,7 +2734,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
 
         final dadosUpdate = <String, dynamic>{
           'data_carga': timestampBrasilia,
-          'status_circuito_orig': tipoOp == 'venda' ? '5' : '4',
+          'status_circuito_orig': (tipoOp == 'venda' || tipoOp == 'consumo') ? '5' : '4',
           'updated_at': timestampBrasilia,
         };
 
