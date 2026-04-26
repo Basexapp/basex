@@ -31,6 +31,7 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
   final TextEditingController dataFiltroCtrl = TextEditingController();
   final TextEditingController terminalController = TextEditingController();
   int? _hoverIndex;
+  late final List<Map<String, dynamic>> _dadosExibicao;
 
   @override
   void initState() {
@@ -38,6 +39,169 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
     statusSelecionado = widget.estagio['titulo'];
     dataFiltro = widget.dataInicial ?? DateTime.now();
     dataFiltroCtrl.text = _formatarData(dataFiltro!.toIso8601String());
+    
+    final rawData = [
+      {
+        'tipo': 'Carga',
+        'placa': ['BRA2E45', 'KML8901'],
+        'transportadora': 'Logística Veloz LTDA',
+        'motorista': 'Ricardo Oliveira',
+        'nota_fiscal': 'NF-8821',
+        'entrada_amb': 42500,
+        'produto': 'Óleo Diesel S10',
+        'origem': 'Terminal Mataripe',
+        'ps': 120,
+        'obs': 'Aguardando pesagem'
+      },
+      {
+        'tipo': 'Descarga',
+        'placa': ['GHT3F67', 'POQ1234'],
+        'transportadora': 'Nacional Trans S.A.',
+        'motorista': 'Marcos Souza',
+        'nota_fiscal': 'NF-4512',
+        'entrada_amb': 38000,
+        'produto': 'Etanol Hidratado',
+        'origem': 'Usina Boa Vista',
+        'ps': -45,
+        'obs': 'Conferência de lacres'
+      },
+      {
+        'tipo': 'Carga',
+        'placa': ['JUI4G89', 'XCS5678'],
+        'transportadora': 'Expresso Rápido',
+        'motorista': 'André Lima',
+        'nota_fiscal': 'NF-1290',
+        'entrada_amb': 45000,
+        'produto': 'Gasolina Aditivada',
+        'origem': 'Base de Distribuição A',
+        'ps': 0,
+        'obs': 'Iniciando carregamento'
+      },
+      {
+        'tipo': 'Descarga',
+        'placa': ['LPO5H12', 'VBN9012'],
+        'transportadora': 'Rodoviário Ideal',
+        'motorista': 'Paulo Santos',
+        'nota_fiscal': 'NF-7634',
+        'entrada_amb': 41200,
+        'produto': 'Gasolina Comum',
+        'origem': 'Refinaria Planalto',
+        'ps': 210,
+        'obs': 'Em descarga - Baía 02'
+      },
+      {
+        'tipo': 'Carga',
+        'placa': ['MNB6J34', 'ZQX3456'],
+        'transportadora': 'TransGlobal S.A.',
+        'motorista': 'Bruno Ferreira',
+        'nota_fiscal': 'NF-5541',
+        'entrada_amb': 44000,
+        'produto': 'Biodiesel B100',
+        'origem': 'Terminal Porto Sul',
+        'ps': -15,
+        'obs': 'Documentação ok'
+      },
+      {
+        'tipo': 'Descarga',
+        'placa': ['VFR7K56', 'ASD6789'],
+        'transportadora': 'Sul Logística',
+        'motorista': 'Fernando Costa',
+        'nota_fiscal': 'NF-3322',
+        'entrada_amb': 39500,
+        'produto': 'Querosene de Aviação',
+        'origem': 'Polo Petroquímico 1',
+        'ps': 85,
+        'obs': 'Amostra coletada'
+      },
+      {
+        'tipo': 'Carga',
+        'placa': ['KIU8L78', 'WER4512'],
+        'transportadora': 'EcoTrans Brasil',
+        'motorista': 'Sérgio Mendes',
+        'nota_fiscal': 'NF-9901',
+        'entrada_amb': 43000,
+        'produto': 'Óleo Diesel S500',
+        'origem': 'Terminal Central 2',
+        'ps': -110,
+        'obs': 'Aguardando manobra'
+      },
+      {
+        'tipo': 'Descarga',
+        'placa': ['OIP9M90', 'TYU2345'],
+        'transportadora': 'Delta Transportes',
+        'motorista': 'Tiago Rocha',
+        'nota_fiscal': 'NF-6678',
+        'entrada_amb': 40000,
+        'produto': 'Etanol Anidro',
+        'origem': 'Destilaria São José',
+        'ps': 30,
+        'obs': 'Aferição de temperatura'
+      },
+      {
+        'tipo': 'Carga',
+        'placa': ['NBV0N12', 'GHJ7890'],
+        'transportadora': 'Rota Oeste Log',
+        'motorista': 'Claudio Duarte',
+        'nota_fiscal': 'NF-4432',
+        'entrada_amb': 46000,
+        'produto': 'Gasolina Comum',
+        'origem': 'Base de Apoio Norte',
+        'ps': 55,
+        'obs': 'Finalizando lacração'
+      },
+      {
+        'tipo': 'Descarga',
+        'placa': ['POW1Q23', 'XCV4567'],
+        'transportadora': 'Carga Nobre',
+        'motorista': 'Gabriel Nunes',
+        'nota_fiscal': 'NF-2210',
+        'entrada_amb': 37500,
+        'produto': 'Lubrificantes',
+        'origem': 'Fábrica São Paulo',
+        'ps': -200,
+        'obs': 'Divergência de lacre'
+      },
+      {
+        'tipo': 'Carga',
+        'placa': ['XSD2W34', 'BNM5678'],
+        'transportadora': 'Pioneira Trans',
+        'motorista': 'Felipe Martins',
+        'nota_fiscal': 'NF-1109',
+        'entrada_amb': 42000,
+        'produto': 'Diesel Marinho',
+        'origem': 'Terminal Oceânico',
+        'ps': 140,
+        'obs': 'Checklist aprovado'
+      },
+      {
+        'tipo': 'Descarga',
+        'placa': ['CDS3E45', 'IUY2390'],
+        'transportadora': 'InterModal Log',
+        'motorista': 'Jorge Silva',
+        'nota_fiscal': 'NF-7786',
+        'entrada_amb': 39000,
+        'produto': 'Gás Natural (GLP)',
+        'origem': 'Refinaria Leste',
+        'ps': 10,
+        'obs': 'Conectando mangotes'
+      },
+    ]..shuffle();
+
+    if (widget.estagio['titulo'] == 'Em fila') {
+      final descargas = rawData.where((item) => item['tipo'] == 'Descarga').toList();
+      final cargas = rawData.where((item) => item['tipo'] == 'Carga').toList();
+      
+      for (int i = 0; i < descargas.length; i++) {
+        descargas[i]['posicao'] = '${i + 1}º';
+      }
+      for (int i = 0; i < cargas.length; i++) {
+        cargas[i]['posicao'] = '${i + 1}º';
+      }
+      
+      _dadosExibicao = [...descargas, ...cargas];
+    } else {
+      _dadosExibicao = rawData;
+    }
   }
 
   String _formatarData(String? d) {
@@ -109,7 +273,7 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
                     isExpanded: true,
                     items: const [
                       DropdownMenuItem(value: null, child: Text('Todos', style: TextStyle(fontSize: 13))),
-                      DropdownMenuItem(value: 'Programado', child: Text('Programados', style: TextStyle(fontSize: 13))),
+                      DropdownMenuItem(value: 'Programados', child: Text('Programados', style: TextStyle(fontSize: 13))),
                       DropdownMenuItem(value: 'Em fila', child: Text('Em fila', style: TextStyle(fontSize: 13))),
                       DropdownMenuItem(value: 'Em operação', child: Text('Em operação', style: TextStyle(fontSize: 13))),
                       DropdownMenuItem(value: 'Liberados', child: Text('Liberados', style: TextStyle(fontSize: 13))),
@@ -354,153 +518,6 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
   }
 
   Widget _buildTabela() {
-    final List<Map<String, dynamic>> dadosFicticios = [
-      {
-        'tipo': 'Carga',
-        'placa': ['BRA2E45', 'KML8901'],
-        'transportadora': 'Logística Veloz LTDA',
-        'motorista': 'Ricardo Oliveira',
-        'nota_fiscal': 'NF-8821',
-        'entrada_amb': 42500,
-        'produto': 'Óleo Diesel S10',
-        'origem': 'Terminal Mataripe',
-        'ps': 120,
-        'obs': 'Aguardando pesagem'
-      },
-      {
-        'tipo': 'Descarga',
-        'placa': ['GHT3F67', 'POQ1234'],
-        'transportadora': 'Nacional Trans S.A.',
-        'motorista': 'Marcos Souza',
-        'nota_fiscal': 'NF-4512',
-        'entrada_amb': 38000,
-        'produto': 'Etanol Hidratado',
-        'origem': 'Usina Boa Vista',
-        'ps': -45,
-        'obs': 'Conferência de lacres'
-      },
-      {
-        'tipo': 'Carga',
-        'placa': ['JUI4G89', 'XCS5678'],
-        'transportadora': 'Expresso Rápido',
-        'motorista': 'André Lima',
-        'nota_fiscal': 'NF-1290',
-        'entrada_amb': 45000,
-        'produto': 'Gasolina Aditivada',
-        'origem': 'Base de Distribuição A',
-        'ps': 0,
-        'obs': 'Iniciando carregamento'
-      },
-      {
-        'tipo': 'Descarga',
-        'placa': ['LPO5H12', 'VBN9012'],
-        'transportadora': 'Rodoviário Ideal',
-        'motorista': 'Paulo Santos',
-        'nota_fiscal': 'NF-7634',
-        'entrada_amb': 41200,
-        'produto': 'Gasolina Comum',
-        'origem': 'Refinaria Planalto',
-        'ps': 210,
-        'obs': 'Em descarga - Baía 02'
-      },
-      {
-        'tipo': 'Carga',
-        'placa': ['MNB6J34', 'ZQX3456'],
-        'transportadora': 'TransGlobal S.A.',
-        'motorista': 'Bruno Ferreira',
-        'nota_fiscal': 'NF-5541',
-        'entrada_amb': 44000,
-        'produto': 'Biodiesel B100',
-        'origem': 'Terminal Porto Sul',
-        'ps': -15,
-        'obs': 'Documentação ok'
-      },
-      {
-        'tipo': 'Descarga',
-        'placa': ['VFR7K56', 'ASD6789'],
-        'transportadora': 'Sul Logística',
-        'motorista': 'Fernando Costa',
-        'nota_fiscal': 'NF-3322',
-        'entrada_amb': 39500,
-        'produto': 'Querosene de Aviação',
-        'origem': 'Polo Petroquímico 1',
-        'ps': 85,
-        'obs': 'Amostra coletada'
-      },
-      {
-        'tipo': 'Carga',
-        'placa': ['KIU8L78', 'WER4512'],
-        'transportadora': 'EcoTrans Brasil',
-        'motorista': 'Sérgio Mendes',
-        'nota_fiscal': 'NF-9901',
-        'entrada_amb': 43000,
-        'produto': 'Óleo Diesel S500',
-        'origem': 'Terminal Central 2',
-        'ps': -110,
-        'obs': 'Aguardando manobra'
-      },
-      {
-        'tipo': 'Descarga',
-        'placa': ['OIP9M90', 'TYU2345'],
-        'transportadora': 'Delta Transportes',
-        'motorista': 'Tiago Rocha',
-        'nota_fiscal': 'NF-6678',
-        'entrada_amb': 40000,
-        'produto': 'Etanol Anidro',
-        'origem': 'Destilaria São José',
-        'ps': 30,
-        'obs': 'Aferição de temperatura'
-      },
-      {
-        'tipo': 'Carga',
-        'placa': ['NBV0N12', 'GHJ7890'],
-        'transportadora': 'Rota Oeste Log',
-        'motorista': 'Claudio Duarte',
-        'nota_fiscal': 'NF-4432',
-        'entrada_amb': 46000,
-        'produto': 'Gasolina Comum',
-        'origem': 'Base de Apoio Norte',
-        'ps': 55,
-        'obs': 'Finalizando lacração'
-      },
-      {
-        'tipo': 'Descarga',
-        'placa': ['POW1Q23', 'XCV4567'],
-        'transportadora': 'Carga Nobre',
-        'motorista': 'Gabriel Nunes',
-        'nota_fiscal': 'NF-2210',
-        'entrada_amb': 37500,
-        'produto': 'Lubrificantes',
-        'origem': 'Fábrica São Paulo',
-        'ps': -200,
-        'obs': 'Divergência de lacre'
-      },
-      {
-        'tipo': 'Carga',
-        'placa': ['XSD2W34', 'BNM5678'],
-        'transportadora': 'Pioneira Trans',
-        'motorista': 'Felipe Martins',
-        'nota_fiscal': 'NF-1109',
-        'entrada_amb': 42000,
-        'produto': 'Diesel Marinho',
-        'origem': 'Terminal Oceânico',
-        'ps': 140,
-        'obs': 'Checklist aprovado'
-      },
-      {
-        'tipo': 'Descarga',
-        'placa': ['CDS3E45', 'IUY2390'],
-        'transportadora': 'InterModal Log',
-        'motorista': 'Jorge Silva',
-        'nota_fiscal': 'NF-7786',
-        'entrada_amb': 39000,
-        'produto': 'Gás Natural (GLP)',
-        'origem': 'Refinaria Leste',
-        'ps': 10,
-        'obs': 'Conectando mangotes'
-      },
-    ];
-
     return Expanded(
       child: Column(
         children: [
@@ -509,6 +526,7 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Row(
               children: [
+                if (widget.estagio['titulo'] == 'Em fila') _buildHeaderCell('Posição', 1),
                 _buildHeaderCell('Tipo', 1),
                 _buildHeaderCell('Placas', 1),
                 _buildHeaderCell('Transportadora', 2),
@@ -517,7 +535,7 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
                 _buildHeaderCell('Qtd (amb)', 1),
                 _buildHeaderCell('Produto', 1),
                 _buildHeaderCell('Origem', 2),
-                _buildHeaderCell('P/S', 1),
+                if (widget.estagio['titulo'] == 'Liberados') _buildHeaderCell('P/S', 1),
                 _buildHeaderCell('Obs', 2),
               ],
             ),
@@ -526,9 +544,9 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 4),
-              itemCount: dadosFicticios.length,
+              itemCount: _dadosExibicao.length,
               itemBuilder: (context, index) {
-                final item = dadosFicticios[index];
+                final item = _dadosExibicao[index];
                 final double diff = (item['ps'] as num).toDouble();
                 return MouseRegion(
                   onEnter: (_) => setState(() => _hoverIndex = index),
@@ -542,6 +560,8 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
                     ),
                     child: Row(
                       children: [
+                        if (widget.estagio['titulo'] == 'Em fila')
+                          _buildDataCell(item['posicao'] ?? '-', 1, weight: FontWeight.bold, color: const Color(0xFF0D47A1)),
                         _buildDataCell(item['tipo'], 1, color: item['tipo'] == 'Carga' ? Colors.blue : Colors.orange, weight: FontWeight.bold),
                         _buildDataCell((item['placa'] as List).join(' / '), 1),
                         _buildDataCell(item['transportadora'], 2),
@@ -550,7 +570,13 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
                         _buildDataCell(_formatarNumero(item['entrada_amb']), 1),
                         _buildDataCell(item['produto'], 1),
                         _buildDataCell(item['origem'], 2),
-                        _buildDataCell(_formatarNumero(diff), 1, color: diff < 0 ? Colors.red : Colors.green, weight: FontWeight.bold),
+                        if (widget.estagio['titulo'] == 'Liberados')
+                          _buildDataCell(
+                            item['tipo'] == 'Descarga' ? _formatarNumero(diff) : '-',
+                            1,
+                            color: item['tipo'] == 'Descarga' ? (diff < 0 ? Colors.red : Colors.green) : Colors.grey,
+                            weight: item['tipo'] == 'Descarga' ? FontWeight.bold : FontWeight.normal,
+                          ),
                         _buildDataCell(item['obs'], 2),
                       ],
                     ),
