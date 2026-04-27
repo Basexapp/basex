@@ -2,6 +2,9 @@
 import "package:supabase_flutter/supabase_flutter.dart";
 import "../../login_page.dart";
 import "detalhes_estagio.dart";
+import 'acompanhamento_fila.dart';
+import 'acompanhamento_programados.dart';
+import 'acompanhamento_operacao.dart';
 
 class RadarPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -219,33 +222,104 @@ class _RadarPageState extends State<RadarPage> {
                                     child: GestureDetector(
                                       onTap: () {
                                         setState(() => _currentPage = index.toDouble());
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => Dialog(
-                                            backgroundColor: Colors.white,
-                                            surfaceTintColor: Colors.white,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(16),
-                                              side: BorderSide(
-                                                color: estagio["cor"],
-                                                width: 1,
+                                        if (estagio["titulo"] == "Em fila") {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => Dialog(
+                                              backgroundColor: Colors.white,
+                                              surfaceTintColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
+                                                side: BorderSide(
+                                                  color: estagio["cor"],
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Container(
+                                                width: 1200,
+                                                height: MediaQuery.of(context).size.height * 0.9,
+                                                padding: const EdgeInsets.all(16),
+                                                child: AcompanhamentoFilaPage(
+                                                  onVoltar: () => Navigator.of(context).pop(),
+                                                ),
                                               ),
                                             ),
-                                            child: Container(
-                                              width: 1100,
-                                              height: MediaQuery.of(context).size.height * 0.8,
-                                              padding: const EdgeInsets.all(16),
-                                              child: DetalhesEstagioPage(
-                                                estagio: estagio,
-                                                produtos: produtos,
-                                                terminais: _terminais,
-                                                nivel: _nivel,
-                                                dataInicial: dataFiltro,
-                                                apenasTabela: true,
+                                          );
+                                        } else if (estagio["titulo"] == "Programados") {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => Dialog(
+                                              backgroundColor: Colors.white,
+                                              surfaceTintColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
+                                                side: BorderSide(
+                                                  color: estagio["cor"],
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Container(
+                                                width: 1200,
+                                                height: MediaQuery.of(context).size.height * 0.9,
+                                                padding: const EdgeInsets.all(16),
+                                                child: AcompanhamentoProgramadosPage(
+                                                  onVoltar: () => Navigator.of(context).pop(),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        );
+                                          );
+                                        } else if (estagio["titulo"] == "Em operação") {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => Dialog(
+                                              backgroundColor: Colors.white,
+                                              surfaceTintColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
+                                                side: BorderSide(
+                                                  color: estagio["cor"],
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Container(
+                                                width: 1200,
+                                                height: MediaQuery.of(context).size.height * 0.9,
+                                                padding: const EdgeInsets.all(16),
+                                                child: AcompanhamentoOperacaoPage(
+                                                  onVoltar: () => Navigator.of(context).pop(),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        } else {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => Dialog(
+                                              backgroundColor: Colors.white,
+                                              surfaceTintColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(16),
+                                                side: BorderSide(
+                                                  color: estagio["cor"],
+                                                  width: 1,
+                                                ),
+                                              ),
+                                              child: Container(
+                                                width: 1100,
+                                                height: MediaQuery.of(context).size.height * 0.8,
+                                                padding: const EdgeInsets.all(16),
+                                                child: DetalhesEstagioPage(
+                                                  estagio: estagio,
+                                                  produtos: produtos,
+                                                  terminais: _terminais,
+                                                  nivel: _nivel,
+                                                  dataInicial: dataFiltro,
+                                                  apenasTabela: true,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }
                                       },
                                       child: AnimatedContainer(
                                         duration: const Duration(milliseconds: 200),
