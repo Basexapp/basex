@@ -30,8 +30,10 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
   DateTime? dataFiltro;
   final TextEditingController dataFiltroCtrl = TextEditingController();
   final TextEditingController terminalController = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   int? _hoverIndex;
   late final List<Map<String, dynamic>> _dadosExibicao;
+  List<Map<String, dynamic>> _dadosFiltrados = [];
 
   @override
   void initState() {
@@ -44,11 +46,11 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
       {
         'tipo': 'Carga',
         'placa': ['BRA2E45', 'KML8901'],
-        'transportadora': 'Logística Veloz LTDA',
+        'transportadora': 'Logistica Veloz LTDA',
         'motorista': 'Ricardo Oliveira',
         'nota_fiscal': 'NF-8821',
         'entrada_amb': 42500,
-        'produto': 'Óleo Diesel S10',
+        'produto': 'Oleo Diesel S10',
         'origem': 'Terminal Mataripe',
         'ps': 120,
         'obs': 'Aguardando pesagem'
@@ -63,31 +65,31 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'produto': 'Etanol Hidratado',
         'origem': 'Usina Boa Vista',
         'ps': -45,
-        'obs': 'Conferência de lacres'
+        'obs': 'Conferencia de lacres'
       },
       {
         'tipo': 'Carga',
         'placa': ['JUI4G89', 'XCS5678'],
-        'transportadora': 'Expresso Rápido',
-        'motorista': 'André Lima',
+        'transportadora': 'Expresso Rapido',
+        'motorista': 'Andre Lima',
         'nota_fiscal': 'NF-1290',
         'entrada_amb': 45000,
         'produto': 'Gasolina Aditivada',
-        'origem': 'Base de Distribuição A',
+        'origem': 'Base de Distribuicao A',
         'ps': 0,
         'obs': 'Iniciando carregamento'
       },
       {
         'tipo': 'Descarga',
         'placa': ['LPO5H12', 'VBN9012'],
-        'transportadora': 'Rodoviário Ideal',
+        'transportadora': 'Rodoviario Ideal',
         'motorista': 'Paulo Santos',
         'nota_fiscal': 'NF-7634',
         'entrada_amb': 41200,
         'produto': 'Gasolina Comum',
         'origem': 'Refinaria Planalto',
         'ps': 210,
-        'obs': 'Em descarga - Baía 02'
+        'obs': 'Em descarga - Baia 02'
       },
       {
         'tipo': 'Carga',
@@ -99,17 +101,17 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'produto': 'Biodiesel B100',
         'origem': 'Terminal Porto Sul',
         'ps': -15,
-        'obs': 'Documentação ok'
+        'obs': 'Documentacao ok'
       },
       {
         'tipo': 'Descarga',
         'placa': ['VFR7K56', 'ASD6789'],
-        'transportadora': 'Sul Logística',
+        'transportadora': 'Sul Logistica',
         'motorista': 'Fernando Costa',
         'nota_fiscal': 'NF-3322',
         'entrada_amb': 39500,
-        'produto': 'Querosene de Aviação',
-        'origem': 'Polo Petroquímico 1',
+        'produto': 'Querosene de Aviacao',
+        'origem': 'Polo Petroquimico 1',
         'ps': 85,
         'obs': 'Amostra coletada'
       },
@@ -117,10 +119,10 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'tipo': 'Carga',
         'placa': ['KIU8L78', 'WER4512'],
         'transportadora': 'EcoTrans Brasil',
-        'motorista': 'Sérgio Mendes',
+        'motorista': 'Sergio Mendes',
         'nota_fiscal': 'NF-9901',
         'entrada_amb': 43000,
-        'produto': 'Óleo Diesel S500',
+        'produto': 'Oleo Diesel S500',
         'origem': 'Terminal Central 2',
         'ps': -110,
         'obs': 'Aguardando manobra'
@@ -133,9 +135,9 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'nota_fiscal': 'NF-6678',
         'entrada_amb': 40000,
         'produto': 'Etanol Anidro',
-        'origem': 'Destilaria São José',
+        'origem': 'Destilaria Sao Jose',
         'ps': 30,
-        'obs': 'Aferição de temperatura'
+        'obs': 'Afericao de temperatura'
       },
       {
         'tipo': 'Carga',
@@ -147,7 +149,7 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'produto': 'Gasolina Comum',
         'origem': 'Base de Apoio Norte',
         'ps': 55,
-        'obs': 'Finalizando lacração'
+        'obs': 'Finalizando lacracao'
       },
       {
         'tipo': 'Descarga',
@@ -157,9 +159,9 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'nota_fiscal': 'NF-2210',
         'entrada_amb': 37500,
         'produto': 'Lubrificantes',
-        'origem': 'Fábrica São Paulo',
+        'origem': 'Fabrica Sao Paulo',
         'ps': -200,
-        'obs': 'Divergência de lacre'
+        'obs': 'Divergencia de lacre'
       },
       {
         'tipo': 'Carga',
@@ -169,7 +171,7 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'nota_fiscal': 'NF-1109',
         'entrada_amb': 42000,
         'produto': 'Diesel Marinho',
-        'origem': 'Terminal Oceânico',
+        'origem': 'Terminal Oceanico',
         'ps': 140,
         'obs': 'Checklist aprovado'
       },
@@ -180,7 +182,7 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
         'motorista': 'Jorge Silva',
         'nota_fiscal': 'NF-7786',
         'entrada_amb': 39000,
-        'produto': 'Gás Natural (GLP)',
+        'produto': 'Gas Natural (GLP)',
         'origem': 'Refinaria Leste',
         'ps': 10,
         'obs': 'Conectando mangotes'
@@ -192,16 +194,46 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
       final cargas = rawData.where((item) => item['tipo'] == 'Carga').toList();
       
       for (int i = 0; i < descargas.length; i++) {
-        descargas[i]['posicao'] = '${i + 1}º';
+        descargas[i]['posicao'] = '${i + 1}o';
       }
       for (int i = 0; i < cargas.length; i++) {
-        cargas[i]['posicao'] = '${i + 1}º';
+        cargas[i]['posicao'] = '${i + 1}o';
       }
       
       _dadosExibicao = [...descargas, ...cargas];
     } else {
       _dadosExibicao = rawData;
     }
+    _dadosFiltrados = List.from(_dadosExibicao);
+  }
+
+  void _filtrarDados(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _dadosFiltrados = List.from(_dadosExibicao);
+      } else {
+        final lowerQuery = query.toLowerCase();
+        _dadosFiltrados = _dadosExibicao.where((item) {
+          final placa = (item['placa'] as List).join(' ').toLowerCase();
+          final transportadora = item['transportadora'].toString().toLowerCase();
+          final motorista = item['motorista'].toString().toLowerCase();
+          final nf = item['nota_fiscal'].toString().toLowerCase();
+          final produto = item['produto'].toString().toLowerCase();
+          final origem = item['origem'].toString().toLowerCase();
+          final obs = item['obs'].toString().toLowerCase();
+          final tipo = item['tipo'].toString().toLowerCase();
+
+          return placa.contains(lowerQuery) ||
+              transportadora.contains(lowerQuery) ||
+              motorista.contains(lowerQuery) ||
+              nf.contains(lowerQuery) ||
+              produto.contains(lowerQuery) ||
+              origem.contains(lowerQuery) ||
+              obs.contains(lowerQuery) ||
+              tipo.contains(lowerQuery);
+        }).toList();
+      }
+    });
   }
 
   String _formatarData(String? d) {
@@ -359,13 +391,15 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextFormField(
+                    controller: _searchController,
+                    onChanged: _filtrarDados,
                     decoration: const InputDecoration(
                       labelText: 'Buscar',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.search, size: 18),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       isDense: true,
-                      hintText: 'Placa...',
+                      hintText: 'Placa, motorista...',
                     ),
                   ),
                 ),
@@ -521,11 +555,42 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
     return Expanded(
       child: Column(
         children: [
+          if (widget.apenasTabela)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  SizedBox(
+                    width: 200,
+                    height: 32,
+                    child: TextFormField(
+                      controller: _searchController,
+                      onChanged: _filtrarDados,
+                      style: const TextStyle(fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText: 'Buscar na tabela...',
+                        hintStyle: const TextStyle(fontSize: 12),
+                        prefixIcon: const Icon(Icons.search, size: 16, color: Color(0xFF0D47A1)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
             child: Row(
               children: [
+                if (widget.estagio['titulo'] == 'Programados') const SizedBox(width: 32),
                 if (widget.estagio['titulo'] == 'Em fila') _buildHeaderCell('Posição', 1),
                 _buildHeaderCell('Tipo', 1),
                 _buildHeaderCell('Placas', 1),
@@ -544,43 +609,103 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.symmetric(vertical: 4),
-              itemCount: _dadosExibicao.length,
+              itemCount: _dadosFiltrados.length,
               itemBuilder: (context, index) {
-                final item = _dadosExibicao[index];
+                final item = _dadosFiltrados[index];
                 final double diff = (item['ps'] as num).toDouble();
-                return MouseRegion(
-                  onEnter: (_) => setState(() => _hoverIndex = index),
-                  onExit: (_) => setState(() => _hoverIndex = null),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: _hoverIndex == index ? const Color(0xFFE3F2FD) : (index.isEven ? Colors.white : const Color(0xFFFDFDFD)),
-                      border: Border(bottom: BorderSide(color: Colors.grey.shade200, width: 1)),
+
+                // Verifica se deve exibir divisor entre Descarga e Carga no estágio 'Em fila'
+                bool mostrarDivisorCarga = false;
+                bool mostrarDivisorDescarga = false;
+                
+                if (widget.estagio['titulo'] == 'Em fila') {
+                  if (index == 0 && item['tipo'] == 'Descarga') {
+                    mostrarDivisorDescarga = true;
+                  } else if (index > 0) {
+                    final itemAnterior = _dadosFiltrados[index - 1];
+                    if (itemAnterior['tipo'] == 'Descarga' && item['tipo'] == 'Carga') {
+                      mostrarDivisorCarga = true;
+                    }
+                  }
+                }
+
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (mostrarDivisorDescarga)
+                      _buildSecaoDivisor('VEÍCULOS AGUARDANDO DESCARGA'),
+                    if (mostrarDivisorCarga)
+                      _buildSecaoDivisor('VEÍCULOS AGUARDANDO CARGA'),
+                    MouseRegion(
+                      onEnter: (_) => setState(() => _hoverIndex = index),
+                      onExit: (_) => setState(() => _hoverIndex = null),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: _hoverIndex == index ? const Color(0xFFE3F2FD) : (index.isEven ? Colors.white : const Color(0xFFFDFDFD)),
+                          border: Border(bottom: BorderSide(color: Colors.grey.shade200, width: 1)),
+                        ),
+                        child: Row(
+                          children: [
+                            if (widget.estagio['titulo'] == 'Programados')
+                              SizedBox(
+                                width: 32,
+                                height: 24,
+                                child: PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert, size: 16, color: Color(0xFF0D47A1)),
+                                  padding: EdgeInsets.zero,
+                                  tooltip: 'Ações',
+                                  onSelected: (value) {
+                                    // Ações futuras aqui
+                                  },
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'fila',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.queue, size: 18, color: Colors.green),
+                                          SizedBox(width: 8),
+                                          Text('Enviar para fila', style: TextStyle(fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'bloquear',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.block, size: 18, color: Colors.red),
+                                          SizedBox(width: 8),
+                                          Text('Bloquear veículo', style: TextStyle(fontSize: 13)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            if (widget.estagio['titulo'] == 'Em fila')
+                              _buildDataCell(item['posicao'] ?? '-', 1, weight: FontWeight.bold, color: const Color(0xFF0D47A1)),
+                            _buildDataCell(item['tipo'], 1, color: item['tipo'] == 'Carga' ? Colors.blue : Colors.orange, weight: FontWeight.bold),
+                            _buildDataCell((item['placa'] as List).join(' / '), 1),
+                            _buildDataCell(item['transportadora'], 2),
+                            _buildDataCell(item['motorista'], 2),
+                            _buildDataCell(item['nota_fiscal'], 1),
+                            _buildDataCell(_formatarNumero(item['entrada_amb']), 1),
+                            _buildDataCell(item['produto'], 1),
+                            _buildDataCell(item['origem'], 2),
+                            if (widget.estagio['titulo'] == 'Liberados')
+                              _buildDataCell(
+                                item['tipo'] == 'Descarga' ? _formatarNumero(diff) : '-',
+                                1,
+                                color: item['tipo'] == 'Descarga' ? (diff < 0 ? Colors.red : Colors.green) : Colors.grey,
+                                weight: item['tipo'] == 'Descarga' ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            _buildDataCell(item['obs'], 2),
+                          ],
+                        ),
+                      ),
                     ),
-                    child: Row(
-                      children: [
-                        if (widget.estagio['titulo'] == 'Em fila')
-                          _buildDataCell(item['posicao'] ?? '-', 1, weight: FontWeight.bold, color: const Color(0xFF0D47A1)),
-                        _buildDataCell(item['tipo'], 1, color: item['tipo'] == 'Carga' ? Colors.blue : Colors.orange, weight: FontWeight.bold),
-                        _buildDataCell((item['placa'] as List).join(' / '), 1),
-                        _buildDataCell(item['transportadora'], 2),
-                        _buildDataCell(item['motorista'], 2),
-                        _buildDataCell(item['nota_fiscal'], 1),
-                        _buildDataCell(_formatarNumero(item['entrada_amb']), 1),
-                        _buildDataCell(item['produto'], 1),
-                        _buildDataCell(item['origem'], 2),
-                        if (widget.estagio['titulo'] == 'Liberados')
-                          _buildDataCell(
-                            item['tipo'] == 'Descarga' ? _formatarNumero(diff) : '-',
-                            1,
-                            color: item['tipo'] == 'Descarga' ? (diff < 0 ? Colors.red : Colors.green) : Colors.grey,
-                            weight: item['tipo'] == 'Descarga' ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        _buildDataCell(item['obs'], 2),
-                      ],
-                    ),
-                  ),
+                  ],
                 );
               },
             ),
@@ -592,6 +717,31 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
 
   Widget _buildHeaderCell(String label, int flex) => Expanded(flex: flex, child: Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey[700]), overflow: TextOverflow.ellipsis));
   Widget _buildDataCell(String value, int flex, {Color? color, FontWeight? weight}) => Expanded(flex: flex, child: Text(value, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: color ?? Colors.black87, fontWeight: weight ?? FontWeight.normal), overflow: TextOverflow.ellipsis));
+
+  Widget _buildSecaoDivisor(String titulo) {
+    return Container(
+      color: const Color(0xFFF5F5F5),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(thickness: 1.5, color: Colors.blueGrey)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              titulo,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.blueGrey[700],
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          const Expanded(child: Divider(thickness: 1.5, color: Colors.blueGrey)),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
