@@ -260,17 +260,17 @@ class _AcompanhamentoFilaPageState extends State<AcompanhamentoFilaPage> {
         final dataMovStr = item['data_mov']?.toString();
         final dataDescargaStr = item['data_descarga']?.toString();
 
-        bool d_mov_valida = true;
+        bool dMovValida = true;
         if (dataFim != null && dataMovStr != null) {
           try {
             final dataMov = DateTime.parse(dataMovStr);
             // Verifica se data_mov <= data selecionada (limite superior do dia selecionado)
             if (dataMov.isAfter(dataFim)) {
-              d_mov_valida = false;
+              dMovValida = false;
             }
           } catch (_) {}
         }
-        if (!d_mov_valida) return false;
+        if (!dMovValida) return false;
 
         bool dentroDaData = true;
 
@@ -1273,10 +1273,6 @@ class _AcompanhamentoFilaPageState extends State<AcompanhamentoFilaPage> {
 
   Widget _buildItemFila(Map<String, dynamic> itemFila, int index) {
     final tipoOp = itemFila['tipo_op']?.toString() ?? 'venda';
-    final tipoOpTexto = _obterTipoOpTexto(tipoOp);
-    final statusTexto = _obterStatusTexto(itemFila, null);
-    
-    final statusCor = _obterCorStatusTimeline(itemFila, null);
     
     final placasFormatadas = _formatarPlacas(itemFila['placas']);
     final dataMov = _formatarData(itemFila['data_mov']?.toString());
@@ -1609,21 +1605,7 @@ class _AcompanhamentoFilaPageState extends State<AcompanhamentoFilaPage> {
   String _abreviarTexto(String texto, int maxLength) {
     if (texto.length <= maxLength) return texto;
     return '${texto.substring(0, maxLength)}...';
-  }
-
-  Color _obterCorStatusTimeline(Map<String, dynamic> itemFila, Map<String, dynamic>? movimentacao) {
-    final statusTexto = _obterStatusTexto(itemFila, movimentacao);
-    
-    switch (statusTexto) {
-      case 'Programado': return const Color.fromARGB(255, 61, 160, 206);
-      case 'Aguardando': return const Color.fromARGB(255, 5, 151, 0);
-      case 'Check-list': return const Color(0xFFF57C00);
-      case 'Em operação': return const Color(0xFF7B1FA2);
-      case 'Emissão NF': return const Color(0xFFC2185B);
-      case 'Liberado': return const Color.fromARGB(255, 42, 199, 50);
-      default: return Colors.grey;
-    }
-  }  
+  }   
 
   @override
   void dispose() {

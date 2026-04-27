@@ -1278,10 +1278,6 @@ class _AcompanhamentoOperacaoPageState extends State<AcompanhamentoOperacaoPage>
 
   Widget _buildItemOrdem(Map<String, dynamic> ordem, int index) {
     final tipoOp = ordem['tipo_op']?.toString() ?? 'venda';
-    final tipoOpTexto = _obterTipoOpTexto(tipoOp);
-    final statusTexto = _obterStatusTexto(ordem, null);
-    
-    final statusCor = _obterCorStatusTimeline(ordem, null);
     
     final placasFormatadas = _formatarPlacas(ordem['placas']);
     final dataMov = _formatarData(ordem['data_mov']?.toString());
@@ -1589,21 +1585,7 @@ class _AcompanhamentoOperacaoPageState extends State<AcompanhamentoOperacaoPage>
   String _abreviarTexto(String texto, int maxLength) {
     if (texto.length <= maxLength) return texto;
     return '${texto.substring(0, maxLength)}...';
-  }
-
-  Color _obterCorStatusTimeline(Map<String, dynamic> ordem, Map<String, dynamic>? movimentacao) {
-    final statusTexto = _obterStatusTexto(ordem, movimentacao);
-    
-    switch (statusTexto) {
-      case 'Programado': return const Color.fromARGB(255, 61, 160, 206);
-      case 'Aguardando': return const Color.fromARGB(255, 5, 151, 0);
-      case 'Check-list': return const Color(0xFFF57C00);
-      case 'Em operação': return const Color(0xFF7B1FA2);
-      case 'Emissão NF': return const Color(0xFFC2185B);
-      case 'Liberado': return const Color.fromARGB(255, 42, 199, 50);
-      default: return Colors.grey;
-    }
-  }  
+  } 
 
   @override
   void dispose() {
@@ -1713,31 +1695,5 @@ class _AcompanhamentoOperacaoPageState extends State<AcompanhamentoOperacaoPage>
                   ),
       ),
     );
-  }
-
-  String _getMonthName(int month) {
-    const months = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    return months[month - 1];
-  }
-
-  List<int?> _getDaysInMonth(DateTime date) {
-    final firstDay = DateTime(date.year, date.month, 1);
-    final lastDay = DateTime(date.year, date.month + 1, 0);
-    final firstWeekday = firstDay.weekday;
-    final startOffset = firstWeekday == 7 ? 0 : firstWeekday;
-    List<int?> days = [];
-    for (int i = 0; i < startOffset; i++) {
-      days.add(null);
-    }
-    for (int i = 1; i <= lastDay.day; i++) {
-      days.add(i);
-    }
-    while (days.length < 42) {
-      days.add(null);
-    }
-    return days;
   }
 }
