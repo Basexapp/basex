@@ -220,8 +220,8 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
 
   void _gerarDatasDisponiveis() {
     final hoje = DateTime.now();
-    final inicio = hoje.subtract(const Duration(days: 7));
-    _datasDisponiveis = List.generate(14, (i) => inicio.add(Duration(days: i)));
+    final inicio = hoje.subtract(const Duration(days: 10));
+    _datasDisponiveis = List.generate(20, (i) => inicio.add(Duration(days: i)));
     _datasFormatadas = _datasDisponiveis.map(_formatarData).toList();
   }
 
