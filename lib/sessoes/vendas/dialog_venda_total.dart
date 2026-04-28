@@ -32,10 +32,10 @@ class DialogVendaTotal extends StatelessWidget {
       {'nome': 'G. ADITIV.', 'cor': Colors.orange.shade700, 'index': 1},
       {'nome': 'D. S10', 'cor': Colors.blueGrey.shade400, 'index': 2},
       {'nome': 'D. S500', 'cor': Colors.blueGrey.shade700, 'index': 3},
-      {'nome': 'ETANOL', 'cor': Colors.green.shade600, 'index': 4},
       {'nome': 'G. A', 'cor': Colors.amber.shade600, 'index': 5},
       {'nome': 'S500 A', 'cor': Colors.brown.shade400, 'index': 6},
       {'nome': 'S10 A', 'cor': Colors.purple.shade400, 'index': 7},
+      {'nome': 'ETANOL', 'cor': Colors.green.shade600, 'index': 4},
       {'nome': 'ANIDRO', 'cor': Colors.teal.shade600, 'index': 8},
       {'nome': 'B100', 'cor': Colors.cyan.shade700, 'index': 9},
     ];
@@ -78,9 +78,9 @@ class DialogVendaTotal extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 children: [
-                  _buildSecao('PRODUTOS TERMINAL', produtos.sublist(0, 5), totais),
+                  _buildSecao('PRODUTOS COMPOSTOS', produtos.sublist(0, 4), totais),
                   const Divider(height: 16, thickness: 1, indent: 16, endIndent: 16),
-                  _buildSecao('MATÉRIAS PRIMAS', produtos.sublist(5, 10), totais),
+                  _buildSecao('PRODUTOS PUROS', produtos.sublist(4, 10), totais),
                 ],
               ),
             ),

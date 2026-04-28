@@ -606,6 +606,25 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
       final dataMov =
           '${dataRef.year}-${dataRef.month.toString().padLeft(2, '0')}-${dataRef.day.toString().padLeft(2, '0')}';
 
+      // Verificar se há carregamento parcial em alguma das placas
+      bool veicParcialOrdem = false;
+      for (final placaVenda in _placasVenda) {
+        int totalTanquesPlaca = placaVenda.tanques.length;
+        int tanquesCompletosPlaca = 0;
+        for (final tanque in placaVenda.tanques) {
+          if (tanque.produtoId != null &&
+              tanque.produtoId!.isNotEmpty &&
+              tanque.clienteController.text.trim().isNotEmpty &&
+              tanque.pagamentoController.text.trim().isNotEmpty) {
+            tanquesCompletosPlaca++;
+          }
+        }
+        if (tanquesCompletosPlaca < totalTanquesPlaca) {
+          veicParcialOrdem = true;
+          break;
+        }
+      }
+
       final ordemResponse = await supabase
           .from('ordens')
           .insert({
@@ -614,6 +633,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'usuario_id': user.id,
             'tipo': 'venda',
             'data_ordem': dataMov,
+            'veic_parcial': veicParcialOrdem,
           })
           .select('id')
           .single();
@@ -718,10 +738,32 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
       final dataMov = 
           '${timestampParaSalvar.year}-${timestampParaSalvar.month.toString().padLeft(2, '0')}-${timestampParaSalvar.day.toString().padLeft(2, '0')}';
 
-      // Atualiza a data da ordem
+      // Verificar se há carregamento parcial em alguma das placas na edição
+      bool veicParcialOrdem = false;
+      for (final placaVenda in _placasVenda) {
+        int totalTanquesPlaca = placaVenda.tanques.length;
+        int tanquesCompletosPlaca = 0;
+        for (final tanque in placaVenda.tanques) {
+          if (tanque.produtoId != null &&
+              tanque.produtoId!.isNotEmpty &&
+              tanque.clienteController.text.trim().isNotEmpty &&
+              tanque.pagamentoController.text.trim().isNotEmpty) {
+            tanquesCompletosPlaca++;
+          }
+        }
+        if (tanquesCompletosPlaca < totalTanquesPlaca) {
+          veicParcialOrdem = true;
+          break;
+        }
+      }
+
+      // Atualiza a data da ordem e o status de carregamento parcial
       await supabase
           .from('ordens')
-          .update({'data_ordem': dataMov})
+          .update({
+            'data_ordem': dataMov,
+            'veic_parcial': veicParcialOrdem,
+          })
           .eq('id', ordemId);
 
       // Processar cada tanque das placas carregadas

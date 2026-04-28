@@ -34,7 +34,17 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   int grupoAtual = 0;
   DateTime _dataFiltro = DateTime.now();
   
-  Map<String, Color> _coresOrdens = {};
+  static const Map<String, Color> _alphabetColors = {
+    'A': Color(0xFFE53935), 'B': Color(0xFF1E88E5), 'C': Color(0xFF43A047),
+    'D': Color(0xFFFB8C00), 'E': Color(0xFF8E24AA), 'F': Color(0xFF0097A7),
+    'G': Color(0xFFF4511E), 'H': Color(0xFF3949AB), 'I': Color(0xFF7CB342),
+    'J': Color.fromARGB(255, 102, 14, 99), 'K': Color(0xFF5D4037), 'L': Color(0xFF546E7A),
+    'M': Color(0xFFC2185B), 'N': Color(0xFF00897B), 'O': Color(0xFF5E35B1),
+    'P': Color(0xFF00ACC1), 'Q': Color(0xFFF57C00), 'R': Color(0xFF303F9F),
+    'S': Color(0xFF689F38), 'T': Color(0xFFAD1457), 'U': Color(0xFFD32F2F),
+    'V': Color(0xFF1976D2), 'W': Color(0xFF388E3C), 'X': Color(0xFFF57C00),
+    'Y': Color(0xFF7B1FA2), 'Z': Color(0xFF00796B),
+  };
   
   static const Map<String, Map<String, dynamic>> _mapaProdutosColuna = {
     '82c348c8-efa1-4d1a-953a-ee384d5780fc': {'grupo': 0, 'coluna': 0}, // G. COMUM
@@ -49,14 +59,6 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     'ecd91066-e763-42e3-8a0e-d982ea6da535': {'grupo': 0, 'coluna': 9}, // B100
   };
   
-  static const List<Color> _paletaCoresOrdens = [
-    Color(0xFFE53935), Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFFB8C00),
-    Color(0xFF8E24AA), Color(0xFF0097A7), Color(0xFFF4511E), Color(0xFF3949AB),
-    Color(0xFF7CB342), Color(0xFFD81B60), Color(0xFF5D4037), Color(0xFF546E7A),
-    Color(0xFFC2185B), Color(0xFF00897B), Color(0xFF5E35B1), Color(0xFF00ACC1),
-    Color(0xFFF57C00), Color(0xFF303F9F), Color(0xFF689F38), Color(0xFFAD1457),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -99,6 +101,9 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
               id,
               nome,
               codigo
+            ),
+            ordens:ordem_id (
+              veic_parcial
             )
           """)
           .eq("tipo_op", "venda");
@@ -130,12 +135,17 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           item['produto_nome'] = produtos['nome'];
           item['produto_codigo'] = produtos['codigo'];
         }
+        
+        final ordens = item['ordens'];
+        if (ordens is Map<String, dynamic>) {
+          item['veic_parcial_ordem'] = ordens['veic_parcial'];
+        }
+
         dadosProcessados.add(item);
       }
 
       setState(() {
         movimentacoes = dadosProcessados;
-        _gerarCoresParaOrdens();
       });
       
     } catch (e) {
@@ -155,44 +165,20 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     }
   }
 
-  void _gerarCoresParaOrdens() {
-    _coresOrdens.clear();
+  Color? _obterCorParaPlaca(dynamic placa) {
+    if (placa == null) return null;
     
-    final ordemIdsSet = <String>{};
-    for (var mov in movimentacoes) {
-      final ordemId = mov['ordem_id']?.toString();
-      if (ordemId != null && ordemId.isNotEmpty) {
-        ordemIdsSet.add(ordemId);
-      }
+    String placaStr = "";
+    if (placa is List && placa.isNotEmpty) {
+      placaStr = placa.first.toString().toUpperCase().trim();
+    } else {
+      placaStr = placa.toString().toUpperCase().trim();
     }
-    
-    final listaOrdens = ordemIdsSet.toList()..sort();
-    
-    for (var i = 0; i < listaOrdens.length; i++) {
-      final ordemId = listaOrdens[i];
-      final indiceCor = i % _paletaCoresOrdens.length;
-      _coresOrdens[ordemId] = _paletaCoresOrdens[indiceCor];
-    }
-  }
 
-  Color? _obterCorParaOrdem(dynamic ordemId) {
-    if (ordemId == null || ordemId.toString().isEmpty) {
-      return null;
-    }
+    if (placaStr.length < 2) return null;
     
-    final idStr = ordemId.toString();
-    
-    if (_coresOrdens.containsKey(idStr)) {
-      return _coresOrdens[idStr];
-    }
-    
-    final hash = idStr.hashCode;
-    final indiceCor = hash.abs() % _paletaCoresOrdens.length;
-    final cor = _paletaCoresOrdens[indiceCor];
-    
-    _coresOrdens[idStr] = cor;
-    
-    return cor;
+    final segundaLetra = placaStr[1];
+    return _alphabetColors[segundaLetra];
   }
 
   void _mostrarDialogNovaVenda() async {
@@ -287,8 +273,17 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     List<Map<String, dynamic>> resultado = [];
     String? ultimaOrdemId;
 
-    for (var i = 0; i < dados.length; i++) {
-      final mov = dados[i];
+    final List<Map<String, dynamic>> ordenados = List<Map<String, dynamic>>.from(dados);
+    
+    // Garantir que a lista esteja ordenada por ordem_id para agrupar corretamente
+    ordenados.sort((a, b) {
+      final idA = a['ordem_id']?.toString() ?? '';
+      final idB = b['ordem_id']?.toString() ?? '';
+      return idA.compareTo(idB);
+    });
+
+    for (var i = 0; i < ordenados.length; i++) {
+      final mov = ordenados[i];
       final ordemId = mov['ordem_id']?.toString();
 
       // Se mudar a ordem (e não for a primeira), adiciona uma linha em branco
@@ -1168,7 +1163,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
                         final corStatus = _obterCorStatus(statusCircuito);
                         
                         String codigo = t["codigo"]?.toString() ?? "";
-                        String uf = t["uf"]?.toString() ?? "";
+                        String uf = t["uf"]?.toString() ?? ""; 
                         String prazo = t["forma_pagamento"]?.toString() ?? "";
                         
                         return Container(
@@ -1223,8 +1218,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
               ),
             ),
           ), // Menu placeholder
-          _cell(" ", 110, bgColor: bgColor), // Placa
-          _cell(" ", 90, bgColor: bgColor), // Status
+          _cellPlaca(" ", 110, isParcial: false), // Placa
+          _statusCell(" ", Colors.transparent), // Status
           _cell(" ", larguraCliente, bgColor: bgColor), // Cliente
           _cell(" ", 70, bgColor: bgColor),  // Cód.
           _cell(" ", 50, bgColor: bgColor),  // UF
@@ -1433,8 +1428,9 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         ? placas.first.toString() 
         : placas?.toString() ?? "";
 
+    final corCliente = _obterCorParaPlaca(t["placa"]);
+
     final ordemId = t['ordem_id'];
-    final corCliente = _obterCorParaOrdem(ordemId);
 
     // Verifica se é a primeira linha desta ordem para exibir placa e menu
     bool isPrimeiraLinhaOrdem = false;
@@ -1454,6 +1450,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     final produtoInfo = produtoId != null ? _mapaProdutosColuna[produtoId] : null;
     final quantidadeSaidaAmb = _formatarQuantidade(t["saida_amb"]?.toString() ?? "0");
 
+    final isParcialRow = t['veic_parcial_ordem'] == true;
+
     final celulasFixas = [
       Container(
         width: 40,
@@ -1468,7 +1466,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         ),
         child: isPrimeiraLinhaOrdem ? _buildMenuButton(context, t) : null,
       ),
-      _cell(isPrimeiraLinhaOrdem ? placaText : "", 110),
+      _cellPlaca(isPrimeiraLinhaOrdem ? placaText : "", 110, isParcial: isParcialRow && isPrimeiraLinhaOrdem),
       _statusCell(statusTexto, corStatus),
       _cellCliente(t["cliente"]?.toString() ?? "", larguraCliente, corCliente),
       _cell(codigo, 70),
@@ -1502,6 +1500,68 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     }
 
     return [...celulasFixas, ...colunasQuantidade];
+  }
+
+  Widget _cellPlaca(String texto, double largura, {bool isParcial = false}) {
+    return Container(
+      width: largura,
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+        ),
+      ),
+      child: isParcial
+          ? Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  texto,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade800,
+                    fontWeight: FontWeight.normal,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 3),
+                  height: 14,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Colors.yellow,
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(color: Colors.brown, width: 0.8),
+                  ),
+                  child: const Text(
+                    "P",
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Text(
+              texto,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade800,
+                fontWeight: FontWeight.normal,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+    );
   }
 
   Widget _cell(String texto, double largura, {bool isNumber = false, bool isFirst = false, Color? bgColor, bool isProduct = false}) {
@@ -1570,25 +1630,27 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
         ),
       ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
-        decoration: BoxDecoration(
-          color: corStatus.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(2),
-          border: Border.all(color: corStatus.withOpacity(0.3), width: 0.5),
-        ),
-        child: Text(
-          statusTexto.toUpperCase(),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 7.5,
-            fontWeight: FontWeight.bold,
-            color: corStatus,
+      child: statusTexto.trim().isEmpty 
+        ? const SizedBox.shrink()
+        : Container(
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
+            decoration: BoxDecoration(
+              color: corStatus.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(2),
+              border: Border.all(color: corStatus.withOpacity(0.3), width: 0.5),
+            ),
+            child: Text(
+              statusTexto.toUpperCase(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 7.5,
+                fontWeight: FontWeight.bold,
+                color: corStatus,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ),
     );
   }
 
