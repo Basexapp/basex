@@ -64,41 +64,70 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
     return DateTime.now().toUtc().subtract(const Duration(hours: 3));
   }
 
-  void _carregarDadosParaEdicao() {
-    final mov = widget.movimentacaoParaEdicao!;
+  void _carregarDadosParaEdicao() async {
+    final movOriginal = widget.movimentacaoParaEdicao!;
+    final ordemId = widget.ordemId ?? movOriginal['ordem_id']?.toString();
     
-    if (mov['ts_mov'] != null) {
-      try {
-        _dataSelecionada = DateTime.parse(mov['ts_mov'].toString());
-      } catch (e) {
+    if (ordemId == null) return;
+
+    setState(() => _carregandoProdutos = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+      
+      // Carregar todas as movimentações da mesma ordem
+      final response = await supabase
+          .from('movimentacoes')
+          .select()
+          .eq('ordem_id', ordemId)
+          .order('id', ascending: true);
+
+      final todasMovimentacoes = List<Map<String, dynamic>>.from(response);
+
+      if (todasMovimentacoes.isEmpty) return;
+
+      // Pegar data da primeira movimentação
+      if (todasMovimentacoes.first['ts_mov'] != null) {
+        try {
+          _dataSelecionada = DateTime.parse(todasMovimentacoes.first['ts_mov'].toString());
+        } catch (e) {
+          _dataSelecionada = _getHorarioBrasilia();
+        }
+      } else {
         _dataSelecionada = _getHorarioBrasilia();
       }
-    } else {
-      _dataSelecionada = _getHorarioBrasilia();
+
+      // Agrupar por placa (normalmente edição é de uma placa só, mas vamos manter a estrutura)
+      final placa = _PlacaVenda();
+      final placasData = todasMovimentacoes.first['placa'];
+      if (placasData is List && placasData.isNotEmpty) {
+        placa.controller.text = placasData.first.toString();
+      } else if (placasData is String) {
+        placa.controller.text = placasData;
+      }
+
+      for (var mov in todasMovimentacoes) {
+        final tanque = _TanqueVenda(
+          capacidade: _calcularCapacidade(mov['saida_amb']?.toString() ?? '0'),
+        );
+        
+        tanque.produtoId = mov['produto_id']?.toString();
+        tanque.clienteController.text = (mov['cliente']?.toString() ?? '').toUpperCase();
+        tanque.pagamentoController.text = (mov['forma_pagamento']?.toString() ?? '').toUpperCase();
+        tanque.movimentacaoId = mov['id']?.toString(); // Armazenamos o ID para atualizar depois
+        
+        placa.tanques.add(tanque);
+      }
+      
+      _placasVenda.add(placa);
+      
+    } catch (e) {
+      print('Erro ao carregar dados para edição: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _carregandoProdutos = false);
+      }
     }
-    
-    final placa = _PlacaVenda();
-    
-    final placasData = mov['placa'];
-    if (placasData is List && placasData.isNotEmpty) {
-      placa.controller.text = placasData.first.toString();
-    } else if (placasData is String) {
-      placa.controller.text = placasData;
-    }
-    
-    final tanque = _TanqueVenda(
-      capacidade: _calcularCapacidade(mov['saida_amb']?.toString() ?? '0'),
-    );
-    
-    tanque.produtoId = mov['produto_id']?.toString();
-    tanque.clienteController.text = (mov['cliente']?.toString() ?? '').toUpperCase();
-    tanque.pagamentoController.text = mov['forma_pagamento']?.toString() ?? '';
-    tanque.pagamentoController.text = (tanque.pagamentoController.text).toUpperCase();
-    
-    placa.tanques.add(tanque);
-    _placasVenda.add(placa);
-    
-    setState(() {});
   }
 
   String _calcularCapacidade(String quantidadeLitros) {
@@ -572,7 +601,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
 
       final hoje = _getHorarioBrasilia();
       final dataRef = widget.dataFiltro != null
-          ? DateTime(widget.dataFiltro!.year, widget.dataFiltro!.month, widget.dataFiltro!.day)
+          ? DateTime(widget.dataFiltro!.year, widget.dataFiltro!.month, widget.dataFiltro!.day, hoje.hour, hoje.minute, hoje.second)
           : hoje;
       final dataMov =
           '${dataRef.year}-${dataRef.month.toString().padLeft(2, '0')}-${dataRef.day.toString().padLeft(2, '0')}';
@@ -665,30 +694,22 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         throw Exception('Usuário não autenticado');
       }
 
-      if (_placasVenda.isEmpty || _placasVenda.first.tanques.isEmpty) {
-        throw Exception('Dados inválidos para edição');
-      }
-
-      final placaVenda = _placasVenda.first;
-      final tanque = placaVenda.tanques.first;
-
-      final capacidadeMCubicos = double.tryParse(tanque.capacidade) ?? 0.0;
-      final capacidadeLitros = capacidadeMCubicos * 1000.0;
-
-      final ordemId = widget.movimentacaoParaEdicao!['ordem_id']?.toString();
+      final ordemId = widget.ordemId ?? widget.movimentacaoParaEdicao!['ordem_id']?.toString();
       
       if (ordemId == null || ordemId.isEmpty) {
         throw Exception('Ordem ID não encontrado para esta movimentação');
       }
 
       DateTime timestampParaSalvar;
-      
       if (_dataSelecionada != null) {
+        final agora = _getHorarioBrasilia();
         timestampParaSalvar = DateTime(
           _dataSelecionada!.year,
           _dataSelecionada!.month,
           _dataSelecionada!.day,
-          0, 0, 0,
+          agora.hour,
+          agora.minute,
+          agora.second,
         );
       } else {
         timestampParaSalvar = _getHorarioBrasilia();
@@ -697,36 +718,56 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
       final dataMov = 
           '${timestampParaSalvar.year}-${timestampParaSalvar.month.toString().padLeft(2, '0')}-${timestampParaSalvar.day.toString().padLeft(2, '0')}';
 
+      // Atualiza a data da ordem
       await supabase
           .from('ordens')
           .update({'data_ordem': dataMov})
           .eq('id', ordemId);
 
-      final Map<String, dynamic> dadosBaseMovimentacao = {
-        'data_mov': dataMov,
-        'ts_mov': timestampParaSalvar.toIso8601String(),
-        'updated_at': _getHorarioBrasilia().toIso8601String(),
-      };
+      // Processar cada tanque das placas carregadas
+      for (final placaVenda in _placasVenda) {
+        final placaTexto = [placaVenda.controller.text.trim().toUpperCase()];
+        
+        for (final tanque in placaVenda.tanques) {
+          final produtoPreenchido = tanque.produtoId != null && tanque.produtoId!.isNotEmpty;
+          final clientePreenchido = tanque.clienteController.text.trim().isNotEmpty;
+          final pagamentoPreenchido = tanque.pagamentoController.text.trim().isNotEmpty;
+          
+          if (!(produtoPreenchido && clientePreenchido && pagamentoPreenchido)) {
+            // Se o tanque foi esvaziado na edição, idealmente poderíamos deletar, 
+            // mas aqui vamos apenas ignorar ou manter se já existia.
+            // Para simplificar: se tem movimentacaoId, atualizamos com o que estiver lá.
+            if (tanque.movimentacaoId == null) continue;
+          }
 
-      await supabase
-          .from('movimentacoes')
-          .update(dadosBaseMovimentacao)
-          .eq('ordem_id', ordemId);
+          final capacidadeMCubicos = double.tryParse(tanque.capacidade) ?? 0.0;
+          final capacidadeLitros = capacidadeMCubicos * 1000.0;
 
-      final Map<String, dynamic> dadosMovimentacaoEspecifica = {
-        'produto_id': tanque.produtoId,
-        'placa': [placaVenda.controller.text.trim().toUpperCase()],
-        'cliente': tanque.clienteController.text.trim(),
-        'forma_pagamento': tanque.pagamentoController.text.trim(),
-        'qtd_faturada': capacidadeLitros,
-        'saida_amb': capacidadeLitros,
-        'terminal_orig_id': widget.terminalId,
-      };
+          final Map<String, dynamic> dadosUpdate = {
+            'data_mov': dataMov,
+            'ts_mov': timestampParaSalvar.toIso8601String(),
+            'updated_at': _getHorarioBrasilia().toIso8601String(),
+            'produto_id': tanque.produtoId,
+            'placa': placaTexto,
+            'cliente': tanque.clienteController.text.trim(),
+            'forma_pagamento': tanque.pagamentoController.text.trim(),
+            'qtd_faturada': capacidadeLitros,
+            'saida_amb': capacidadeLitros,
+            'terminal_orig_id': widget.terminalId,
+          };
 
-      await supabase
-          .from('movimentacoes')
-          .update(dadosMovimentacaoEspecifica)
-          .eq('id', widget.movimentacaoParaEdicao!['id']);
+          if (tanque.movimentacaoId != null) {
+            // Atualiza movimentação existente
+            await supabase
+                .from('movimentacoes')
+                .update(dadosUpdate)
+                .eq('id', tanque.movimentacaoId!);
+          } else {
+            // Se o usuário adicionou um tanque novo durante a edição (caso permitamos)
+            // faríamos um insert aqui vinculando ao ordemId.
+          }
+        }
+      }
 
       widget.onSalvar(true, 'Programação atualizada!');
       if (mounted) Navigator.of(context).pop(true);
@@ -1103,14 +1144,6 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Placa ${index + 1}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey,
-                        ),
-                      ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: placa.controller,
@@ -1119,6 +1152,8 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                         inputFormatters: [PlacaMascaraFormatter()],
                         onSubmitted: _modoEdicao ? null : (value) => _buscarPlacas(placa, value),
                         decoration: InputDecoration(
+                          labelText: 'Placa',
+                          floatingLabelBehavior: FloatingLabelBehavior.always,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 10,
@@ -1289,6 +1324,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
   InputDecoration _inputDecoration(String label, {bool incompleto = false}) {
     return InputDecoration(
       labelText: label,
+      floatingLabelBehavior: FloatingLabelBehavior.always,
       labelStyle: TextStyle(
         fontSize: 13,
         color: incompleto ? Colors.orange.shade700 : null,
@@ -1498,6 +1534,7 @@ class _PlacaVenda {
 class _TanqueVenda {
   final String capacidade;
   String? produtoId;
+  String? movimentacaoId; // Adicionado para rastrear qual registro atualizar na edição
   final TextEditingController clienteController = TextEditingController();
   final TextEditingController pagamentoController = TextEditingController();
 

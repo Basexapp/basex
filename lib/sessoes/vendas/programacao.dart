@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'nova_venda.dart';
+import 'dialog_venda_total.dart';
 import 'dart:async';
 
 class ProgramacaoPage extends StatefulWidget {
@@ -31,24 +32,21 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   final ScrollController _horizontalBodyController = ScrollController();
   final ScrollController _verticalScrollController = ScrollController();
   int grupoAtual = 0;
-  bool _hoverGrupo1 = false;
-  bool _hoverGrupo2 = false;
-  
   DateTime _dataFiltro = DateTime.now();
   
   Map<String, Color> _coresOrdens = {};
   
   static const Map<String, Map<String, dynamic>> _mapaProdutosColuna = {
-    '82c348c8-efa1-4d1a-953a-ee384d5780fc': {'grupo': 0, 'coluna': 0},
-    '93686e9d-6ef5-4f7c-a97d-b058b3c2c693': {'grupo': 0, 'coluna': 1},
-    '58ce20cf-f252-4291-9ef6-f4821f22c29e': {'grupo': 0, 'coluna': 2},
-    'c77a6e31-52f0-4fe1-bdc8-685dff83f3a1': {'grupo': 0, 'coluna': 3},
-    '66ca957a-5698-4a02-8c9e-987770b6a151': {'grupo': 0, 'coluna': 4},
-    'f8e95435-471a-424c-947f-def8809053a0': {'grupo': 1, 'coluna': 0},
-    '4da89784-301f-4abe-b97e-c48729969e3d': {'grupo': 1, 'coluna': 1},
-    '3c26a7e5-8f3a-4429-a8c7-2e0e72f1b80a': {'grupo': 1, 'coluna': 2},
-    'cecab8eb-297a-4640-81ae-e88335b88d8b': {'grupo': 1, 'coluna': 3},
-    'ecd91066-e763-42e3-8a0e-d982ea6da535': {'grupo': 1, 'coluna': 4},
+    '82c348c8-efa1-4d1a-953a-ee384d5780fc': {'grupo': 0, 'coluna': 0}, // G. COMUM
+    '93686e9d-6ef5-4f7c-a97d-b058b3c2c693': {'grupo': 0, 'coluna': 1}, // G. ADITIVADA
+    '58ce20cf-f252-4291-9ef6-f4821f22c29e': {'grupo': 0, 'coluna': 2}, // D. S10
+    'c77a6e31-52f0-4fe1-bdc8-685dff83f3a1': {'grupo': 0, 'coluna': 3}, // D. S500
+    '66ca957a-5698-4a02-8c9e-987770b6a151': {'grupo': 0, 'coluna': 4}, // ETANOL
+    'f8e95435-471a-424c-947f-def8809053a0': {'grupo': 0, 'coluna': 5}, // GASOLINA A
+    '4da89784-301f-4abe-b97e-c48729969e3d': {'grupo': 0, 'coluna': 6}, // S500 A
+    '3c26a7e5-8f3a-4429-a8c7-2e0e72f1b80a': {'grupo': 0, 'coluna': 7}, // S10 A
+    'cecab8eb-297a-4640-81ae-e88335b88d8b': {'grupo': 0, 'coluna': 8}, // ANIDRO
+    'ecd91066-e763-42e3-8a0e-d982ea6da535': {'grupo': 0, 'coluna': 9}, // B100
   };
   
   static const List<Color> _paletaCoresOrdens = [
@@ -117,7 +115,10 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           .gte('data_mov', dataInicio)
           .lte('data_mov', dataFim);
 
-      final response = await query.order('data_mov', ascending: true);
+      final response = await query
+          .order('ts_mov', ascending: true)
+          .order('ordem_id', ascending: true)
+          .order('id', ascending: true);
 
       List<Map<String, dynamic>> dadosProcessados = [];
 
@@ -238,6 +239,16 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     }
   }
 
+  void _mostrarDialogTotais() {
+    showDialog(
+      context: context,
+      builder: (context) => DialogVendaTotal(
+        movimentacoes: movimentacoes,
+        mapaProdutosColuna: _mapaProdutosColuna,
+      ),
+    );
+  }
+
   List<Map<String, dynamic>> get _movimentacoesFiltradas {
     final query = _searchController.text.toLowerCase().trim();
     if (query.isEmpty) {
@@ -271,7 +282,25 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   }
 
   List<Map<String, dynamic>> _agruparPorOrdem(List<Map<String, dynamic>> dados) {
-    return List<Map<String, dynamic>>.from(dados);
+    if (dados.isEmpty) return [];
+
+    List<Map<String, dynamic>> resultado = [];
+    String? ultimaOrdemId;
+
+    for (var i = 0; i < dados.length; i++) {
+      final mov = dados[i];
+      final ordemId = mov['ordem_id']?.toString();
+
+      // Se mudar a ordem (e não for a primeira), adiciona uma linha em branco
+      if (ultimaOrdemId != null && ordemId != ultimaOrdemId) {
+        resultado.add({'isSpacer': true});
+      }
+
+      resultado.add(mov);
+      ultimaOrdemId = ordemId;
+    }
+
+    return resultado;
   }
 
   String _formatarQuantidadeParaBusca(String quantidade) {
@@ -302,10 +331,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       final produtoId = l['produto_id']?.toString();
       if (produtoId == null) return false;
       
-      final produtoInfo = _mapaProdutosColuna[produtoId];
-      if (produtoInfo == null) return false;
-      
-      return produtoInfo['grupo'] == grupo;
+      return _mapaProdutosColuna.containsKey(produtoId);
     }).toList();
   }  
 
@@ -639,7 +665,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
                         text: 'Tem certeza que quer excluir a programação?\n',
                       ),
                       TextSpan(
-                        text: 'Atenção: a exclusão ocorrerá para todas os clientes do veículo. Esta ação é irreversível.',
+                        text: 'Atenção: a exclusão ocorrerá para todos os clientes do veículo. Esta ação é irreversível.',
                         style: TextStyle(
                           color: Colors.red,
                           fontWeight: FontWeight.bold,
@@ -741,13 +767,6 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
 
   @override
   Widget build(BuildContext context) {
-    String tituloAppBar = "Programação de Vendas";
-    if (widget.filialNomeDois != null && widget.filialNomeDois!.isNotEmpty) {
-      tituloAppBar = "Programação ${widget.filialNomeDois}";
-    } else if (widget.filialNome != null && widget.filialNome!.isNotEmpty) {
-      tituloAppBar = "Programação ${widget.filialNome}";
-    }
-    
     return Scaffold(
       appBar: null,
       body: Column(
@@ -771,16 +790,20 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      tituloAppBar,
+                      "Programação - ${widget.filialNomeDois ?? widget.filialNome ?? "Vendas"}",
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black,
+                        color: Color(0xFF0D47A1),
                       ),
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                     ),
                   ),
+                ),
+                Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  child: _buildSeletorDataPresets(),
                 ),
                 Container(
                   width: 250,
@@ -834,78 +857,256 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _mostrarDialogNovaVenda,
-        backgroundColor: const Color(0xFF0D47A1),
-        foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        elevation: 4,
-        child: const Icon(Icons.add_box, size: 28),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            onPressed: _mostrarDialogNovaVenda,
+            backgroundColor: const Color(0xFF0D47A1),
+            foregroundColor: Colors.white,
+            mini: true,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 4,
+            child: const Icon(Icons.add_box, size: 24),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            onPressed: _mostrarDialogTotais,
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF0D47A1),
+            mini: true,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+            ),
+            elevation: 4,
+            tooltip: 'Ver totais do dia',
+            child: const Icon(Icons.analytics_outlined, size: 24),
+          ),
+        ],
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
     );
   }
 
   Widget _buildBodyContent() {
-    return Column(
-      children: [
-        _buildFixedPanel(),
-        Expanded(
-          child: _buildScrollableTable(),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final viewportWidth = constraints.maxWidth;
+        return Column(
+          children: [
+            _buildFixedHeader(viewportWidth),
+            Expanded(
+              child: _buildScrollableTable(viewportWidth),
+            ),
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildFixedPanel() {
-    return Column(
-      children: [
-        Container(
-          height: 40,
-          color: Colors.grey.shade100,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildGrupoButton("Grupo 1 (Compostos)", 0),
-                    const SizedBox(width: 16),
-                    _buildGrupoButton("Grupo 2 (Puros)", 1),
-                  ],
-                ),
-              ),
-              _buildCampoDataFiltro(),
-            ],
+  Widget _buildSeletorDataPresets() {
+    final textoData = '${_dataFiltro.day.toString().padLeft(2, '0')}/${_dataFiltro.month.toString().padLeft(2, '0')}/${_dataFiltro.year}';
+
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-        ),
-        
-        Container(
-          height: 32,
-          color: Colors.grey.shade50,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          alignment: Alignment.centerLeft,
-          child: Text(
-            '${_movimentacoesFiltradas.length} venda(s)',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Seta para DIA ANTERIOR
+          _buildSetaNavegacao(
+            icon: Icons.chevron_left,
+            onTap: () {
+              setState(() {
+                _dataFiltro = _dataFiltro.subtract(const Duration(days: 1));
+              });
+              carregar();
+            },
+          ),
+          Container(width: 1, color: Colors.grey.shade200),
+          // Botão CENTRAL (Calendário + Data)
+          InkWell(
+            onTap: () => _abrirCalendarioDialog(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.calendar_today, size: 14, color: Color(0xFF0D47A1)),
+                  const SizedBox(width: 10),
+                  Text(
+                    textoData,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0D47A1),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        
-        if (_movimentacoesFiltradas.isNotEmpty)
-          _buildFixedHeader(),
-      ],
+          Container(width: 1, color: Colors.grey.shade200),
+          // Seta para PRÓXIMO DIA
+          _buildSetaNavegacao(
+            icon: Icons.chevron_right,
+            onTap: () {
+              setState(() {
+                _dataFiltro = _dataFiltro.add(const Duration(days: 1));
+              });
+              carregar();
+            },
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildFixedHeader() {
-    final larguraTabela = _obterLarguraTabela();
+  Widget _buildSetaNavegacao({required IconData icon, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        width: 36,
+        height: 40,
+        alignment: Alignment.center,
+        child: Icon(icon, size: 20, color: Colors.grey.shade600),
+      ),
+    );
+  }
+
+  Future<void> _abrirCalendarioDialog() async {
+    DateTime tempDate = _dataFiltro;
+    final dataSelecionada = await showDialog<DateTime>(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            width: 350,
+            padding: const EdgeInsets.all(20),
+            child: StatefulBuilder(
+              builder: (context, setStateDialog) {
+                int? hoveredDay;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, color: Color(0xFF0D47A1), size: 24),
+                        const SizedBox(width: 12),
+                        const Text('Filtrar por data', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
+                        const Spacer(),
+                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(), color: Colors.grey, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(icon: const Icon(Icons.chevron_left, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month - 1, tempDate.day); }); }),
+                          Text('${_getMonthName(tempDate.month)} ${tempDate.year}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
+                          IconButton(icon: const Icon(Icons.chevron_right, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month + 1, tempDate.day); }); }),
+                        ],
+                      ),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 7,
+                      childAspectRatio: 1.0,
+                      children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day) {
+                        return Center(child: Text(day, style: const TextStyle(color: Color(0xFF0D47A1), fontWeight: FontWeight.bold)));
+                      }).toList(),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 7,
+                      childAspectRatio: 1.0,
+                      children: _getDaysInMonth(tempDate).map((day) {
+                        final isSelected = day != null && day == tempDate.day;
+                        final isToday = day != null && day == DateTime.now().day && tempDate.month == DateTime.now().month && tempDate.year == DateTime.now().year;
+                        return StatefulBuilder(
+                          builder: (context, setDayState) {
+                            return MouseRegion(
+                              cursor: day != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                              onEnter: (_) { if (day != null) { setDayState(() => hoveredDay = day); } },
+                              onExit: (_) { if (day != null) { setDayState(() => hoveredDay = null); } },
+                              child: GestureDetector(
+                                onTap: day != null ? () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month, day); }); } : null,
+                                child: Container(
+                                  margin: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? const Color(0xFF0D47A1)
+                                        : (day != null && hoveredDay == day) ? const Color(0xFF0D47A1).withOpacity(0.1)
+                                        : isToday ? const Color(0x220D47A1) : Colors.transparent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(child: Text(
+                                    day != null ? day.toString() : '',
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : isToday || (day != null && hoveredDay == day) ? const Color(0xFF0D47A1) : Colors.black87,
+                                      fontWeight: isSelected || isToday || (day != null && hoveredDay == day) ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  )),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(onPressed: () => Navigator.of(context).pop(), style: TextButton.styleFrom(foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(horizontal: 16)), child: const Text('CANCELAR')),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(tempDate),
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                          child: const Text('SELECIONAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+    
+    if (dataSelecionada != null) {
+      setState(() {
+        _dataFiltro = DateTime(
+          dataSelecionada.year,
+          dataSelecionada.month,
+          dataSelecionada.day,
+        );
+      });
+      carregar();
+    }
+  }
+
+  Widget _buildFixedHeader(double viewportWidth) {
+    final larguraTabela = _obterLarguraTabela(viewportWidth);
     
     return Scrollbar(
       controller: _horizontalHeaderController,
@@ -916,10 +1117,16 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         child: SizedBox(
           width: larguraTabela,
           child: Container(
-            height: 40,
-            color: const Color(0xFF0D47A1),
+            height: 24,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
             child: Row(
-              children: _obterColunasCabecalho(),
+              children: _obterColunasCabecalho(viewportWidth),
             ),
           ),
         ),
@@ -927,108 +1134,112 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     );
   }
 
-  Widget _buildScrollableTable() {
-    return _movimentacoesFiltradas.isEmpty
-        ? _buildEmptyState()
-        : Scrollbar(
-            controller: _verticalScrollController,
-            thumbVisibility: true,
-            child: SingleChildScrollView(
-              controller: _verticalScrollController,
-              child: Scrollbar(
-                controller: _horizontalBodyController,
-                thumbVisibility: true,
-                child: SingleChildScrollView(
-                  controller: _horizontalBodyController,
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: _obterLarguraTabela(),
-                    child: Column(
-                      children: [
-                        ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _movimentacoesFiltradas.length,
-                          itemBuilder: (context, index) {
+  Widget _buildScrollableTable(double viewportWidth) {
+    return Scrollbar(
+      controller: _verticalScrollController,
+      thumbVisibility: true,
+      child: SingleChildScrollView(
+        controller: _verticalScrollController,
+        child: Scrollbar(
+          controller: _horizontalBodyController,
+          thumbVisibility: true,
+          child: SingleChildScrollView(
+            controller: _horizontalBodyController,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: _obterLarguraTabela(viewportWidth),
+              child: Column(
+                children: [
+                  // Exibe as movimentações reais
+                  if (_movimentacoesFiltradas.isNotEmpty)
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: _movimentacoesFiltradas.length,
+                      itemBuilder: (context, index) {
                         final t = _movimentacoesFiltradas[index];
+                        
+                        if (t['isSpacer'] == true) {
+                          return _buildEmptyRow(index, viewportWidth, isSpacer: true);
+                        }
+
                         final statusCircuito = t['status_circuito'];
                         final statusTexto = _obterTextoStatus(statusCircuito);
                         final corStatus = _obterCorStatus(statusCircuito);
                         
-                        bool temProduto = false;
-                        String codigo = "";
-                        String uf = "";
-                        String prazo = "";
-                        
-                        if (grupoAtual == 0) {
-                          temProduto = [
-                            'g_comum', 'g_aditivada', 'd_s10', 'd_s500', 'etanol'
-                          ].any((k) => (double.tryParse(t[k]?.toString() ?? '0') ?? 0) > 0);
-                        } else {
-                          temProduto = [
-                            'b100', 'gasolina_a', 's500_a', 's10_a', 'anidro'
-                          ].any((k) => (double.tryParse(t[k]?.toString() ?? '0') ?? 0) > 0);
-                        }
-                        
-                        if (temProduto) {
-                          codigo = t["codigo"]?.toString() ?? "";
-                          uf = t["uf"]?.toString() ?? "";
-                          prazo = t["forma_pagamento"]?.toString() ?? "";
-                        }
+                        String codigo = t["codigo"]?.toString() ?? "";
+                        String uf = t["uf"]?.toString() ?? "";
+                        String prazo = t["forma_pagamento"]?.toString() ?? "";
                         
                         return Container(
-                          height: 50,
+                          height: 22,
                           decoration: BoxDecoration(
                             color: index % 2 == 0 ? Colors.grey.shade50 : Colors.white,
-                            border: Border(
-                              bottom: BorderSide(color: Colors.grey.shade200, width: 0.5),
-                            ),
                           ),
                           child: Row(
-                            children: _obterCelulasLinha(t, statusTexto, corStatus, codigo, uf, prazo),
+                            children: _obterCelulasLinha(t, statusTexto, corStatus, codigo, uf, prazo, viewportWidth),
                           ),
                         );
                       },
-                        ),
-                        _buildTotalizadorLinha(),
-                      ],
                     ),
+                  // Preenche o restante até completar 100 linhas
+                  ...List.generate(
+                    (100 - _movimentacoesFiltradas.length).clamp(0, 100),
+                    (index) => _buildEmptyRow(index + _movimentacoesFiltradas.length, viewportWidth),
                   ),
-                ),
+                  _buildTotalizadorLinha(viewportWidth),
+                ],
               ),
             ),
-          );
+          ),
+        ),
+      ),
+    );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyRow(int index, double viewportWidth, {bool isSpacer = false}) {
+    double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
+    double larguraRestante = viewportWidth - larguraFixaSemCliente;
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+
+    final bgColor = isSpacer ? Colors.white : (index % 2 == 0 ? Colors.grey.shade50 : Colors.white);
+
     return Container(
-      padding: const EdgeInsets.only(top: 60),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.list, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 16),
-            Text(
-              'Nenhuma programação ainda.',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade600,
+      height: 22,
+      decoration: BoxDecoration(
+        color: bgColor,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 22,
+            decoration: BoxDecoration(
+              border: Border(
+                left: BorderSide(color: Colors.grey.shade400, width: 0.6),
+                right: BorderSide(color: Colors.grey.shade400, width: 0.6),
+                bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
               ),
             ),
-            if (_searchController.text.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(
-                  'Tente alterar os termos da pesquisa',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-              ),
-          ],
-        ),
+          ), // Menu placeholder
+          _cell(" ", 110, bgColor: bgColor), // Placa
+          _cell(" ", 90, bgColor: bgColor), // Status
+          _cell(" ", larguraCliente, bgColor: bgColor), // Cliente
+          _cell(" ", 70, bgColor: bgColor),  // Cód.
+          _cell(" ", 50, bgColor: bgColor),  // UF
+          _cell(" ", 90, bgColor: bgColor), // Prazo
+          _cell(" ", larguraProduto, bgColor: Colors.orange.shade50, isProduct: true),    // G. COM.
+          _cell(" ", larguraProduto, bgColor: Colors.orange.shade100, isProduct: true),   // G. ADITIV.
+          _cell(" ", larguraProduto, bgColor: Colors.blueGrey.shade50, isProduct: true),  // D. S10
+          _cell(" ", larguraProduto, bgColor: Colors.blueGrey.shade100, isProduct: true), // D. S500
+          _cell(" ", larguraProduto, bgColor: Colors.green.shade50, isProduct: true),     // ETANOL
+          _cell(" ", larguraProduto, bgColor: Colors.amber.shade50, isProduct: true),     // G. A
+          _cell(" ", larguraProduto, bgColor: Colors.brown.shade50, isProduct: true),     // S500 A
+          _cell(" ", larguraProduto, bgColor: Colors.purple.shade50, isProduct: true),    // S10 A
+          _cell(" ", larguraProduto, bgColor: Colors.teal.shade50, isProduct: true),      // ANIDRO
+          _cell(" ", larguraProduto, bgColor: Colors.cyan.shade50, isProduct: true),      // B100
+        ],
       ),
     );
   }
@@ -1073,223 +1284,6 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
               constraints: const BoxConstraints(minWidth: 36),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCampoDataFiltro() {
-    final String textoData = '${_dataFiltro.day.toString().padLeft(2, '0')}/${_dataFiltro.month.toString().padLeft(2, '0')}/${_dataFiltro.year}';
-    
-    return InkWell(
-      onTap: () async {
-        DateTime tempDate = _dataFiltro;
-        final dataSelecionada = await showDialog<DateTime>(
-          context: context,
-          builder: (BuildContext context) {
-            return Dialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: Container(
-                width: 350,
-                padding: const EdgeInsets.all(20),
-                child: StatefulBuilder(
-                  builder: (context, setStateDialog) {
-                    int? hoveredDay;
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.calendar_today, color: Color(0xFF0D47A1), size: 24),
-                            const SizedBox(width: 12),
-                            const Text('Filtrar por data', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
-                            const Spacer(),
-                            IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(), color: Colors.grey, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              IconButton(icon: const Icon(Icons.chevron_left, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month - 1, tempDate.day); }); }),
-                              Text('${_getMonthName(tempDate.month)} ${tempDate.year}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
-                              IconButton(icon: const Icon(Icons.chevron_right, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month + 1, tempDate.day); }); }),
-                            ],
-                          ),
-                        ),
-                        GridView.count(
-                          shrinkWrap: true,
-                          crossAxisCount: 7,
-                          childAspectRatio: 1.0,
-                          children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day) {
-                            return Center(child: Text(day, style: const TextStyle(color: Color(0xFF0D47A1), fontWeight: FontWeight.bold)));
-                          }).toList(),
-                        ),
-                        GridView.count(
-                          shrinkWrap: true,
-                          crossAxisCount: 7,
-                          childAspectRatio: 1.0,
-                          children: _getDaysInMonth(tempDate).map((day) {
-                            final isSelected = day != null && day == tempDate.day;
-                            final isToday = day != null && day == DateTime.now().day && tempDate.month == DateTime.now().month && tempDate.year == DateTime.now().year;
-                            return StatefulBuilder(
-                              builder: (context, setDayState) {
-                                return MouseRegion(
-                                  cursor: day != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
-                                  onEnter: (_) { if (day != null) { setDayState(() => hoveredDay = day); } },
-                                  onExit: (_) { if (day != null) { setDayState(() => hoveredDay = null); } },
-                                  child: GestureDetector(
-                                    onTap: day != null ? () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month, day); }); } : null,
-                                    child: Container(
-                                      margin: const EdgeInsets.all(2),
-                                      decoration: BoxDecoration(
-                                        color: isSelected ? const Color(0xFF0D47A1)
-                                            : (day != null && hoveredDay == day) ? const Color(0xFF0D47A1).withOpacity(0.1)
-                                            : isToday ? const Color(0x220D47A1) : Colors.transparent,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Center(child: Text(
-                                        day != null ? day.toString() : '',
-                                        style: TextStyle(
-                                          color: isSelected ? Colors.white : isToday || (day != null && hoveredDay == day) ? const Color(0xFF0D47A1) : Colors.black87,
-                                          fontWeight: isSelected || isToday || (day != null && hoveredDay == day) ? FontWeight.bold : FontWeight.normal,
-                                        ),
-                                      )),
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton(onPressed: () => Navigator.of(context).pop(), style: TextButton.styleFrom(foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(horizontal: 16)), child: const Text('CANCELAR')),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => Navigator.of(context).pop(tempDate),
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: const Text('SELECIONAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            );
-          },
-        );
-        
-        if (dataSelecionada != null) {
-          setState(() {
-            _dataFiltro = DateTime(
-              dataSelecionada.year,
-              dataSelecionada.month,
-              dataSelecionada.day,
-            );
-          });
-          carregar();
-        }
-      },
-      borderRadius: BorderRadius.circular(4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFF0D47A1).withOpacity(0.5)),
-          borderRadius: BorderRadius.circular(4),
-          color: Colors.white,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.calendar_today,
-              size: 14,
-              color: Color(0xFF0D47A1),
-            ),
-            const SizedBox(width: 4),
-            Text(
-              textoData,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF0D47A1),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGrupoButton(String texto, int grupo) {
-    final bool selecionado = grupoAtual == grupo;
-    bool isHovering = grupo == 0 ? _hoverGrupo1 : _hoverGrupo2;
-    
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) {
-        setState(() {
-          if (grupo == 0) {
-            _hoverGrupo1 = true;
-          } else {
-            _hoverGrupo2 = true;
-          }
-        });
-      },
-      onExit: (_) {
-        setState(() {
-          if (grupo == 0) {
-            _hoverGrupo1 = false;
-          } else {
-            _hoverGrupo2 = false;
-          }
-        });
-      },
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            grupoAtual = grupo;
-          });
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          decoration: BoxDecoration(
-            color: selecionado 
-                ? Colors.blue.shade700 
-                : (isHovering ? Colors.blue.shade50 : Colors.white),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: selecionado 
-                  ? Colors.blue.shade700 
-                  : Colors.grey.shade400,
-              width: 1,
-            ),
-            boxShadow: isHovering && !selecionado
-                ? [
-                    BoxShadow(
-                      color: Colors.grey.shade300,
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    )
-                  ]
-                : [],
-          ),
-          child: Text(
-            texto,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: selecionado ? Colors.white : Colors.grey.shade700,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -1352,58 +1346,68 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     );
   }
 
-  double _obterLarguraTabela() {
-    double larguraFixa = 50 + 120 + 100 + 220 + 80 + 60 + 100;
+  double _obterLarguraTabela(double viewportWidth) {
+    double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
+    double larguraRestante = viewportWidth - larguraFixaSemCliente;
     
-    if (grupoAtual == 0) {
-      return larguraFixa + (90 * 5);
-    } else {
-      return larguraFixa + (90 * 5);
-    }
+    // Tentamos dar 200px para cliente e o resto para produtos (min 50px cada)
+    // Se sobrar muito espaço, ambos se expandem proporcionalmente
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+    
+    return larguraFixaSemCliente + larguraCliente + (larguraProduto * 10);
   }
 
-  List<Widget> _obterColunasCabecalho() {
+  List<Widget> _obterColunasCabecalho(double viewportWidth) {
+    double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
+    double larguraRestante = viewportWidth - larguraFixaSemCliente;
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+
     final colunasFixas = [
-      _th("", 50),
-      _th("Placa", 120),
-      _th("Status", 100),
-      _th("Cliente", 220),
-      _th("Cód.", 80),
-      _th("UF", 60),
-      _th("Prazo", 100),
+      _th("", 40, isFirst: true),
+      _th("PLACA", 110),
+      _th("STATUS", 90),
+      _th("CLIENTE", larguraCliente),
+      _th("CÓD.", 70),
+      _th("UF", 50),
+      _th("PRAZO", 90),
     ];
 
-    if (grupoAtual == 0) {
-      return [
-        ...colunasFixas,
-        _th("G. Com.", 90),
-        _th("G. Aditiv.", 90),
-        _th("D. S10", 90),
-        _th("D. S500", 90),
-        _th("Etanol", 90),
-      ];
-    } else {
-      return [
-        ...colunasFixas,
-        _th("G. A", 90),
-        _th("S500 A", 90),
-        _th("S10 A", 90),
-        _th("Anidro", 90),
-        _th("B100", 90),
-      ];
-    }
+    return [
+      ...colunasFixas,
+      _th("G. COM.", larguraProduto, color: Colors.orange.shade400),
+      _th("G. ADITIV.", larguraProduto, color: Colors.orange.shade700),
+      _th("D. S10", larguraProduto, color: Colors.blueGrey.shade400),
+      _th("D. S500", larguraProduto, color: Colors.blueGrey.shade700),
+      _th("ETANOL", larguraProduto, color: Colors.green.shade600),
+      _th("G. A", larguraProduto, color: Colors.amber.shade600),
+      _th("S500 A", larguraProduto, color: Colors.brown.shade400),
+      _th("S10 A", larguraProduto, color: Colors.purple.shade400),
+      _th("ANIDRO", larguraProduto, color: Colors.teal.shade600),
+      _th("B100", larguraProduto, color: Colors.cyan.shade700),
+    ];
   }
 
-  Widget _th(String texto, double largura) {
+  Widget _th(String texto, double largura, {bool isFirst = false, Color? color}) {
     return Container(
       width: largura,
+      height: 24,
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color,
+        border: Border(
+          left: isFirst ? BorderSide(color: Colors.white.withOpacity(0.2), width: 0.8) : BorderSide.none,
+          right: BorderSide(color: Colors.white.withOpacity(0.2), width: 0.8),
+        ),
+      ),
       child: Text(
-        texto,
+        texto.toUpperCase(),
         style: const TextStyle(
           color: Colors.white,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          fontSize: 9,
+          letterSpacing: 0.5,
         ),
         textAlign: TextAlign.center,
       ),
@@ -1417,7 +1421,13 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     String codigo,
     String uf,
     String prazo,
+    double viewportWidth,
   ) {
+    double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
+    double larguraRestante = viewportWidth - larguraFixaSemCliente;
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+
     final placas = t["placa"];
     final placaText = placas is List && placas.isNotEmpty 
         ? placas.first.toString() 
@@ -1426,45 +1436,94 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     final ordemId = t['ordem_id'];
     final corCliente = _obterCorParaOrdem(ordemId);
 
+    // Verifica se é a primeira linha desta ordem para exibir placa e menu
+    bool isPrimeiraLinhaOrdem = false;
+    if (ordemId != null) {
+      final index = _movimentacoesFiltradas.indexOf(t);
+      if (index == 0) {
+        isPrimeiraLinhaOrdem = true;
+      } else {
+        final anterior = _movimentacoesFiltradas[index - 1];
+        if (anterior['isSpacer'] == true) {
+          isPrimeiraLinhaOrdem = true;
+        }
+      }
+    }
+
     final produtoId = t['produto_id']?.toString();
     final produtoInfo = produtoId != null ? _mapaProdutosColuna[produtoId] : null;
     final quantidadeSaidaAmb = _formatarQuantidade(t["saida_amb"]?.toString() ?? "0");
 
     final celulasFixas = [
-      _buildMenuButton(context, t),
-      _cell(placaText, 120),
+      Container(
+        width: 40,
+        height: 22,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: Colors.grey.shade400, width: 0.6),
+            right: BorderSide(color: Colors.grey.shade400, width: 0.6),
+            bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          ),
+        ),
+        child: isPrimeiraLinhaOrdem ? _buildMenuButton(context, t) : null,
+      ),
+      _cell(isPrimeiraLinhaOrdem ? placaText : "", 110),
       _statusCell(statusTexto, corStatus),
-      _cellCliente(t["cliente"]?.toString() ?? "", 220, corCliente),
-      _cell(codigo, 80),
-      _cell(uf, 60),
-      _cell(prazo, 100),
+      _cellCliente(t["cliente"]?.toString() ?? "", larguraCliente, corCliente),
+      _cell(codigo, 70),
+      _cell(uf, 50),
+      _cell(prazo, 90),
     ];
 
     final List<Widget> colunasQuantidade = [];
-    final numColunas = 5;
+    final numColunas = 10;
+    
+    final coresColunas = [
+      Colors.orange.shade50,     // G. COM.
+      Colors.orange.shade100,    // G. ADITIV.
+      Colors.blueGrey.shade50,   // D. S10
+      Colors.blueGrey.shade100,  // D. S500
+      Colors.green.shade50,      // ETANOL
+      Colors.amber.shade50,      // G. A
+      Colors.brown.shade50,      // S500 A
+      Colors.purple.shade50,     // S10 A
+      Colors.teal.shade50,       // ANIDRO
+      Colors.cyan.shade50,       // B100
+    ];
     
     for (int i = 0; i < numColunas; i++) {
+      final corFundo = coresColunas[i];
       if (produtoInfo != null && produtoInfo['coluna'] == i) {
-        colunasQuantidade.add(_cell(quantidadeSaidaAmb, 90, isNumber: true));
+        colunasQuantidade.add(_cell(quantidadeSaidaAmb, larguraProduto, isNumber: true, bgColor: corFundo, isProduct: true));
       } else {
-        colunasQuantidade.add(_cell("", 90, isNumber: true));
+        colunasQuantidade.add(_cell("", larguraProduto, isNumber: true, bgColor: corFundo, isProduct: true));
       }
     }
 
     return [...celulasFixas, ...colunasQuantidade];
   }
 
-  Widget _cell(String texto, double largura, {bool isNumber = false}) {
+  Widget _cell(String texto, double largura, {bool isNumber = false, bool isFirst = false, Color? bgColor, bool isProduct = false}) {
     return Container(
       width: largura,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          left: isFirst ? BorderSide(color: Colors.grey.shade400, width: 0.6) : BorderSide.none,
+          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+        ),
+      ),
       child: Text(
-        texto.isNotEmpty ? texto : '-',
+        texto,
         style: TextStyle(
-          fontSize: 12,
-          color: Colors.grey.shade700,
-          fontWeight: isNumber ? FontWeight.w600 : FontWeight.normal,
+          fontSize: 11,
+          color: Colors.grey.shade800,
+          fontWeight: (isNumber || isProduct) ? FontWeight.w600 : FontWeight.normal,
         ),
         textAlign: TextAlign.center,
         maxLines: 1,
@@ -1476,13 +1535,20 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   Widget _cellCliente(String texto, double largura, Color? cor) {
     return Container(
       width: largura,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+        ),
+      ),
       child: Text(
-        texto.isNotEmpty ? texto : '-',
+        texto,
         style: TextStyle(
-          fontSize: 12,
-          color: cor ?? Colors.grey.shade700,
+          fontSize: 11,
+          color: cor ?? Colors.grey.shade800,
           fontWeight: FontWeight.w600,
         ),
         textAlign: TextAlign.center,
@@ -1494,22 +1560,29 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
 
   Widget _statusCell(String statusTexto, Color corStatus) {
     return Container(
-      width: 100,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      width: 90,
+      height: 22,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+        ),
+      ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5),
         decoration: BoxDecoration(
           color: corStatus.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: corStatus.withOpacity(0.3), width: 1),
+          borderRadius: BorderRadius.circular(2),
+          border: Border.all(color: corStatus.withOpacity(0.3), width: 0.5),
         ),
         child: Text(
-          statusTexto,
+          statusTexto.toUpperCase(),
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
+            fontSize: 7.5,
+            fontWeight: FontWeight.bold,
             color: corStatus,
           ),
           maxLines: 1,
@@ -1539,36 +1612,43 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     }
   }
 
-  Widget _buildTotalizadorLinha() {
-    final totais = List.filled(5, 0.0);
+  Widget _buildTotalizadorLinha(double viewportWidth) {
+    double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
+    double larguraRestante = viewportWidth - larguraFixaSemCliente;
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+
+    final totais = List.filled(10, 0.0);
 
     for (final t in _movimentacoesFiltradas) {
+      if (t['isSpacer'] == true) continue;
       final produtoId = t['produto_id']?.toString();
       if (produtoId == null) continue;
       final info = _mapaProdutosColuna[produtoId];
       if (info == null) continue;
       final col = info['coluna'] as int;
-      if (col < 0 || col >= 5) continue;
+      if (col < 0 || col >= 10) continue;
       totais[col] += double.tryParse(t['saida_amb']?.toString() ?? '0') ?? 0;
     }
 
     return Container(
-      height: 40,
+      height: 22,
       color: Colors.orange.shade50,
       child: Row(
         children: [
+          _cellTot('', 40),
+          _cellTot('TOTAL', 110, isLabel: true),
+          _cellTot('', 90),
+          _cellTot('', larguraCliente),
+          _cellTot('', 70),
           _cellTot('', 50),
-          _cellTot('TOTAL', 120, isLabel: true),
-          _cellTot('', 100),
-          _cellTot('', 220),
-          _cellTot('', 80),
-          _cellTot('', 60),
-          _cellTot('', 100),
-          for (int i = 0; i < 5; i++)
+          _cellTot('', 90),
+          for (int i = 0; i < 10; i++)
             _cellTot(
               totais[i] > 0 ? _formatarQuantidade(totais[i].toStringAsFixed(0)) : '',
-              90,
+              larguraProduto,
               isNumber: true,
+              isProduct: true,
             ),
         ],
       ),
@@ -1576,16 +1656,23 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   }
 
   Widget _cellTot(String texto, double largura,
-      {bool isLabel = false, bool isNumber = false}) {
+      {bool isLabel = false, bool isNumber = false, bool isProduct = false}) {
     return Container(
       width: largura,
+      height: 22,
       alignment: Alignment.center,
+      decoration: BoxDecoration(
+        border: Border(
+          right: BorderSide(color: Colors.orange.shade300, width: 0.6),
+          bottom: BorderSide(color: Colors.orange.shade300, width: 0.6),
+        ),
+      ),
       child: Text(
         texto,
         style: TextStyle(
-          fontSize: 12,
+          fontSize: 11,
           fontWeight:
-              (isLabel || isNumber) ? FontWeight.bold : FontWeight.normal,
+              (isLabel || isNumber || isProduct) ? FontWeight.bold : FontWeight.normal,
           color:
               isLabel ? const Color(0xFF0D47A1) : Colors.grey.shade800,
         ),
