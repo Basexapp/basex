@@ -174,7 +174,7 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
             terminal_destino:terminais!terminal_dest_id(nome_dois)
           ''')
           .or('tipo_op.eq.transf,tipo_op.eq.consumo')
-          .order("data_mov", ascending: true)
+          .order("data_mov", ascending: false)
           .range(from, to);
 
       final novos = List<Map<String, dynamic>>.from(response);
@@ -907,72 +907,78 @@ class _TransferenciasPageState extends State<TransferenciasPage> {
       ),
       body: carregando
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              controller: _verticalScrollController,
+          : Column(
               children: [
-                _buildTabela(
-                  "Transferências de hoje",
-                  transferenciasHoje,
-                  headerController: _horizontalHeaderControllerHoje,
-                  bodyController: _horizontalBodyControllerHoje,
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Divider(
-                    color: const Color(0xFF0D47A1).withOpacity(0.3),
-                    thickness: 1,
+                Expanded(
+                  child: ListView(
+                    controller: _verticalScrollController,
+                    children: [
+                      _buildTabela(
+                        "Transferências de hoje",
+                        transferenciasHoje,
+                        headerController: _horizontalHeaderControllerHoje,
+                        bodyController: _horizontalBodyControllerHoje,
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Divider(
+                          color: const Color(0xFF0D47A1).withOpacity(0.3),
+                          thickness: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTabela(
+                        "Transferências entre filiais - Histórico",
+                        transferenciasHistorico,
+                        headerController: _horizontalHeaderControllerHist,
+                        bodyController: _horizontalBodyControllerHist,
+                        paginacao: true,
+                      ),
+                      if (_carregandoHistorico)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
                 ),
-
-                const SizedBox(height: 16),
-
-                _buildTabela(
-                  "Transferências entre filiais - Histórico",
-                  transferenciasHistorico,
-                  headerController: _horizontalHeaderControllerHist,
-                  bodyController: _horizontalBodyControllerHist,
-                  paginacao: true,
-                ),
-                  if (_carregandoHistorico)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                  
-                  const SizedBox(height: 40),
-
-                  // Rodapé Institucional
-                  Container(
-                    height: 50,
-                    width: double.infinity,
+                // Rodapé Institucional Fixo
+                Container(
+                  height: 50,
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+                  decoration: BoxDecoration(
                     color: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'PowerTank Terminais 2026, All rights reserved.',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.grey[600],
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Licenciado e comercializado por Metabots Business Intelligence - Rua Leais Paulistanos, 416 - Ipiranga - São Paulo, SP | Uma iniciativa © Norton Technology',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.grey[500],
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
+                    border: Border(
+                      top: BorderSide(color: Colors.grey.shade300, width: 0.5),
                     ),
                   ),
-                ],
-              ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'PowerTank Terminais 2026, All rights reserved.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[600],
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Licenciado e comercializado por Metabots Business Intelligence - Rua Leais Paulistanos, 416 - Ipiranga - São Paulo, SP | Uma iniciativa © Norton Technology',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[500],
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

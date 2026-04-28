@@ -26,8 +26,10 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
   // filtros
   List<String> produtos = [];
   String? produtoSelecionado;
-  DateTime? dataFiltro;
-  final TextEditingController dataFiltroCtrl = TextEditingController();
+  DateTime? dataInicial;
+  DateTime? dataFinal;
+  final TextEditingController dataInicialController = TextEditingController();
+  final TextEditingController dataFinalController = TextEditingController();
   final TextEditingController terminalController = TextEditingController();
 
   String? _terminalSelecionado;
@@ -52,7 +54,8 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
 
   @override
   void dispose() {
-    dataFiltroCtrl.dispose();
+    dataInicialController.dispose();
+    dataFinalController.dispose();
     terminalController.dispose();
     super.dispose();
   }
@@ -101,9 +104,26 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
         await _carregarTerminais();
       }
       
-      // Fixar data inicial como hoje para o filtro
-      dataFiltro = DateTime.now();
-      dataFiltroCtrl.text = _formatarData(dataFiltro!.toIso8601String());
+      // Definir data final como hoje
+      dataFinal = DateTime.now();
+      dataFinalController.text = _formatarData(dataFinal!.toIso8601String());
+
+      // Definir data inicial como hoje - 2 dias úteis
+      DateTime hoje = DateTime.now();
+      int subtrairDias = 2; // Padrão: 2 dias úteis
+
+      if (hoje.weekday == DateTime.monday) {
+        subtrairDias = 4; // Segunda -> Quinta (4 dias corridos)
+      } else if (hoje.weekday == DateTime.tuesday) {
+        subtrairDias = 4; // Terça -> Sexta (4 dias corridos)
+      } else if (hoje.weekday == DateTime.sunday) {
+        subtrairDias = 3; // Domingo -> Quinta (3 dias corridos)
+      } else if (hoje.weekday == DateTime.saturday) {
+        subtrairDias = 2; // Sábado -> Quinta (2 dias corridos)
+      }
+
+      dataInicial = hoje.subtract(Duration(days: subtrairDias));
+      dataInicialController.text = _formatarData(dataInicial!.toIso8601String());
       
       // Se não for admin, já fixa o terminal do usuário e carrega
       if (nivel != 3) {
@@ -190,11 +210,22 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
 
     query = query.eq('terminal_id', _terminalSelecionado!);
 
-    // Aplicar filtro de data (intervalo do dia selecionado)
-    if (dataFiltro != null) {
-      final dia = dataFiltro!;
-      final diaStr = '${dia.year}-${dia.month.toString().padLeft(2, '0')}-${dia.day.toString().padLeft(2, '0')}';
-      final proximo = dia.add(const Duration(days: 1));
+    // Aplicar filtro de data
+    if (dataInicial != null && dataFinal != null) {
+      final inicioStr = '${dataInicial!.year}-${dataInicial!.month.toString().padLeft(2, '0')}-${dataInicial!.day.toString().padLeft(2, '0')}';
+      
+      final fim = dataFinal!.add(const Duration(days: 1));
+      final fimStr = '${fim.year}-${fim.month.toString().padLeft(2, '0')}-${fim.day.toString().padLeft(2, '0')}';
+      
+      query = query.gte('data_criacao', inicioStr).lt('data_criacao', fimStr);
+    } else if (dataInicial != null) {
+      final diaStr = '${dataInicial!.year}-${dataInicial!.month.toString().padLeft(2, '0')}-${dataInicial!.day.toString().padLeft(2, '0')}';
+      final proximo = dataInicial!.add(const Duration(days: 1));
+      final proximoStr = '${proximo.year}-${proximo.month.toString().padLeft(2, '0')}-${proximo.day.toString().padLeft(2, '0')}';
+      query = query.gte('data_criacao', diaStr).lt('data_criacao', proximoStr);
+    } else if (dataFinal != null) {
+      final diaStr = '${dataFinal!.year}-${dataFinal!.month.toString().padLeft(2, '0')}-${dataFinal!.day.toString().padLeft(2, '0')}';
+      final proximo = dataFinal!.add(const Duration(days: 1));
       final proximoStr = '${proximo.year}-${proximo.month.toString().padLeft(2, '0')}-${proximo.day.toString().padLeft(2, '0')}';
       query = query.gte('data_criacao', diaStr).lt('data_criacao', proximoStr);
     } else {
@@ -361,13 +392,13 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
 
                 Expanded(
                   child: Builder(builder: (context) {
-                    final textoData = dataFiltro != null
-                        ? '${dataFiltro!.day.toString().padLeft(2, '0')}/${dataFiltro!.month.toString().padLeft(2, '0')}/${dataFiltro!.year}'
-                        : 'Data';
+                    final textoInicial = dataInicial != null
+                        ? '${dataInicial!.day.toString().padLeft(2, '0')}/${dataInicial!.month.toString().padLeft(2, '0')}/${dataInicial!.year}'
+                        : 'Data inicial';
 
                     return InkWell(
                       onTap: () async {
-                        DateTime tempDate = dataFiltro ?? DateTime.now();
+                        DateTime tempDate = dataInicial ?? DateTime.now();
                         final dataSelecionada = await showDialog<DateTime>(
                           context: context,
                           builder: (BuildContext context) {
@@ -387,7 +418,7 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
                                           children: [
                                             const Icon(Icons.calendar_today, color: Color(0xFF0D47A1), size: 24),
                                             const SizedBox(width: 12),
-                                            const Text('Filtrar por data', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
+                                            const Text('Data inicial', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
                                             const Spacer(),
                                             IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(), color: Colors.grey, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                                           ],
@@ -473,12 +504,8 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
 
                         if (dataSelecionada != null) {
                           setState(() {
-                            dataFiltro = DateTime(
-                              dataSelecionada.year,
-                              dataSelecionada.month,
-                              dataSelecionada.day,
-                            );
-                            dataFiltroCtrl.text = _formatarData(dataFiltro!.toIso8601String());
+                            dataInicial = dataSelecionada;
+                            dataInicialController.text = _formatarData(dataInicial!.toIso8601String());
                           });
                           _refreshData();
                         }
@@ -498,18 +525,170 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
                           children: [
                             const Icon(
                               Icons.calendar_today,
-                              size: 14,
+                              size: 16,
                               color: Color(0xFF0D47A1),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                textoData,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFF0D47A1),
-                                  fontWeight: FontWeight.w500,
+                                textoInicial,
+                                style: const TextStyle(fontSize: 13, color: Colors.black87),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+
+                const SizedBox(width: 8),
+
+                Expanded(
+                  child: Builder(builder: (context) {
+                    final textoFinal = dataFinal != null
+                        ? '${dataFinal!.day.toString().padLeft(2, '0')}/${dataFinal!.month.toString().padLeft(2, '0')}/${dataFinal!.year}'
+                        : 'Data final';
+
+                    return InkWell(
+                      onTap: () async {
+                        DateTime tempDate = dataFinal ?? DateTime.now();
+                        final dataSelecionada = await showDialog<DateTime>(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return Dialog(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              child: Container(
+                                width: 350,
+                                padding: const EdgeInsets.all(20),
+                                child: StatefulBuilder(
+                                  builder: (context, setStateDialog) {
+                                    int? hoveredDay;
+                                    return Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            const Icon(Icons.calendar_today, color: Color(0xFF0D47A1), size: 24),
+                                            const SizedBox(width: 12),
+                                            const Text('Data final', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
+                                            const Spacer(),
+                                            IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(), color: Colors.grey, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          child: Row(
+                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              IconButton(icon: const Icon(Icons.chevron_left, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month - 1, tempDate.day); }); }),
+                                              Text('${_getMonthName(tempDate.month)} ${tempDate.year}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
+                                              IconButton(icon: const Icon(Icons.chevron_right, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month + 1, tempDate.day); }); }),
+                                            ],
+                                          ),
+                                        ),
+                                        GridView.count(
+                                          shrinkWrap: true,
+                                          crossAxisCount: 7,
+                                          childAspectRatio: 1.0,
+                                          children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day) {
+                                            return Center(child: Text(day, style: const TextStyle(color: Color(0xFF0D47A1), fontWeight: FontWeight.bold)));
+                                          }).toList(),
+                                        ),
+                                        GridView.count(
+                                          shrinkWrap: true,
+                                          crossAxisCount: 7,
+                                          childAspectRatio: 1.0,
+                                          children: _getDaysInMonth(tempDate).map((day) {
+                                            final isSelected = day != null && day == tempDate.day;
+                                            final isToday = day != null && day == DateTime.now().day && tempDate.month == DateTime.now().month && tempDate.year == DateTime.now().year;
+                                            return StatefulBuilder(
+                                              builder: (context, setDayState) {
+                                                return MouseRegion(
+                                                  cursor: day != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                                                  onEnter: (_) { if (day != null) { setDayState(() => hoveredDay = day); } },
+                                                  onExit: (_) { if (day != null) { setDayState(() => hoveredDay = null); } },
+                                                  child: GestureDetector(
+                                                    onTap: day != null ? () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month, day); }); } : null,
+                                                    child: Container(
+                                                      margin: const EdgeInsets.all(2),
+                                                      decoration: BoxDecoration(
+                                                        color: isSelected ? const Color(0xFF0D47A1)
+                                                            : (day != null && hoveredDay == day) ? const Color(0xFF0D47A1).withOpacity(0.1)
+                                                            : isToday ? const Color(0x220D47A1) : Colors.transparent,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Center(child: Text(
+                                                        day != null ? day.toString() : '',
+                                                        style: TextStyle(
+                                                          color: isSelected ? Colors.white : isToday || (day != null && hoveredDay == day) ? const Color(0xFF0D47A1) : Colors.black87,
+                                                          fontWeight: isSelected || isToday || (day != null && hoveredDay == day) ? FontWeight.bold : FontWeight.normal,
+                                                        ),
+                                                      )),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            );
+                                          }).toList(),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.end,
+                                          children: [
+                                            TextButton(onPressed: () => Navigator.of(context).pop(), style: TextButton.styleFrom(foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(horizontal: 16)), child: const Text('CANCELAR')),
+                                            const SizedBox(width: 8),
+                                            ElevatedButton(
+                                              onPressed: () => Navigator.of(context).pop(tempDate),
+                                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+                                              child: const Text('SELECIONAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
+                              ),
+                            );
+                          },
+                        );
+
+                        if (dataSelecionada != null) {
+                          setState(() {
+                            dataFinal = dataSelecionada;
+                            dataFinalController.text = _formatarData(dataFinal!.toIso8601String());
+                          });
+                          _refreshData();
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        height: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        alignment: Alignment.centerLeft,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFF0D47A1).withOpacity(0.5)),
+                          borderRadius: BorderRadius.circular(4),
+                          color: Colors.white,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              size: 16,
+                              color: Color(0xFF0D47A1),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                textoFinal,
+                                style: const TextStyle(fontSize: 13, color: Colors.black87),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -556,7 +735,7 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
           body: EmitirCertificadoEntrada(
             onVoltar: _voltarParaLista,
             terminalId: _terminalSelecionado ?? '',
-            dataFiltro: dataFiltroCtrl.text,
+            dataFiltro: dataInicialController.text,
             idAnaliseExistente: _ordemSelecionadaId,
             modoSomenteVisualizacao: true,
           ),
@@ -834,11 +1013,22 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
           terminal_id
         ''');
 
-    // Aplicar filtro de data (intervalo do dia selecionado)
-    if (dataFiltro != null) {
-      final dia = dataFiltro!;
-      final diaStr = '${dia.year}-${dia.month.toString().padLeft(2, '0')}-${dia.day.toString().padLeft(2, '0')}';
-      final proximo = dia.add(const Duration(days: 1));
+    // Aplicar filtro de data
+    if (dataInicial != null && dataFinal != null) {
+      final inicioStr = '${dataInicial!.year}-${dataInicial!.month.toString().padLeft(2, '0')}-${dataInicial!.day.toString().padLeft(2, '0')}';
+      
+      final fim = dataFinal!.add(const Duration(days: 1));
+      final fimStr = '${fim.year}-${fim.month.toString().padLeft(2, '0')}-${fim.day.toString().padLeft(2, '0')}';
+      
+      query = query.gte('data_criacao', inicioStr).lt('data_criacao', fimStr);
+    } else if (dataInicial != null) {
+      final diaStr = '${dataInicial!.year}-${dataInicial!.month.toString().padLeft(2, '0')}-${dataInicial!.day.toString().padLeft(2, '0')}';
+      final proximo = dataInicial!.add(const Duration(days: 1));
+      final proximoStr = '${proximo.year}-${proximo.month.toString().padLeft(2, '0')}-${proximo.day.toString().padLeft(2, '0')}';
+      query = query.gte('data_criacao', diaStr).lt('data_criacao', proximoStr);
+    } else if (dataFinal != null) {
+      final diaStr = '${dataFinal!.year}-${dataFinal!.month.toString().padLeft(2, '0')}-${dataFinal!.day.toString().padLeft(2, '0')}';
+      final proximo = dataFinal!.add(const Duration(days: 1));
       final proximoStr = '${proximo.year}-${proximo.month.toString().padLeft(2, '0')}-${proximo.day.toString().padLeft(2, '0')}';
       query = query.gte('data_criacao', diaStr).lt('data_criacao', proximoStr);
     } else {
