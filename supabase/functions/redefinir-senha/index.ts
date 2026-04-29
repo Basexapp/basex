@@ -18,46 +18,31 @@ serve(async (req: Request): Promise<Response> => {
     if (!email) throw new Error("E-mail é obrigatório.");
 
     const supabase = createClient(
-      Deno.env.get("PROJECT_URL")!,
-      Deno.env.get("SERVICE_ROLE_KEY")!,
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!
     );
 
-    // 1️⃣ Buscar usuário no Auth
-    const { data: users, error: listError } = await supabase.auth.admin.listUsers();
-    if (listError) throw listError;
-
-    const user = users.users.find((u: any) => u.email === email);
-    if (!user) throw new Error("Usuário não encontrado.");
-
-    // 2️⃣ Disparar link de redefinição pelo Supabase (usa SMTP configurado)
-    const { error: recoveryErr } = await supabase.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: {
-        redirectTo: "https://powertankapp.com.br/",
-      },
+    // 🔐 fluxo oficial do Supabase
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://powertankapp.com.br/",
     });
 
-    if (recoveryErr) {
-      throw new Error("Falha ao enviar link de redefinição.");
+    if (error) {
+      // não expõe erro real
+      console.error(error);
     }
 
-    // 3️⃣ Atualizar flag no banco (opcional)
-    await supabase
-      .from("usuarios")
-      .update({ redefinicao_senha: false })
-      .eq("email", email);
-
+    // 🔒 SEMPRE retorna sucesso (anti-enumeração)
     return new Response(
       JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
+    // 🔒 mesma resposta mesmo com erro
     return new Response(
-      JSON.stringify({ success: false, error: message }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({ success: true }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
