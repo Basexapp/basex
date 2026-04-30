@@ -540,6 +540,26 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
             ),
             children: [
               const Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => _alternarTodosModuloNoExpansion(modulo, true),
+                      icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.green),
+                      label: const Text("Marcar Todos", style: TextStyle(color: Colors.green, fontSize: 12)),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: () => _alternarTodosModuloNoExpansion(modulo, false),
+                      icon: const Icon(Icons.remove_circle_outline, size: 18, color: Colors.red),
+                      label: const Text("Desmarcar Todos", style: TextStyle(color: Colors.red, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
               ...cardsDoModulo.map((card) => _buildCardItem(card)).toList(),
             ],
           ),

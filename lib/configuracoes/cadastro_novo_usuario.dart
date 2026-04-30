@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../login_page.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'dart:html' as html;
 
 class CadastroNovoUsuarioPage extends StatefulWidget {
   const CadastroNovoUsuarioPage({super.key});
@@ -21,18 +22,10 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController celularController = TextEditingController();
   final TextEditingController funcaoController = TextEditingController();
+  final TextEditingController empresaController = TextEditingController();
+  final TextEditingController terminalController = TextEditingController();
 
   // Empresas
-  List<Map<String, dynamic>> empresas = [];
-  String? empresaSelecionadaNome;
-  String? empresaSelecionadaId;
-  bool carregandoEmpresas = true;
-
-  // Filiais
-  List<Map<String, dynamic>> filiais = [];
-  String? filialSelecionadaNome;
-  String? filialSelecionadaId;
-  bool carregandoFiliais = true;
   bool _salvando = false;
 
   // Máscara de telefone (99) 9 9999-9999
@@ -41,13 +34,20 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
     filter: {"#": RegExp(r'[0-9]')},
   );
 
+  String getClientId() {
+    const key = 'client_id';
+    String? clientId = html.window.localStorage[key];
+
+    if (clientId == null) {
+      clientId = DateTime.now().millisecondsSinceEpoch.toString();
+      html.window.localStorage[key] = clientId;
+    }
+    return clientId;
+  }
+
   @override
   void initState() {
     super.initState();
-    // carregue apenas empresas inicialmente; filiais serão carregadas
-    // após o usuário selecionar uma empresa
-    _carregarEmpresas();
-    carregandoFiliais = false;
   }
 
   @override
@@ -58,74 +58,11 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
     emailController.dispose();
     celularController.dispose();
     funcaoController.dispose();
+    empresaController.dispose();
+    terminalController.dispose();
     super.dispose();
-  }  
-
-  // Carrega filiais filtrando pela empresa selecionada
-  Future<void> _carregarFiliaisPorEmpresa(String? empresaId) async {
-    setState(() {
-      carregandoFiliais = true;
-      filiais = [];
-      filialSelecionadaId = null;
-      filialSelecionadaNome = null;
-    });
-
-    if (empresaId == null) {
-      // sem empresa selecionada, apenas esvazia a lista
-      if (mounted) setState(() => carregandoFiliais = false);
-      return;
-    }
-
-    try {
-      final response = await supabase
-          .from('filiais')
-          .select('id, nome')
-          .eq('empresa_id', empresaId)
-          .order('nome');
-
-      if (mounted) {
-        setState(() {
-          filiais = List<Map<String, dynamic>>.from(response);
-        });
-      }
-    } catch (e) {
-      debugPrint("❌ Erro ao carregar filiais por empresa: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erro ao carregar filiais: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => carregandoFiliais = false);
-    }
   }
-
-  // 🔹 Carrega empresas do Supabase
-  Future<void> _carregarEmpresas() async {
-    try {
-      final response =
-          await supabase.from('empresas').select('id, nome_abrev').order('nome_abrev');
-
-      setState(() {
-        empresas = List<Map<String, dynamic>>.from(response);
-      });
-    } catch (e) {
-      debugPrint("❌ Erro ao carregar empresas: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("Erro ao carregar empresas: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => carregandoEmpresas = false);
-    }
-  }
+  
 
   // 🔹 Envia a solicitação de cadastro - CÓDIGO CORRIGIDO
   Future<void> _enviarCadastro() async {
@@ -140,6 +77,8 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
       final email = emailController.text.trim();
       final celular = celularController.text.trim();
       final funcao = funcaoController.text.trim();
+      final empresa = empresaController.text.trim();
+      final terminal = terminalController.text.trim();
 
       // 1️⃣ Verifica se já existe um cadastro pendente
       final existe = await supabase
@@ -153,15 +92,21 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
             "Já existe uma solicitação de cadastro pendente para este e-mail.");
       }
 
+      final now = DateTime.now().toUtc();
+      final timeBucket = (now.millisecondsSinceEpoch / (1000 * 600)).floor();
+      final clientId = getClientId();
+
       // 2️⃣ Prepara os dados para inserção
       final dadosCadastro = {
         'nome': nome,
         'email': email,
         'celular': celular,
         'funcao': funcao,
-        'id_filial': filialSelecionadaId,
-        'empresa_id': empresaSelecionadaId,
+        'empresa': empresa,
+        'terminal': terminal,
         'status': 'pendente',
+        'time_bucket': timeBucket,
+        'ip': clientId,
       };
 
       // ✅ Adiciona nome_apelido apenas se não estiver vazio
@@ -281,7 +226,7 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                   MaterialPageRoute(builder: (_) => const LoginPage()),
                 );
               },
-              child: Image.asset('assets/logo_top_login.png'),
+              child: Image.asset('assets/logo_top_login20.png'),
             ),
           ),
 
@@ -365,154 +310,39 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                         decoration: _inputDecoration("Celular (com WhatsApp)"),
                       ),
                       const SizedBox(height: 16),
-                      // Empresa / Organização (lista real)
-                      if (carregandoEmpresas)
-                        const Center(
-                            child: CircularProgressIndicator(
-                                color: Color(0xFF0A4B78)))
-                      else
-                        DropdownButtonFormField<String>(
-                          value: empresaSelecionadaId,
-                          isExpanded: true,
-                          isDense: true,
-                          dropdownColor: Colors.white,
-                          iconEnabledColor: Colors.grey,
-                          style: const TextStyle(
-                            height: 1.0,
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: 'Empresa/Organização',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF0A4B78),
-                                width: 1.0,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF0A4B78),
-                                width: 1.0,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10, horizontal: 12),
-                          ),
-                          hint: const Text('Selecione a empresa'),
-                          items: empresas.map((f) {
-                            final label = (f['nome_abrev'] ?? '').toString();
-                            final id = f['id']?.toString();
-                            return DropdownMenuItem<String>(
-                              value: id,
-                              child: Container(
-                                height: 34,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  label,
-                                  style: const TextStyle(height: 1.0),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (id) async {
-                            // quando empresa muda, recarrega filiais relacionadas
-                            setState(() {
-                              empresaSelecionadaId = id;
-                              empresaSelecionadaNome = empresas.firstWhere(
-                                (f) => f['id']?.toString() == id,
-                                orElse: () => {'nome_abrev': null},
-                              )['nome_abrev']?.toString();
-                            });
-                            await _carregarFiliaisPorEmpresa(id);
-                          },
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'Selecione a empresa';
-                            return null;
-                          },
+
+                      // Empresa / Organização
+                      TextFormField(
+                        controller: empresaController,
+                        textCapitalization: TextCapitalization.words,
+                        maxLength: 50,
+                        decoration: _inputDecoration("Empresa/Organização").copyWith(
+                          counterText: "",
                         ),
+                        validator: (v) => v == null || v.isEmpty
+                            ? "Informe a empresa"
+                            : null,
+                      ),
                       const SizedBox(height: 16),
 
-                      // Filial (lista real) - permanece aqui, antes da função
-                      if (carregandoFiliais)
-                        const Center(
-                            child: CircularProgressIndicator(
-                                color: Color(0xFF0A4B78)))
-                      else
-                        DropdownButtonFormField<String>(
-                          value: filialSelecionadaId,
-                          isExpanded: true,
-                          isDense: true,
-                          dropdownColor: Colors.white,
-                          iconEnabledColor: Colors.grey,
-                          style: const TextStyle(
-                            height: 1.0,
-                            fontSize: 14,
-                            color: Colors.black87,
-                          ),
-                          decoration: InputDecoration(
-                            labelText: 'Filial',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF0A4B78),
-                                width: 1.0,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: const BorderSide(
-                                color: Color(0xFF0A4B78),
-                                width: 1.0,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10, horizontal: 12),
-                          ),
-                          hint: filiais.isEmpty
-                              ? const Text('Nenhuma filial para a empresa selecionada')
-                              : const Text('Selecione a filial'),
-                          items: filiais.map((f) {
-                            final id = f['id']?.toString();
-                            final nome = f['nome']?.toString() ?? '';
-                            return DropdownMenuItem<String>(
-                              value: id,
-                              child: Container(
-                                height: 34,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  nome,
-                                  style: const TextStyle(height: 1.0),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: filiais.isEmpty
-                              ? null
-                              : (id) {
-                                  setState(() {
-                                    filialSelecionadaId = id;
-                                    filialSelecionadaNome = filiais.firstWhere(
-                                      (f) => f['id']?.toString() == id,
-                                      orElse: () => {'nome': null},
-                                    )['nome']?.toString();
-                                  });
-                                },
-                          validator: (v) {
-                            // se não houver filiais para a empresa selecionada,
-                            // o campo não é obrigatório
-                            if (filiais.isEmpty) return null;
-                            if (v == null || v.isEmpty) return 'Selecione a filial';
-                            return null;
-                          },
+                      // Terminal
+                      TextFormField(
+                        controller: terminalController,
+                        textCapitalization: TextCapitalization.words,
+                        maxLength: 50,
+                        decoration: _inputDecoration("Terminal").copyWith(
+                          counterText: "",
                         ),
+                        validator: (v) => v == null || v.isEmpty
+                            ? "Informe o terminal"
+                            : null,
+                      ),
                       const SizedBox(height: 16),
 
                       // Função / Cargo (agora como último campo antes do botão)
                       TextFormField(
                         controller: funcaoController,
+                        textCapitalization: TextCapitalization.words,
                         decoration: _inputDecoration("Função / Cargo"),
                       ),
                       const SizedBox(height: 25),
