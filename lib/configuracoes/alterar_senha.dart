@@ -182,7 +182,12 @@ class _AlterarSenhaPageState extends State<AlterarSenhaPage> {
                 TextFormField(
                   controller: _senhaAtualController,
                   obscureText: !_mostrarSenhaAtual,
-                  validator: _validarSenha,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Este campo é obrigatório';
+                    }
+                    return null;
+                  },
                   decoration: InputDecoration(
                     labelText: "Senha Atual",
                     border: OutlineInputBorder(

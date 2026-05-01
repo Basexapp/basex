@@ -32,6 +32,7 @@ import 'sessoes/laboratorio/temp_dens_media.dart';
 import 'sessoes/suporte/desenvolvedor.dart';
 import 'sessoes/suporte/suporte.dart';
 import 'sessoes/suporte/fila_solic.dart';
+import 'sessoes/suporte/acesso_desenvolvedor.dart';
 import 'sessoes/circuito/criar_ordem.dart';
 import 'sessoes/circuito/radar.dart';
 import 'sessoes/almoxerifado/frascos_amostras.dart';
@@ -115,6 +116,7 @@ class _HomePageState extends State<HomePage>
   bool _mostrarEstoquePorTanque = false;
   bool _mostrarMenuSuporte = false;
   bool _mostrarFilaSolicitacoes = false;
+  bool _mostrarAcessoDesenvolvedor = false;
   bool _mostrarTempDensMedia = false;
   bool _mostrarEstoqueProduto = false;
   bool _mostrarGestaoBombeios = false;
@@ -370,6 +372,21 @@ class _HomePageState extends State<HomePage>
   }
 
   void _navegarParaFavorito(Map<String, dynamic> card) {
+    final usuario = UsuarioAtual.instance;
+    final cardId = card['id']?.toString();
+
+    // Verificação de segurança: se o usuário não tiver permissão, bloqueia a navegação
+    if (usuario != null && cardId != null && !usuario.podeAcessarCard(cardId)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Você não tem permissão para acessar este recurso.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     final sessaoPai = card['sessao_pai']?.toString() ?? '';
     final menuIndex = menuItems.indexOf(sessaoPai);
     final filhos = _filhosPorSessao[sessaoPai] ?? [];
@@ -1153,6 +1170,7 @@ class _HomePageState extends State<HomePage>
       _mostrarMenuSuporte = false;
       _mostrarSuporte = false;
       _mostrarFilaSolicitacoes = false; // Resetar Fila de Solicitações
+      _mostrarAcessoDesenvolvedor = false;
       _mostrarEstoqueProduto = false;
       _mostrarRegistroPreset = false;
       _mostrarContaCorrenteRefinarias = false;
@@ -1279,6 +1297,7 @@ class _HomePageState extends State<HomePage>
       _mostrarMenuSuporte = false;
       _mostrarSuporte = false;
       _mostrarFilaSolicitacoes = false;
+      _mostrarAcessoDesenvolvedor = false;
       _mostrarCardsFilial = false;
       _mostrarVeiculos = false;
       _mostrarDetalhesVeiculo = false;
@@ -1760,6 +1779,17 @@ class _HomePageState extends State<HomePage>
           );
         }
 
+        if (_mostrarAcessoDesenvolvedor) {
+          return AcessoDesenvolvedorPage(
+            onVoltar: () {
+              setState(() {
+                _mostrarAcessoDesenvolvedor = false;
+                _mostrarMenuSuporte = true;
+              });
+            },
+          );
+        }
+
         if (!_mostrarMenuSuporte) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             setState(() {
@@ -1898,6 +1928,12 @@ class _HomePageState extends State<HomePage>
           case 'fila_solicitacoes':
             setState(() {
               _mostrarFilaSolicitacoes = true;
+            });
+            break;
+
+          case 'acesso_desenvolvedor':
+            setState(() {
+              _mostrarAcessoDesenvolvedor = true;
             });
             break;
 
@@ -4022,13 +4058,21 @@ class _HomePageState extends State<HomePage>
     for (final entry in _filhosPorSessao.entries) {
       for (final card in entry.value) {
         if (card['favorito'] == true) {
-          favoritos.add(card);
+          // Verifica se o usuário tem permissão para este card
+          final cardId = card['id']?.toString();
+          if (usuario == null || cardId == null || usuario.podeAcessarCard(cardId)) {
+            favoritos.add(card);
+          }
         }
       }
     }
     for (final card in _filiaisProgramacao) {
       if (card['favorito'] == true) {
-        favoritos.add(card);
+        // Verifica se o usuário tem permissão para este card
+        final cardId = card['id']?.toString();
+        if (usuario == null || cardId == null || usuario.podeAcessarCard(cardId)) {
+          favoritos.add(card);
+        }
       }
     }
 
@@ -4358,6 +4402,13 @@ class HomeCards extends StatelessWidget {
         'icone': Icons.receipt_long,
         'cor': const Color(0xFF0D47A1),
         'tipo': 'fila_solicitacoes',
+      },
+      {
+        'titulo': 'Acesso Desenvolvedor',
+        'descricao': 'Gerenciamento e acesso de desenvolvedor',
+        'icone': Icons.developer_mode,
+        'cor': const Color(0xFF0D47A1),
+        'tipo': 'acesso_desenvolvedor',
       },
     ];
 
