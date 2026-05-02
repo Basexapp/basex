@@ -24,6 +24,8 @@ class _MotoristasPageState extends State<MotoristasPage> {
   bool _editando = false;
   Map<String, dynamic>? _motoristaEditando;
   String? _campoEditando;
+  final Map<String, Map<String, String>> _dadosRevelados = {}; // {motoristaId: {cpf: '...', cnh: '...'}}
+  final Map<String, bool> _carregandoDados = {}; // {motoristaId: true/false}
   final TextEditingController _controller = TextEditingController();
   int _paginaAtual = 0;
   final int _itensPorPagina = 20;
@@ -197,6 +199,51 @@ class _MotoristasPageState extends State<MotoristasPage> {
     });
   }
 
+  Future<void> _visualizarDadosSensiveis(Map<String, dynamic> motorista) async {
+    final String motoristaId = motorista['id'].toString();
+
+    // Se já foi revelado, não faz nada
+    if (_dadosRevelados.containsKey(motoristaId)) return;
+
+    setState(() {
+      _carregandoDados[motoristaId] = true;
+    });
+
+    try {
+      final response = await _supabase.functions.invoke(
+        'acessar-dados-motoristas',
+        body: {'pessoa_id': motoristaId},
+      );
+
+      if (response.status == 200 && response.data != null) {
+        final data = response.data;
+        setState(() {
+          _dadosRevelados[motoristaId] = {
+            'cpf': data['cpf']?.toString() ?? 'Não cadastrado',
+            'cnh': data['cnh']?.toString() ?? 'Não cadastrado',
+          };
+        });
+      } else {
+        throw Exception('Erro ao buscar dados');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao validar acesso: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _carregandoDados[motoristaId] = false;
+        });
+      }
+    }
+  }
+
   void _cancelarEdicao() {
     setState(() {
       _editando = false;
@@ -262,12 +309,8 @@ class _MotoristasPageState extends State<MotoristasPage> {
   Widget _buildLinhaTabela(Map<String, dynamic> motorista, int index) {
     final isEditando = _editando && _motoristaEditando?['id'] == motorista['id'];
 
-    String formatarCPFVisivel(String? cpf) {
-      if (cpf == null || cpf.isEmpty) return '-';
-      final cpfLimpo = cpf.replaceAll(RegExp(r'[^0-9]'), '');
-      if (cpfLimpo.length < 2) return cpfLimpo;
-      final ultimosDois = cpfLimpo.substring(cpfLimpo.length - 2);
-      return '***.***.***-$ultimosDois';
+    Future<void> visualizarDadosSensiveisInterno() async {
+      await _visualizarDadosSensiveis(motorista);
     }
 
     return Container(
@@ -296,15 +339,56 @@ class _MotoristasPageState extends State<MotoristasPage> {
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
                         onDoubleTap: () => _iniciarEdicao(motorista, campo),
-                        child: Text(
-                          campo == 'cpf'
-                              ? formatarCPFVisivel(motorista[campo]?.toString())
-                              : (motorista[campo]?.toString().isNotEmpty == true
-                                  ? motorista[campo].toString()
-                                  : '-'),
-                          style: const TextStyle(fontSize: 14),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    child: (campo == 'cpf' || campo == 'cnh')
+                        ? Builder(
+                            builder: (context) {
+                              final String motoristaId = motorista['id'].toString();
+                              final bool carregando = _carregandoDados[motoristaId] ?? false;
+                              final Map<String, String>? dados = _dadosRevelados[motoristaId];
+
+                              if (carregando) {
+                                return const Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              if (dados != null) {
+                                return SelectableText(
+                                  dados[campo] ?? '---',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              }
+
+                              return Align(
+                                alignment: Alignment.centerLeft,
+                                child: IconButton(
+                                  icon: const Icon(Icons.visibility_outlined, size: 20),
+                                  onPressed: visualizarDadosSensiveisInterno,
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  tooltip: 'Visualizar CPF e CNH',
+                                ),
+                              );
+                            },
+                          )
+                        : Text(
+                            motorista[campo]?.toString().isNotEmpty == true
+                                ? motorista[campo].toString()
+                                : '-',
+                            style: const TextStyle(fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                       ),
                     ),
             ),
