@@ -261,7 +261,15 @@ class _MotoristasPageState extends State<MotoristasPage> {
   // Widget para renderizar uma linha da tabela usando a configuração unificada
   Widget _buildLinhaTabela(Map<String, dynamic> motorista, int index) {
     final isEditando = _editando && _motoristaEditando?['id'] == motorista['id'];
-    
+
+    String formatarCPFVisivel(String? cpf) {
+      if (cpf == null || cpf.isEmpty) return '-';
+      final cpfLimpo = cpf.replaceAll(RegExp(r'[^0-9]'), '');
+      if (cpfLimpo.length < 2) return cpfLimpo;
+      final ultimosDois = cpfLimpo.substring(cpfLimpo.length - 2);
+      return '***.***.***-$ultimosDois';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
@@ -289,9 +297,11 @@ class _MotoristasPageState extends State<MotoristasPage> {
                       child: GestureDetector(
                         onDoubleTap: () => _iniciarEdicao(motorista, campo),
                         child: Text(
-                          motorista[campo]?.toString().isNotEmpty == true 
-                              ? motorista[campo].toString() 
-                              : '-',
+                          campo == 'cpf'
+                              ? formatarCPFVisivel(motorista[campo]?.toString())
+                              : (motorista[campo]?.toString().isNotEmpty == true
+                                  ? motorista[campo].toString()
+                                  : '-'),
                           style: const TextStyle(fontSize: 14),
                           overflow: TextOverflow.ellipsis,
                         ),

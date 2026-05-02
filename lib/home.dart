@@ -1358,6 +1358,106 @@ class _HomePageState extends State<HomePage>
     });
   }
 
+  void _showLoginDevDialog() {
+    final TextEditingController emailController = TextEditingController();
+    final TextEditingController senhaController = TextEditingController();
+    bool carregando = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              title: const Text('Acesso Desenvolvedor'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: emailController,
+                    decoration: const InputDecoration(
+                      labelText: 'E-mail',
+                      prefixIcon: Icon(Icons.email),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: senhaController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Senha',
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: carregando
+                      ? null
+                      : () async {
+                          setDialogState(() => carregando = true);
+                          try {
+                            final response = await Supabase.instance.client.functions.invoke(
+                              'validar-dev',
+                              body: {
+                                'email': emailController.text,
+                                'senha': senhaController.text,
+                              },
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                            );
+
+                            if (response.data != null && response.data['autorizado'] == true) {
+                              Navigator.pop(context);
+                              setState(() {
+                                _mostrarAcessoDesenvolvedor = true;
+                                _mostrarMenuSuporte = false;
+                              });
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Credenciais inválidas'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Erro ao validar: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted) {
+                              setDialogState(() => carregando = false);
+                            }
+                          }
+                        },
+                  child: carregando
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Acessar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = UsuarioAtual.instance;
@@ -1932,9 +2032,7 @@ class _HomePageState extends State<HomePage>
             break;
 
           case 'acesso_desenvolvedor':
-            setState(() {
-              _mostrarAcessoDesenvolvedor = true;
-            });
+            _showLoginDevDialog();
             break;
 
           case 'minhas_solicitacoes':
