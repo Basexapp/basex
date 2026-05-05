@@ -46,6 +46,8 @@ import 'sessoes/bombeios/ordem_bombeio.dart';
 import 'sessoes/financeiro/conta_corrente_refinarias.dart';
 import 'sessoes/operacao/presets.dart';
 import 'sessoes/operacao/calculadora_arqueacao.dart';
+import 'sessoes/operacao/controle_aditivo.dart';
+import 'sessoes/operacao/filtro_controle_aditivo.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -123,7 +125,18 @@ class _HomePageState extends State<HomePage>
   bool _mostrarResultadoMensal = false;
   bool _mostrarRegistroPreset = false;
   bool _mostrarCalculadoraArqueacao = false;
+  bool _mostrarControleAditivo = false;
+  bool _mostrarFiltroControleAditivo = false;
   bool _mostrarCardsFilial = false;
+
+  // Parâmetros de filtro para aditivos
+  String? _aditivoTerminalId;
+  String? _aditivoEmpresaId;
+  String _aditivoNomeTerminal = '';
+  String? _aditivoEmpresaNome;
+  DateTime _aditivoDataInicial = DateTime.now();
+  DateTime _aditivoDataFinal = DateTime.now();
+  String _aditivoTipoRelatorio = 'sintetico';
   bool _mostrarContaCorrenteRefinarias = false;
   bool _voltarParaTanquesApoCACL = false; // ← RASTREIA SE VEIO DE TANQUES
   bool _estoquePorTanqueVemDaApuracao =
@@ -612,6 +625,15 @@ class _HomePageState extends State<HomePage>
         'label': 'Calculadora de Arqueação',
         'descricao': 'Cálculo de arqueação de tanques e embarcações',
         'tipo': 'calculadora_arqueacao',
+        'sessao_pai': 'Operação',
+        'favorito': false,
+      },
+      {
+        'id': 'ebd85bc2-3334-4078-a22a-3458fbdad8f1',
+        'icon': Icons.add_chart,
+        'label': 'Controle de Aditivos',
+        'descricao': 'Gestão e monitoramento de aditivos',
+        'tipo': 'controle_aditivo',
         'sessao_pai': 'Operação',
         'favorito': false,
       },
@@ -1298,6 +1320,8 @@ class _HomePageState extends State<HomePage>
       _mostrarSuporte = false;
       _mostrarFilaSolicitacoes = false;
       _mostrarAcessoDesenvolvedor = false;
+      _mostrarControleAditivo = false;
+      _mostrarFiltroControleAditivo = false;
       _mostrarCardsFilial = false;
       _mostrarVeiculos = false;
       _mostrarDetalhesVeiculo = false;
@@ -2567,6 +2591,60 @@ class _HomePageState extends State<HomePage>
         );
       }
 
+      if (_mostrarControleAditivo) {
+        return ControleAditivoPage(
+          key: const ValueKey('controle-aditivo-page'),
+          terminalId: _aditivoTerminalId,
+          empresaId: _aditivoEmpresaId,
+          nomeTerminal: _aditivoNomeTerminal,
+          empresaNome: _aditivoEmpresaNome,
+          dataInicial: _aditivoDataInicial,
+          dataFinal: _aditivoDataFinal,
+          tipoRelatorio: _aditivoTipoRelatorio,
+          onVoltar: () {
+            setState(() {
+              _mostrarControleAditivo = false;
+              _mostrarFiltroControleAditivo = true;
+            });
+          },
+        );
+      }
+
+      if (_mostrarFiltroControleAditivo) {
+        return FiltroControleAditivoPage(
+          key: const ValueKey('filtro-controle-aditivo-page'),
+          nomeTerminal: _usuarioTerminalNome ?? 'Terminal',
+          onConsultar: ({
+            required String? terminalId,
+            required String? empresaId,
+            required String nomeTerminal,
+            String? empresaNome,
+            required DateTime dataInicial,
+            required DateTime dataFinal,
+            required String tipoRelatorio,
+          }) {
+            setState(() {
+              _aditivoTerminalId = terminalId;
+              _aditivoEmpresaId = empresaId;
+              _aditivoNomeTerminal = nomeTerminal;
+              _aditivoEmpresaNome = empresaNome;
+              _aditivoDataInicial = dataInicial;
+              _aditivoDataFinal = dataFinal;
+              _aditivoTipoRelatorio = tipoRelatorio;
+
+              _mostrarFiltroControleAditivo = false;
+              _mostrarControleAditivo = true;
+            });
+          },
+          onVoltar: () {
+            setState(() {
+              _mostrarFiltroControleAditivo = false;
+              _mostrarFilhosDaSessao('Operação');
+            });
+          },
+        );
+      }
+
       if (_sessaoAtual == 'Perdas e Sobras') {
         return _buildFilhosSessaoPage();
       }
@@ -3564,6 +3642,11 @@ class _HomePageState extends State<HomePage>
       case '0bc9a8ec-40a0-41c1-a44a-405c64c233a5': // Gestão de Bombeios
         setState(() {
           _mostrarGestaoBombeios = true;
+        });
+        break;
+      case 'controle_aditivo':
+        setState(() {
+          _mostrarFiltroControleAditivo = true;
         });
         break;
       case 'perdas_sobras':
