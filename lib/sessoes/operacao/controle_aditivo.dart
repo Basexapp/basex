@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ControleAditivoPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -27,7 +28,8 @@ class ControleAditivoPage extends StatefulWidget {
 }
 
 class _ControleAditivoPageState extends State<ControleAditivoPage> {
-  
+  final SupabaseClient _supabase = Supabase.instance.client;
+
   // Flags de carregamento
   bool _carregandoDados = false;
   String? _erro;
@@ -70,7 +72,7 @@ class _ControleAditivoPageState extends State<ControleAditivoPage> {
   void initState() {
     super.initState();
     _syncScroll();
-    _carregarDadosFicticios();
+    _carregarDados();
   }
 
   void _syncScroll() {
@@ -94,58 +96,88 @@ class _ControleAditivoPageState extends State<ControleAditivoPage> {
     super.dispose();
   }
 
-  Future<void> _carregarDadosFicticios() async {
+  Future<void> _carregarDados() async {
+    if (widget.terminalId == null || widget.terminalId!.isEmpty ||
+        widget.empresaId == null || widget.empresaId!.isEmpty) {
+      setState(() {
+        _erro = 'Terminal e empresa são obrigatórios';
+      });
+      return;
+    }
+
     setState(() {
       _carregandoDados = true;
       _erro = null;
     });
 
-    // Simulando delay de rede
-    await Future.delayed(const Duration(milliseconds: 800));
-
     try {
-      final List<Map<String, dynamic>> mockData = [
-        {
-          'data': DateTime.now().subtract(const Duration(days: 5)).toIso8601String(),
-          'descricao': 'Recebimento de Aditivo - NF 1234',
-          'entradas': 1000.0,
-          'saidas': 0.0,
-        },
-        {
-          'data': DateTime.now().subtract(const Duration(days: 4)).toIso8601String(),
-          'descricao': 'Consumo Operacional - Carregamento GCI',
-          'entradas': 0.0,
-          'saidas': 15.5,
-        },
-        {
-          'data': DateTime.now().subtract(const Duration(days: 3)).toIso8601String(),
-          'descricao': 'Consumo Operacional - Carregamento GAS',
-          'entradas': 0.0,
-          'saidas': 22.8,
-        },
-        {
-          'data': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-          'descricao': 'Ajuste de Estoque - Inventário Mensal',
-          'entradas': 5.0,
-          'saidas': 0.0,
-        },
-        {
-          'data': DateTime.now().subtract(const Duration(days: 1)).toIso8601String(),
-          'descricao': 'Consumo Operacional - Transferência entre Tanques',
-          'entradas': 0.0,
-          'saidas': 8.4,
-        },
-      ];
+      // 1. Buscar produtos que são aditivos
+      final produtosAditivosResponse = await _supabase
+          .from('produtos')
+          .select('id')
+          .eq('aditivo', true);
+
+      final List<String> aditivoIds = (produtosAditivosResponse as List)
+          .map((p) => p['id'].toString())
+          .toList();
+
+      if (aditivoIds.isEmpty) {
+        setState(() {
+          _movimentacoes = [];
+          _movimentacoesOrdenadas = [];
+          _totalEntradas = 0;
+          _totalSaidas = 0;
+          _saldoFinal = 0;
+          _carregandoDados = false;
+        });
+        return;
+      }
+
+      // 2. Buscar movimentações para esses produtos no período e terminal
+      final dataInicio = DateTime(
+        widget.dataInicial.year,
+        widget.dataInicial.month,
+        widget.dataInicial.day,
+      );
+      final dataFim = DateTime(
+        widget.dataFinal.year,
+        widget.dataFinal.month,
+        widget.dataFinal.day,
+        23, 59, 59,
+      );
+
+      final response = await _supabase
+          .from('movimentacoes')
+          .select('data_mov, cliente, saida_amb, entrada_amb, produto_id')
+          .inFilter('produto_id', aditivoIds)
+          .eq('terminal_orig_id', widget.terminalId!)
+          .eq('empresa_id', widget.empresaId!)
+          .gte('data_mov', dataInicio.toIso8601String())
+          .lte('data_mov', dataFim.toIso8601String())
+          .order('data_mov', ascending: true);
+
+      final List<Map<String, dynamic>> rawData = (response as List).map((m) {
+        // Conversão: saida_amb x 0,01
+        final double saiaAmb = (m['saida_amb'] as num?)?.toDouble() ?? 0.0;
+        
+        return {
+          'data': m['data_mov'],
+          'descricao': m['cliente'] ?? 'Consumo Operacional',
+          'entradas': 0.0, // Como pedido, entradas ficam zeradas por enquanto
+          'saidas': saiaAmb * 0.01,
+        };
+      }).toList();
 
       if (widget.tipoRelatorio == 'sintetico') {
-        _processarDadosSintetico(mockData);
+        _processarDadosSintetico(rawData);
       } else {
-        _processarDadosAnalitico(mockData);
+        _processarDadosAnalitico(rawData);
       }
 
     } catch (e) {
+      debugPrint('❌ Erro ao carregar dados reais: $e');
       setState(() {
-        _erro = 'Erro ao processar dados fictícios';
+        _erro = 'Erro ao carregar dados: ${e.toString()}';
         _carregandoDados = false;
       });
     }
@@ -346,7 +378,7 @@ class _ControleAditivoPageState extends State<ControleAditivoPage> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _carregarDadosFicticios,
+            onPressed: _carregarDados,
             tooltip: 'Recarregar dados',
           ),
         ],
@@ -400,8 +432,7 @@ class _ControleAditivoPageState extends State<ControleAditivoPage> {
     );
   }
 
-  Widget _buildErro() {
-    return Center(
+ Widget _buildErro() {    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -410,7 +441,7 @@ class _ControleAditivoPageState extends State<ControleAditivoPage> {
           Text(_erro!, style: TextStyle(fontSize: 16, color: Colors.red.shade700), textAlign: TextAlign.center),
           const SizedBox(height: 8),
           ElevatedButton(
-            onPressed: _carregarDadosFicticios,
+            onPressed: _carregarDados,
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1)),
             child: const Text('Tentar novamente'),
           ),

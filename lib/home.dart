@@ -134,9 +134,9 @@ class _HomePageState extends State<HomePage>
   String? _aditivoEmpresaId;
   String _aditivoNomeTerminal = '';
   String? _aditivoEmpresaNome;
-  DateTime _aditivoDataInicial = DateTime.now();
-  DateTime _aditivoDataFinal = DateTime.now();
-  String _aditivoTipoRelatorio = 'sintetico';
+  DateTime? _aditivoDataInicial;
+  DateTime? _aditivoDataFinal;
+  String? _aditivoTipoRelatorio;
   bool _mostrarContaCorrenteRefinarias = false;
   bool _voltarParaTanquesApoCACL = false; // ← RASTREIA SE VEIO DE TANQUES
   bool _estoquePorTanqueVemDaApuracao =
@@ -2598,9 +2598,9 @@ class _HomePageState extends State<HomePage>
           empresaId: _aditivoEmpresaId,
           nomeTerminal: _aditivoNomeTerminal,
           empresaNome: _aditivoEmpresaNome,
-          dataInicial: _aditivoDataInicial,
-          dataFinal: _aditivoDataFinal,
-          tipoRelatorio: _aditivoTipoRelatorio,
+          dataInicial: _aditivoDataInicial ?? DateTime(DateTime.now().year, DateTime.now().month, 1),
+          dataFinal: _aditivoDataFinal ?? DateTime.now(),
+          tipoRelatorio: _aditivoTipoRelatorio ?? 'sintetico',
           onVoltar: () {
             setState(() {
               _mostrarControleAditivo = false;
@@ -2614,6 +2614,12 @@ class _HomePageState extends State<HomePage>
         return FiltroControleAditivoPage(
           key: const ValueKey('filtro-controle-aditivo-page'),
           nomeTerminal: _usuarioTerminalNome ?? 'Terminal',
+          terminalId: _aditivoTerminalId,
+          empresaId: _aditivoEmpresaId,
+          empresaNome: _aditivoEmpresaNome,
+          dataInicial: _aditivoDataInicial,
+          dataFinal: _aditivoDataFinal,
+          tipoRelatorio: _aditivoTipoRelatorio,
           onConsultar: ({
             required String? terminalId,
             required String? empresaId,

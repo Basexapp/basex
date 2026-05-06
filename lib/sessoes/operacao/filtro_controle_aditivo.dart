@@ -7,6 +7,9 @@ class FiltroControleAditivoPage extends StatefulWidget {
   final String? empresaId;
   final String nomeTerminal;
   final String? empresaNome;
+  final DateTime? dataInicial;
+  final DateTime? dataFinal;
+  final String? tipoRelatorio;
   final Function({
     required String? terminalId,
     required String? empresaId,
@@ -24,6 +27,9 @@ class FiltroControleAditivoPage extends StatefulWidget {
     this.empresaId,
     required this.nomeTerminal,
     this.empresaNome,
+    this.dataInicial,
+    this.dataFinal,
+    this.tipoRelatorio,
     required this.onConsultar,
     required this.onVoltar,
   });
@@ -36,35 +42,49 @@ class FiltroControleAditivoPage extends StatefulWidget {
 class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
   final SupabaseClient _supabase = Supabase.instance.client;
 
-  DateTime _dataInicial = DateTime(DateTime.now().year, DateTime.now().month, 1);
-  DateTime _dataFinal = DateTime.now();
+  late DateTime _dataInicial;
+  late DateTime _dataFinal;
   String? _terminalSelecionadoId;
   String? _terminalSelecionadoNome;
   String? _empresaSelecionadaId;
   String? _empresaSelecionadaNome;
-  String _tipoRelatorio = 'sintetico';
+  late String _tipoRelatorio;
   List<Map<String, dynamic>> _terminaisDisponiveis = [];
   List<Map<String, dynamic>> _empresasDisponiveis = [];
   bool _carregandoTerminais = false;
   bool _carregandoEmpresas = false;
   bool _carregando = false;
+  bool _terminalVinculado = false;
 
   @override
   void initState() {
     super.initState();
+    _dataInicial = widget.dataInicial ?? DateTime(DateTime.now().year, DateTime.now().month, 1);
+    _dataFinal = widget.dataFinal ?? DateTime.now();
+    _tipoRelatorio = widget.tipoRelatorio ?? 'sintetico';
     _inicializarFiltros();
   }
 
   Future<void> _inicializarFiltros() async {
     setState(() => _carregando = true);
 
+    final usuario = UsuarioAtual.instance;
+
+    // Verificar se usuário tem terminal vinculado no login (mesma lógica do filtro estoque)
+    if (usuario?.terminalId != null && usuario!.terminalId!.isNotEmpty) {
+      _terminalVinculado = true;
+      _terminalSelecionadoId = usuario.terminalId;
+      _terminalSelecionadoNome = usuario.terminalNome ?? 'Terminal vinculado';
+    }
+
     await _carregarTerminaisDisponiveis();
 
-    final usuario = UsuarioAtual.instance;
     final terminalIdInicial =
         widget.terminalId ?? usuario?.terminalId ?? '';
 
-    if (terminalIdInicial.isNotEmpty) {
+    if (_terminalVinculado) {
+      // Já definido no bloco acima
+    } else if (terminalIdInicial.isNotEmpty) {
       final encontrado = _terminaisDisponiveis.firstWhere(
         (t) => t['id'] == terminalIdInicial,
         orElse: () => <String, dynamic>{'id': '', 'nome': ''},
@@ -99,6 +119,16 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
   }
 
   Future<void> _carregarTerminaisDisponiveis() async {
+    // Se usuário já tem terminal vinculado, não precisa carregar lista (Lógica copiada do filtro estoque)
+    if (_terminalVinculado) {
+      setState(() {
+        _terminaisDisponiveis = [
+          {'id': _terminalSelecionadoId!, 'nome': _terminalSelecionadoNome!},
+        ];
+      });
+      return;
+    }
+
     setState(() => _carregandoTerminais = true);
 
     try {
@@ -195,6 +225,18 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
       final usuario = UsuarioAtual.instance;
       final nivelUsuario = usuario?.nivel ?? 0;
       
+      // Se já temos a empresa no objeto do usuário, evitamos nova busca no banco
+      if (usuario?.empresaId != null && usuario!.empresaId!.isNotEmpty) {
+        final empresaId = usuario.empresaId!;
+        final nomeEmpresa = usuario.empresaNome ?? 'Empresa vinculada';
+        setState(() {
+          _empresaSelecionadaId = empresaId;
+          _empresaSelecionadaNome = nomeEmpresa;
+          _empresasDisponiveis = [{'id': empresaId, 'nome': nomeEmpresa}];
+        });
+        return;
+      }
+
       final temEmpresaFixa = (nivelUsuario == 1 || nivelUsuario == 2 || nivelUsuario == 3) && 
                             usuario?.empresaId?.isNotEmpty == true;
 
@@ -296,16 +338,242 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
   }
 
   Future<void> _selecionarDataInicial(BuildContext context) async {
-     final DateTime? picked = await showDatePicker(
+    DateTime tempDate = _dataInicial;
+    final DateTime? selecionado = await showDialog<DateTime>(
       context: context,
-      initialDate: _dataInicial,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2101),
-      locale: const Locale('pt', 'BR'),
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            width: 350,
+            padding: const EdgeInsets.all(20),
+            child: StatefulBuilder(
+              builder: (context, setStateDialog) {
+                int? hoveredDay;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          color: Color(0xFF0D47A1),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Data inicial',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0D47A1),
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                          color: Colors.grey,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.chevron_left,
+                              color: Color(0xFF0D47A1),
+                            ),
+                            onPressed: () {
+                              setStateDialog(() {
+                                tempDate = DateTime(
+                                  tempDate.year,
+                                  tempDate.month - 1,
+                                  tempDate.day,
+                                );
+                              });
+                            },
+                          ),
+                          Text(
+                            '${_getMonthName(tempDate.month)} ${tempDate.year}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0D47A1),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.chevron_right,
+                              color: Color(0xFF0D47A1),
+                            ),
+                            onPressed: () {
+                              setStateDialog(() {
+                                tempDate = DateTime(
+                                  tempDate.year,
+                                  tempDate.month + 1,
+                                  tempDate.day,
+                                );
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 7,
+                      childAspectRatio: 1.0,
+                      children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day) {
+                        return Center(
+                          child: Text(
+                            day,
+                            style: const TextStyle(
+                              color: Color(0xFF0D47A1),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 7,
+                      childAspectRatio: 1.0,
+                      children: _getDaysInMonth(tempDate).map((day) {
+                        final isSelected = day != null && day == tempDate.day;
+                        final isToday =
+                            day != null &&
+                            day == DateTime.now().day &&
+                            tempDate.month == DateTime.now().month &&
+                            tempDate.year == DateTime.now().year;
+                        return StatefulBuilder(
+                          builder: (context, setDayState) {
+                            return MouseRegion(
+                              cursor: day != null
+                                  ? SystemMouseCursors.click
+                                  : SystemMouseCursors.basic,
+                              onEnter: (_) {
+                                if (day != null) {
+                                  setDayState(() => hoveredDay = day);
+                                }
+                              },
+                              onExit: (_) {
+                                if (day != null) {
+                                  setDayState(() => hoveredDay = null);
+                                }
+                              },
+                              child: GestureDetector(
+                                onTap: day != null
+                                    ? () {
+                                        setStateDialog(() {
+                                          tempDate = DateTime(
+                                            tempDate.year,
+                                            tempDate.month,
+                                            day,
+                                          );
+                                        });
+                                      }
+                                    : null,
+                                child: Container(
+                                  margin: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFF0D47A1)
+                                        : (day != null && hoveredDay == day)
+                                        ? const Color(
+                                            0xFF0D47A1,
+                                          ).withOpacity(0.1)
+                                        : isToday
+                                        ? const Color(0x220D47A1)
+                                        : Colors.transparent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      day != null ? day.toString() : '',
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : isToday ||
+                                                  (day != null &&
+                                                      hoveredDay == day)
+                                            ? const Color(0xFF0D47A1)
+                                            : Colors.black87,
+                                        fontWeight:
+                                            isSelected ||
+                                                isToday ||
+                                                (day != null &&
+                                                    hoveredDay == day)
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.black87,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          child: const Text('CANCELAR'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(tempDate),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D47A1),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'SELECIONAR',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
-    if (picked != null && picked != _dataInicial) {
+    if (selecionado != null && selecionado != _dataInicial) {
       setState(() {
-        _dataInicial = picked;
+        _dataInicial = selecionado;
         if (_dataInicial.isAfter(_dataFinal)) {
           _dataFinal = _dataInicial;
         }
@@ -314,21 +582,283 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
   }
 
   Future<void> _selecionarDataFinal(BuildContext context) async {
-    final DateTime? picked = await showDatePicker(
+    DateTime tempDate = _dataFinal;
+    final DateTime? selecionado = await showDialog<DateTime>(
       context: context,
-      initialDate: _dataFinal,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2101),
-      locale: const Locale('pt', 'BR'),
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            width: 350,
+            padding: const EdgeInsets.all(20),
+            child: StatefulBuilder(
+              builder: (context, setStateDialog) {
+                int? hoveredDay;
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          color: Color(0xFF0D47A1),
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Data final',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0D47A1),
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                          color: Colors.grey,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: const Icon(
+                              Icons.chevron_left,
+                              color: Color(0xFF0D47A1),
+                            ),
+                            onPressed: () {
+                              setStateDialog(() {
+                                tempDate = DateTime(
+                                  tempDate.year,
+                                  tempDate.month - 1,
+                                  tempDate.day,
+                                );
+                              });
+                            },
+                          ),
+                          Text(
+                            '${_getMonthName(tempDate.month)} ${tempDate.year}',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0D47A1),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.chevron_right,
+                              color: Color(0xFF0D47A1),
+                            ),
+                            onPressed: () {
+                              setStateDialog(() {
+                                tempDate = DateTime(
+                                  tempDate.year,
+                                  tempDate.month + 1,
+                                  tempDate.day,
+                                );
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 7,
+                      childAspectRatio: 1.0,
+                      children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day) {
+                        return Center(
+                          child: Text(
+                            day,
+                            style: const TextStyle(
+                              color: Color(0xFF0D47A1),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 7,
+                      childAspectRatio: 1.0,
+                      children: _getDaysInMonth(tempDate).map((day) {
+                        final isSelected = day != null && day == tempDate.day;
+                        final isToday =
+                            day != null &&
+                            day == DateTime.now().day &&
+                            tempDate.month == DateTime.now().month &&
+                            tempDate.year == DateTime.now().year;
+                        return StatefulBuilder(
+                          builder: (context, setDayState) {
+                            return MouseRegion(
+                              cursor: day != null
+                                  ? SystemMouseCursors.click
+                                  : SystemMouseCursors.basic,
+                              onEnter: (_) {
+                                if (day != null) {
+                                  setDayState(() => hoveredDay = day);
+                                }
+                              },
+                              onExit: (_) {
+                                if (day != null) {
+                                  setDayState(() => hoveredDay = null);
+                                }
+                              },
+                              child: GestureDetector(
+                                onTap: day != null
+                                    ? () {
+                                        setStateDialog(() {
+                                          tempDate = DateTime(
+                                            tempDate.year,
+                                            tempDate.month,
+                                            day,
+                                          );
+                                        });
+                                      }
+                                    : null,
+                                child: Container(
+                                  margin: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFF0D47A1)
+                                        : (day != null && hoveredDay == day)
+                                        ? const Color(
+                                            0xFF0D47A1,
+                                          ).withOpacity(0.1)
+                                        : isToday
+                                        ? const Color(0x220D47A1)
+                                        : Colors.transparent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      day != null ? day.toString() : '',
+                                      style: TextStyle(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : isToday ||
+                                                  (day != null &&
+                                                      hoveredDay == day)
+                                            ? const Color(0xFF0D47A1)
+                                            : Colors.black87,
+                                        fontWeight:
+                                            isSelected ||
+                                                isToday ||
+                                                (day != null &&
+                                                    hoveredDay == day)
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.black87,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          child: const Text('CANCELAR'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(tempDate),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D47A1),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            'SELECIONAR',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
-    if (picked != null && picked != _dataFinal) {
+    if (selecionado != null && selecionado != _dataFinal) {
       setState(() {
-        _dataFinal = picked;
+        _dataFinal = selecionado;
         if (_dataFinal.isBefore(_dataInicial)) {
           _dataInicial = _dataFinal;
         }
       });
     }
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Janeiro',
+      'Fevereiro',
+      'Março',
+      'Abril',
+      'Maio',
+      'Junho',
+      'Julho',
+      'Agosto',
+      'Setembro',
+      'Outubro',
+      'Novembro',
+      'Dezembro',
+    ];
+    return months[month - 1];
+  }
+
+  List<int?> _getDaysInMonth(DateTime date) {
+    final firstDay = DateTime(date.year, date.month, 1);
+    final lastDay = DateTime(date.year, date.month + 1, 0);
+    final firstWeekday = firstDay.weekday;
+    final startOffset = firstWeekday == 7 ? 0 : firstWeekday;
+    List<int?> days = [];
+    for (int i = 0; i < startOffset; i++) {
+      days.add(null);
+    }
+    for (int i = 1; i <= lastDay.day; i++) {
+      days.add(i);
+    }
+    while (days.length < 42) {
+      days.add(null);
+    }
+    return days;
   }
 
   void _consultar() {
@@ -379,6 +909,11 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
       _dataInicial = DateTime(agora.year, agora.month, 1);
       _dataFinal = agora;
       _tipoRelatorio = 'sintetico';
+
+      // Se não tiver terminal vinculado, volta para o primeiro da lista
+      if (!_terminalVinculado) {
+        _selecionarPrimeiroTerminal();
+      }
     });
   }
 
@@ -449,95 +984,180 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.filter_alt, color: Color(0xFF0D47A1), size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Filtros de Pesquisa',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+          // Header do card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.filter_alt,
                   color: Color(0xFF0D47A1),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  'Filtros de Pesquisa',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0D47A1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Linha de filtros: Terminal, Empresa, Tipo de relatório, Data inicial e Data final
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1 - Campo Terminal
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Terminal *',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0D47A1),
+                          ),
+                        ),
+                        if (_terminalVinculado) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.lock, size: 14, color: Colors.grey),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(height: 50, child: _buildDropdownTerminal(temTerminalFixo)),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              // 2 - Campo Empresa
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Empresa *',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(height: 50, child: _buildDropdownEmpresa(temEmpresaFixa)),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              // 3 - Campo Tipo de Relatório
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Relatório',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(height: 50, child: _buildDropdownTipoRelatorio()),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              // 4 - Campo Data inicial
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Data inicial *',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildDataPicker(
+                      '${_dataInicial.day.toString().padLeft(2, '0')}/${_dataInicial.month.toString().padLeft(2, '0')}/${_dataInicial.year}',
+                      () => _selecionarDataInicial(context),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              // 5 - Campo Data final
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Data final *',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    _buildDataPicker(
+                      '${_dataFinal.day.toString().padLeft(2, '0')}/${_dataFinal.month.toString().padLeft(2, '0')}/${_dataFinal.year}',
+                      () => _selecionarDataFinal(context),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  _buildCampoFiltro(
-                    label: 'Terminal *',
-                    child: _buildDropdownTerminal(temTerminalFixo),
-                    width: constraints.maxWidth > 600 ? (constraints.maxWidth - 32) / 3 : constraints.maxWidth,
-                  ),
-                  _buildCampoFiltro(
-                    label: 'Empresa *',
-                    child: _buildDropdownEmpresa(temEmpresaFixa),
-                    width: constraints.maxWidth > 600 ? (constraints.maxWidth - 32) / 3 : constraints.maxWidth,
-                  ),
-                  _buildCampoFiltro(
-                    label: 'Tipo de relatório',
-                    child: _buildDropdownTipoRelatorio(),
-                    width: constraints.maxWidth > 600 ? (constraints.maxWidth - 32) / 3 : constraints.maxWidth,
-                  ),
-                  _buildCampoFiltro(
-                    label: 'Data inicial *',
-                    child: _buildDataPicker(
-                      '${_dataInicial.day.toString().padLeft(2, '0')}/${_dataInicial.month.toString().padLeft(2, '0')}/${_dataInicial.year}',
-                      () => _selecionarDataInicial(context),
-                    ),
-                    width: constraints.maxWidth > 600 ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth,
-                  ),
-                  _buildCampoFiltro(
-                    label: 'Data final *',
-                    child: _buildDataPicker(
-                      '${_dataFinal.day.toString().padLeft(2, '0')}/${_dataFinal.month.toString().padLeft(2, '0')}/${_dataFinal.year}',
-                      () => _selecionarDataFinal(context),
-                    ),
-                    width: constraints.maxWidth > 600 ? (constraints.maxWidth - 16) / 2 : constraints.maxWidth,
-                  ),
-                ],
-              );
-            }
-          ),
         ],
       ),
     );
   }
-
-  Widget _buildCampoFiltro({required String label, required Widget child, required double width}) {
-    return SizedBox(
-      width: width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF0D47A1),
-            ),
-          ),
-          const SizedBox(height: 4),
-          child,
-        ],
-      ),
-    );
-  }
-
+  
   Widget _buildDropdownTerminal(bool temTerminalFixo) {
     if (_carregandoTerminais) {
-      return const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)));
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade400, width: 1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              color: Color(0xFF0D47A1),
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      );
     }
     return Container(
       decoration: BoxDecoration(
-        color: temTerminalFixo ? Colors.grey.shade100 : Colors.white,
+        color: (temTerminalFixo || _terminalVinculado) ? Colors.grey.shade100 : Colors.white,
         border: Border.all(color: Colors.grey.shade400, width: 1),
         borderRadius: BorderRadius.circular(4),
       ),
@@ -546,19 +1166,25 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
           value: _terminalSelecionadoId,
           isExpanded: true,
           itemHeight: 50,
-          onChanged: temTerminalFixo ? null : (String? novoValor) {
+          onChanged: (temTerminalFixo || _terminalVinculado) ? null : (String? novoValor) {
             setState(() {
               _terminalSelecionadoId = novoValor;
               final terminal = _terminaisDisponiveis.firstWhere((t) => t['id'] == novoValor, orElse: () => <String, dynamic>{'id': '', 'nome': ''});
               _terminalSelecionadoNome = terminal['nome'];
             });
           },
+          style: const TextStyle(fontSize: 13, color: Colors.black),
           items: _terminaisDisponiveis.map<DropdownMenuItem<String>>((terminal) {
             return DropdownMenuItem<String>(
               value: terminal['id'],
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(terminal['nome']),
+                child: Text(
+                  terminal['nome'],
+                  style: TextStyle(
+                    color: terminal['id'].isEmpty ? Colors.grey.shade600 : Colors.black,
+                  ),
+                ),
               ),
             );
           }).toList(),
@@ -569,7 +1195,23 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
 
   Widget _buildDropdownEmpresa(bool temEmpresaFixa) {
     if (_carregandoEmpresas) {
-      return const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)));
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.grey.shade400, width: 1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              color: Color(0xFF0D47A1),
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      );
     }
     return Container(
       decoration: BoxDecoration(
@@ -589,12 +1231,18 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
               _empresaSelecionadaNome = empresa['nome'];
             });
           },
+          style: const TextStyle(fontSize: 13, color: Colors.black),
           items: _empresasDisponiveis.map<DropdownMenuItem<String>>((empresa) {
             return DropdownMenuItem<String>(
               value: empresa['id'],
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(empresa['nome']),
+                child: Text(
+                  empresa['nome'],
+                  style: TextStyle(
+                    color: empresa['id'].isEmpty ? Colors.grey.shade600 : Colors.black,
+                  ),
+                ),
               ),
             );
           }).toList(),
@@ -615,10 +1263,24 @@ class _FiltroControleAditivoPageState extends State<FiltroControleAditivoPage> {
           value: _tipoRelatorio,
           isExpanded: true,
           itemHeight: 50,
+          icon: const Icon(Icons.arrow_drop_down, size: 20),
+          style: const TextStyle(fontSize: 13, color: Colors.black),
           onChanged: (String? novoValor) => setState(() => _tipoRelatorio = novoValor!),
           items: const [
-            DropdownMenuItem(value: 'sintetico', child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('Sintético'))),
-            DropdownMenuItem(value: 'analitico', child: Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('Analítico'))),
+            DropdownMenuItem(
+              value: 'sintetico',
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: Text('Sintético'),
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'analitico',
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: Text('Analítico'),
+              ),
+            ),
           ],
         ),
       ),
