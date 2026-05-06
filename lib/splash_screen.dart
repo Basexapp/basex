@@ -23,7 +23,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   final supabase = Supabase.instance.client;
   String _statusMessage = 'Verificando atualizações...';
-  String _versaoExibida = '2.2.12';
+  String _versaoExibida = '2.2.13';
   Timer? _timer;
 
   @override
@@ -105,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   String _getVersaoAtual() {
-    return '2.2.12';
+    return '2.2.13';
   }
 
   void _mostrarDialogAtualizacao() {
