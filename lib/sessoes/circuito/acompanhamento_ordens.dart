@@ -213,7 +213,7 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
             terminal_dest_id,
             empresa_id,
             tipo_op,
-            produtos!produto_id(id, nome_dois),
+            produtos!produto_id(id, nome_dois, grupo),
             terminal_origem:terminais!movimentacoes_terminal_orig_id_fkey(id, nome),
             terminal_destino:terminais!movimentacoes_terminal_dest_id_fkey(id, nome),
             ordem_id
@@ -243,6 +243,10 @@ class _AcompanhamentoOrdensPageState extends State<AcompanhamentoOrdensPage> {
           usuario.nivel < 3 ? usuario.terminalId : _terminalFiltroId;
 
       List<Map<String, dynamic>> movimentacoesFiltradas = dados.where((item) {
+        final produto = item['produtos'] as Map<String, dynamic>?;
+        if (produto != null && (produto['grupo'] == 4 || produto['grupo']?.toString() == '4')) {
+          return false;
+        }
 
         final tipoOp = (item['tipo_op'] ?? '').toString().toLowerCase();
         final origem = item['terminal_orig_id']?.toString();

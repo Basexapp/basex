@@ -784,7 +784,7 @@ class _HomePageState extends State<HomePage>
       {
         'id': 'fallback-mov',
         'icon': Icons.swap_horiz,
-        'label': 'Relatório de Entradas e Saídas',
+        'label': 'Relatório de Saídas',
         'descricao': 'Acompanhar entradas e saídas em geral',
         'tipo': 'movimentacoes',
         'sessao_pai': 'Vendas',
@@ -4341,7 +4341,7 @@ class _HomePageState extends State<HomePage>
       {
         'id': 'movimentacoes-filial',
         'icon': Icons.swap_horiz,
-        'label': 'Relatório de Entradas e Saídas',
+        'label': 'Relatório de Saídas',
         'descricao': 'Consultar movimentações da filial',
         'tipo': 'movimentacoes',
       },

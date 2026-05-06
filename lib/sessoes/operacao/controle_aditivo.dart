@@ -164,7 +164,7 @@ class _ControleAditivoPageState extends State<ControleAditivoPage> {
           'data': m['data_mov'],
           'descricao': m['cliente'] ?? 'Consumo Operacional',
           'entradas': 0.0, // Como pedido, entradas ficam zeradas por enquanto
-          'saidas': saiaAmb * 0.01,
+          'saidas': saiaAmb * 0.0001,
         };
       }).toList();
 
