@@ -32,8 +32,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     ),
     _Estagio(
       titulo: 'Em Fila',
-      cor: Color(0xFFE65100),
-      corFundo: Color(0xFF1A1200),
+      cor: Color(0xFF00ACC1), // Ciano Escuro / Teal
+      corFundo: Color(0xFF002025), // Fundo Ciano muito escuro
     ),
     _Estagio(
       titulo: 'Em Operação',
@@ -58,60 +58,71 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
   List<_Veiculo> _gerarVeiculosFicticios() {
     const placasProgramados = [
-      'ABC1D23', 'XYZ9A10', 'TRK5B44', 'CAM2E78', 'FOG3C91',
-      'GTX7A55', 'MNO4F62', 'PQR8G11', 'STU6H33', 'VWX1I99',
-      'CML9J07', 'BRS4K88', 'PAR2L30', 'JAP6M22', 'RIO5N14',
+      'ABC-1234', 'XYZ-9010', 'TRK-5444', 'CAM-2788', 'FOG-3911',
+      'GTX-7555', 'MNO-4622', 'PQR-8111', 'STU-6333', 'VWX-1999',
+      'CML-9077', 'BRS-4888', 'PAR-2300', 'JAP-6222', 'RIO-5144',
     ];
     const placasEmFila = [
-      'SFR3O45', 'BHZ8P60', 'MNS1Q71', 'TAU7R02', 'FLN4S38',
-      'GYN0T19', 'POA2U84', 'MAC9V66', 'CRU5W53', 'NAT6X27',
+      'SFR-3455', 'BHZ-8600', 'MNS-1711', 'TAU-7022', 'FLN-4388',
+      'GYN-0199', 'POA-2844', 'MAC-9666', 'CRU-5533', 'NAT-6277',
     ];
     const placasEmOperacao = [
-      'VIT1Y90', 'MAO3Z18', 'LDB7A43', 'FZO2B56', 'AJU8C35',
-      'BOA4D72', 'PET6E08', 'SAL0F64', 'MOC9G15', 'ARA5H81',
+      'VIT-1900', 'MAO-3188', 'LDB-7433', 'FZO-2566', 'AJU-8355',
+      'BOA-4722', 'PET-6088', 'SAL-0644', 'MOC-9155', 'ARA-5811',
     ];
     const placasLiberados = [
-      'CGB1I50', 'TBA7J26', 'IPT3K97', 'ATI6L31', 'LNS2M74',
-      'CXS8N09', 'TFC4O83', 'SBR0P47', 'COD9Q62', 'REC5R28',
-      'FOR1S15', 'NTL7T39', 'MCA3U67', 'VDE6V42', 'JPE2W88',
+      'CGB-1500', 'TBA-7266', 'IPT-3977', 'ATI-6311', 'LNS-2744',
+      'CXS-8099', 'TFC-4833', 'SBR-0477', 'COD-9622', 'REC-5288',
+      'FOR-1155', 'NTL-7399', 'MCA-3677', 'VDE-6422', 'JPE-2888',
     ];
 
     final veiculos = <_Veiculo>[];
 
-    for (final p in placasProgramados) {
+    // Usaremos tempos diferentes para simular a ordem de chegada
+    DateTime baseTime = DateTime.now();
+
+    for (int i = 0; i < placasProgramados.length; i++) {
+      final p = placasProgramados[i];
       veiculos.add(_Veiculo(
         placa: p,
         estagio: 0,
         produto: _getProdutoFicticio(p),
         empresa: _getEmpresaFicticia(p),
         tipoOp: _getTipoOpFicticio(p),
+        entrada: baseTime.add(Duration(minutes: i)),
       ));
     }
-    for (final p in placasEmFila) {
+    for (int i = 0; i < placasEmFila.length; i++) {
+      final p = placasEmFila[i];
       veiculos.add(_Veiculo(
         placa: p,
         estagio: 1,
         produto: _getProdutoFicticio(p),
         empresa: _getEmpresaFicticia(p),
         tipoOp: _getTipoOpFicticio(p),
+        entrada: baseTime.add(Duration(minutes: i)),
       ));
     }
-    for (final p in placasEmOperacao) {
+    for (int i = 0; i < placasEmOperacao.length; i++) {
+      final p = placasEmOperacao[i];
       veiculos.add(_Veiculo(
         placa: p,
         estagio: 2,
         produto: _getProdutoFicticio(p),
         empresa: _getEmpresaFicticia(p),
         tipoOp: _getTipoOpFicticio(p),
+        entrada: baseTime.add(Duration(minutes: i)),
       ));
     }
-    for (final p in placasLiberados) {
+    for (int i = 0; i < placasLiberados.length; i++) {
+      final p = placasLiberados[i];
       veiculos.add(_Veiculo(
         placa: p,
         estagio: 3,
         produto: _getProdutoFicticio(p),
         empresa: _getEmpresaFicticia(p),
         tipoOp: _getTipoOpFicticio(p),
+        entrada: baseTime.add(Duration(minutes: i)),
       ));
     }
 
@@ -134,7 +145,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   }
 
   List<_Veiculo> _veiculosPorEstagio(int estagio) {
-    return _veiculos.where((v) {
+    final list = _veiculos.where((v) {
       if (v.estagio != estagio) return false;
 
       // Filtro de Empresa
@@ -153,6 +164,10 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       return v.placa.toLowerCase().contains(busca) ||
           v.produto.toLowerCase().contains(busca);
     }).toList();
+
+    // Ordenação por antiguidade (entrada)
+    list.sort((a, b) => a.entrada.compareTo(b.entrada));
+    return list;
   }
 
   void _avancarEstagio(_Veiculo v) {
@@ -163,6 +178,146 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   void _retrocederEstagio(_Veiculo v) {
     if (v.estagio <= 0) return;
     setState(() => v.estagio--);
+  }
+
+  void _mostrarDialogDetalhesVeiculo(BuildContext context, _Veiculo v) {
+    final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E293B);
+    final subTextColor = _isDarkMode ? Colors.white70 : Colors.black54;
+    final bgColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
+
+    // Dados fictícios para o dialog
+    const motorista = 'João da Silva';
+    const transportadora = 'TransLog Express';
+    final produtos = v.tipoOp == 'Carga' ? ['GAS', 'S10', 'S500'] : [v.produto];
+    final dataCriacao =
+        '${v.entrada.day.toString().padLeft(2, '0')}/${v.entrada.month.toString().padLeft(2, '0')}/${v.entrada.year}';
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: bgColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          width: 300,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'DETALHES DO VEÍCULO',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.close, size: 18, color: subTextColor),
+                    onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+              const Divider(),
+              _itemDetalhe('Placa', v.placa, textColor, subTextColor),
+              _itemDetalhe('Motorista', motorista, textColor, subTextColor),
+              _itemDetalhe('Transportadora', transportadora, textColor, subTextColor),
+              _itemDetalhe('Empresa', v.empresa, textColor, subTextColor),
+              _itemDetalhe('Operação', v.tipoOp, textColor, subTextColor),
+              _itemDetalhe('Produto(s)', produtos.join(', '), textColor, subTextColor),
+              _itemDetalhe('Data Criação', dataCriacao, textColor, subTextColor),
+              const SizedBox(height: 12),
+              _buildStatusDocumentos(v),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2196F3),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('FECHAR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusDocumentos(_Veiculo v) {
+    // Aumentado para 30% com documentos vencidos (usando mod 10 < 3)
+    final int hash = v.placa.hashCode;
+    final bool documentoVencido = hash % 10 < 3;
+
+    String mensagem = 'Check-list ok';
+    Color cor = Colors.green;
+    IconData icone = Icons.check_circle_outline;
+
+    if (documentoVencido) {
+      cor = Colors.red;
+      icone = Icons.error_outline;
+      final pendencias = ['CIV vencido', 'IBAMA Vencido', 'Aferição vencida'];
+      mensagem = pendencias[hash % pendencias.length];
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: cor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icone, size: 16, color: cor),
+          const SizedBox(width: 8),
+          Text(
+            mensagem,
+            style: TextStyle(
+              color: cor,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _itemDetalhe(String label, String valor, Color textColor, Color subTextColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              '$label:',
+              style: TextStyle(color: subTextColor, fontSize: 11, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              valor,
+              style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _mostrarMenuVeiculo(BuildContext context, _Veiculo v, Offset posicao) {
@@ -258,15 +413,15 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       child: Row(
         children: [
           Text(
-            '"Por produto"',
-            style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 13, fontWeight: FontWeight.w500),
+            'Por produto',
+            style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(width: 4),
           Transform.scale(
             scale: 0.8,
             child: Switch(
               value: _mostrarPorProduto,
-              activeColor: const Color(0xFF2196F3),
+              activeThumbColor: const Color(0xFF2196F3),
               onChanged: (val) => setState(() => _mostrarPorProduto = val),
             ),
           ),
@@ -310,7 +465,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 fillColor: _isDarkMode ? Colors.white : Colors.transparent,
                 hintText: 'Placa ou produto...',
                 hintStyle: TextStyle(
-                  color: _isDarkMode ? Colors.black38 : subTextColor.withOpacity(0.5),
+                  color: _isDarkMode ? Colors.black38 : subTextColor.withValues(alpha: 0.5),
                   fontSize: 13,
                 ),
                 border: OutlineInputBorder(
@@ -393,7 +548,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back, color: textColor.withOpacity(0.7), size: 20),
+            icon: Icon(Icons.arrow_back, color: textColor.withValues(alpha: 0.7), size: 20),
             tooltip: 'Voltar',
             onPressed: widget.onVoltar,
           ),
@@ -414,14 +569,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               Icon(
                 _isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
                 size: 18,
-                color: textColor.withOpacity(0.5),
+                color: textColor.withValues(alpha: 0.5),
               ),
               const SizedBox(width: 4),
               Transform.scale(
                 scale: 0.7,
                 child: Switch(
                   value: _isDarkMode,
-                  activeColor: const Color(0xFF2196F3),
+                  activeThumbColor: const Color(0xFF2196F3),
                   onChanged: (val) => setState(() => _isDarkMode = val),
                 ),
               ),
@@ -444,7 +599,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       ),
       child: Text(
         '$total veículos',
-        style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 11),
+        style: TextStyle(color: textColor.withValues(alpha: 0.6), fontSize: 11),
       ),
     );
   }
@@ -465,6 +620,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     final veiculos = _veiculosPorEstagio(estagioIndex);
     final colColor = _isDarkMode ? estagio.corFundo : Colors.white;
 
+    // Configuração específica para estágio "Em Fila" (Index 1)
+    final isFila = estagioIndex == 1;
+
     return Container(
       decoration: BoxDecoration(
         color: colColor,
@@ -481,15 +639,20 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(10),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isFila ? 1 : 3,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
-                childAspectRatio: 2.2,
+                childAspectRatio: isFila ? 8.0 : 2.2,
               ),
               itemCount: veiculos.length,
               itemBuilder: (context, index) {
-                return _buildChip(veiculos[index], estagio, borderColor);
+                return _buildChip(
+                  veiculos[index],
+                  estagio,
+                  borderColor,
+                  posicao: isFila ? index + 1 : null,
+                );
               },
             ),
           ),
@@ -502,9 +665,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.transparent : estagio.cor.withOpacity(0.05),
+        color: _isDarkMode ? Colors.transparent : estagio.cor.withValues(alpha: 0.05),
         border: Border(
-          bottom: BorderSide(color: estagio.cor.withOpacity(0.4), width: 1),
+          bottom: BorderSide(color: estagio.cor.withValues(alpha: 0.4), width: 1),
         ),
       ),
       child: Row(
@@ -533,9 +696,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: estagio.cor.withOpacity(0.15),
+              color: estagio.cor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: estagio.cor.withOpacity(0.3)),
+              border: Border.all(color: estagio.cor.withValues(alpha: 0.3)),
             ),
             child: Text(
               '$count',
@@ -551,61 +714,97 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     );
   }
 
-  Widget _buildChip(_Veiculo v, _Estagio estagio, Color borderColor) {
+  Widget _buildChip(_Veiculo v, _Estagio estagio, Color borderColor, {int? posicao}) {
     final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E293B);
-    final cardColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
+    var cardColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
+
+    final isProgramado = v.estagio == 0;
+    // Aumentado para 30% com documentos vencidos (usando mod 10 < 3)
+    final bool documentoVencido = isProgramado && (v.placa.hashCode % 10 < 3);
+
+    if (documentoVencido) {
+      cardColor = _isDarkMode ? Colors.red.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.1);
+      borderColor = Colors.red.withValues(alpha: 0.5);
+    }
 
     return GestureDetector(
-      onSecondaryTapDown: (details) =>
-          _mostrarMenuVeiculo(context, v, details.globalPosition),
-      onLongPressStart: (details) =>
-          _mostrarMenuVeiculo(context, v, details.globalPosition),
-      onTapDown: (details) => _mostrarMenuVeiculo(
-        context,
-        v,
-        details.globalPosition,
-      ),
+      onSecondaryTapDown: (details) => isProgramado
+          ? _mostrarDialogDetalhesVeiculo(context, v)
+          : _mostrarMenuVeiculo(context, v, details.globalPosition),
+      onLongPressStart: (details) => isProgramado
+          ? _mostrarDialogDetalhesVeiculo(context, v)
+          : _mostrarMenuVeiculo(context, v, details.globalPosition),
+      onTapDown: (details) => isProgramado
+          ? _mostrarDialogDetalhesVeiculo(context, v)
+          : _mostrarMenuVeiculo(context, v, details.globalPosition),
       child: _ChipHover(
         cor: estagio.cor,
         child: Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _isDarkMode ? cardColor : estagio.cor.withOpacity(0.08),
+            color: documentoVencido ? cardColor : (_isDarkMode ? cardColor : estagio.cor.withValues(alpha: 0.08)),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _isDarkMode ? borderColor : estagio.cor.withOpacity(0.3),
+              color: documentoVencido ? borderColor : (_isDarkMode ? borderColor : estagio.cor.withValues(alpha: 0.3)),
               width: 1,
             ),
             boxShadow: [
               if (!_isDarkMode)
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
             ],
           ),
-          child: Column(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                v.placa,
-                style: TextStyle(
-                  color: _isDarkMode ? textColor : estagio.cor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                  fontFamily: 'monospace',
+              if (posicao != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: estagio.cor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '$posicaoº',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _mostrarPorProduto ? v.produto : v.empresa,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: textColor.withOpacity(0.5),
-                  fontSize: 9,
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: posicao != null ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      v.placa,
+                      style: TextStyle(
+                        color: _isDarkMode ? textColor : estagio.cor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _mostrarPorProduto ? v.produto : v.empresa,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _isDarkMode ? textColor.withValues(alpha: 0.9) : Colors.black54,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -642,7 +841,7 @@ class _ChipHoverState extends State<_ChipHover> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(4),
           boxShadow: _hover
-              ? [BoxShadow(color: widget.cor.withOpacity(0.5), blurRadius: 6)]
+              ? [BoxShadow(color: widget.cor.withValues(alpha: 0.5), blurRadius: 6)]
               : null,
         ),
         child: widget.child,
@@ -670,6 +869,7 @@ class _Veiculo {
   final String produto;
   final String empresa;
   final String tipoOp;
+  final DateTime entrada;
   int estagio;
 
   _Veiculo({
@@ -677,6 +877,7 @@ class _Veiculo {
     required this.produto,
     required this.empresa,
     required this.tipoOp,
+    required this.entrada,
     required this.estagio,
   });
 }
