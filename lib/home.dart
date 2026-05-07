@@ -35,6 +35,7 @@ import 'sessoes/suporte/fila_solic.dart';
 import 'sessoes/suporte/acesso_desenvolvedor.dart';
 import 'sessoes/circuito/criar_ordem.dart';
 import 'sessoes/circuito/radar.dart';
+import 'sessoes/circuito/visao_geral.dart';
 import 'sessoes/almoxerifado/frascos_amostras.dart';
 import 'sessoes/almoxerifado/filtro_estoque_frascos.dart';
 import 'sessoes/operacao/estoque_produto.dart';
@@ -3866,7 +3867,14 @@ class _HomePageState extends State<HomePage>
         });
         break;
       case 'visao_geral_circuito':
-        // Adicione aqui quando criar a tela
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => VisaoGeralCircuitoPage(
+              onVoltar: () => Navigator.pop(context),
+            ),
+          ),
+        );
         break;
       case 'criar_ordem':
         setState(() {
