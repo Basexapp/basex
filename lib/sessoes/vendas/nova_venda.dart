@@ -87,9 +87,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
       if (todasMovimentacoes.isEmpty) return;
 
       // Pegar data da primeira movimentação
-      if (todasMovimentacoes.first['ts_mov'] != null) {
+      if (todasMovimentacoes.first['data_mov'] != null) {
         try {
-          _dataSelecionada = DateTime.parse(todasMovimentacoes.first['ts_mov'].toString());
+          _dataSelecionada = DateTime.parse(todasMovimentacoes.first['data_mov'].toString());
         } catch (e) {
           _dataSelecionada = _getHorarioBrasilia();
         }
@@ -670,8 +670,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'tipo_mov': 'saida',
             'tipo_mov_orig': 'saida',
             'descricao': 'venda comum',
-            'data_mov': dataMov,
-            'ts_mov': dataRef.toIso8601String(),
+            'data_mov': dataRef.toIso8601String(),
             'qtd_faturada': capacidadeLitros,
             'anp': false,
             'status_circuito_orig': 1,
@@ -786,8 +785,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
           final capacidadeLitros = capacidadeMCubicos * 1000.0;
 
           final Map<String, dynamic> dadosUpdate = {
-            'data_mov': dataMov,
-            'ts_mov': timestampParaSalvar.toIso8601String(),
+            'data_mov': timestampParaSalvar.toIso8601String(),
             'updated_at': _getHorarioBrasilia().toIso8601String(),
             'produto_id': tanque.produtoId,
             'placa': placaTexto,

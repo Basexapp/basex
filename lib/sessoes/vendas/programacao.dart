@@ -121,7 +121,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           .lte('data_mov', dataFim);
 
       final response = await query
-          .order('ts_mov', ascending: true)
+          .order('data_mov', ascending: true)
           .order('ordem_id', ascending: true)
           .order('id', ascending: true);
 

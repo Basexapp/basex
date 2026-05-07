@@ -1435,7 +1435,6 @@ class _CalcPageState extends State<CalcPage> {
         'terminal_id': terminalId,
         'empresa_id': usuario.empresaId,
         'data_mov': timestampBrasilia,
-        'ts_mov': timestampBrasilia,
         'updated_at': timestampBrasilia,
         'descricao': descricao,
         'entrada_amb': entradaAmbPositiva,

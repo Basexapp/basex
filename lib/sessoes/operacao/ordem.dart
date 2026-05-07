@@ -2273,7 +2273,6 @@ class _EmitirOrdemPageState extends State<EmitirOrdemPage> {
         'quantidade': null,
         'usuario_id': dadosOrdem['usuario_id'],
         'created_at': _obterTimestampBrasilia(),
-        'ts_mov': _obterTimestampBrasilia(),
         'data_mov': _obterTimestampBrasilia(),
         'updated_at': _obterTimestampBrasilia(),
         ...camposProduto,

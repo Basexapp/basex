@@ -389,7 +389,6 @@ class _ContabilFisicoPageState extends State<ContabilFisicoPage> {
             id,
             data_mov,
             data_descarga,
-            ts_mov,
             descricao,
             cliente,
             entrada_amb,
@@ -415,7 +414,7 @@ class _ContabilFisicoPageState extends State<ContabilFisicoPage> {
         query = query.eq('produto_id', widget.produtoFiltro!);
       }
 
-      final dados = await query.order('ts_mov', ascending: true);
+      final dados = await query.order('data_mov', ascending: true);
 
       final Set<String> filialDestinoIds = {};
       for (var mov in dados) {

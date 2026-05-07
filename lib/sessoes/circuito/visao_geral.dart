@@ -14,7 +14,7 @@ class VisaoGeralCircuitoPage extends StatefulWidget {
 class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   // ── Controles ────────────────────────────────────────────────────────────
   bool _mostrarPorProduto = false;
-  bool _isDarkMode = true;
+  bool _isDarkMode = false;
   String _filtroBusca = '';
   String _empresaSelecionada = 'Todas';
   String _tipoOpSelecionada = 'Todos';

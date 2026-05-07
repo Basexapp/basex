@@ -350,7 +350,6 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
           .select('''
             id,
             data_mov,
-            ts_mov,
             descricao,
             cliente,
             entrada_amb,
@@ -397,7 +396,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
       }
 
       // EXECUTAR QUERY
-      final dados = await query.order('ts_mov', ascending: true);
+      final dados = await query.order('data_mov', ascending: true);
 
       // Coletar IDs de filiais destino de transferências e buscar nomes em lote
       final Set<String> filialDestinoIds = {};
