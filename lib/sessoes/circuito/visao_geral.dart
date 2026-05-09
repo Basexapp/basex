@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../login_page.dart';
 
 /// Flight-controller-style dashboard for the Circuito session.
 /// Shows every vehicle as a tiny chip organised in 4 stage columns.
@@ -12,6 +14,11 @@ class VisaoGeralCircuitoPage extends StatefulWidget {
 }
 
 class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
+  final SupabaseClient _supabase = Supabase.instance.client;
+  bool _carregando = true;
+  bool _erro = false;
+  String _mensagemErro = '';
+
   // ── Controles ────────────────────────────────────────────────────────────
   bool _mostrarPorProduto = false;
   bool _isDarkMode = false;
@@ -32,8 +39,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     ),
     _Estagio(
       titulo: 'Em Fila',
-      cor: Color(0xFF00ACC1), // Ciano Escuro / Teal
-      corFundo: Color(0xFF002025), // Fundo Ciano muito escuro
+      cor: Color(0xFFE65100),
+      corFundo: Color(0xFF1A1200),
     ),
     _Estagio(
       titulo: 'Em Operação',
@@ -47,105 +54,110 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     ),
   ];
 
-  // ── Dados fictícios ───────────────────────────────────────────────────────
-  late List<_Veiculo> _veiculos;
+  // ── Dados ─────────────────────────────────────────────────────────────────
+  List<_Veiculo> _veiculos = [];
 
   @override
   void initState() {
     super.initState();
-    _veiculos = _gerarVeiculosFicticios();
+    _carregarDados();
   }
 
-  List<_Veiculo> _gerarVeiculosFicticios() {
-    const placasProgramados = [
-      'ABC-1234', 'XYZ-9010', 'TRK-5444', 'CAM-2788', 'FOG-3911',
-      'GTX-7555', 'MNO-4622', 'PQR-8111', 'STU-6333', 'VWX-1999',
-      'CML-9077', 'BRS-4888', 'PAR-2300', 'JAP-6222', 'RIO-5144',
-    ];
-    const placasEmFila = [
-      'SFR-3455', 'BHZ-8600', 'MNS-1711', 'TAU-7022', 'FLN-4388',
-      'GYN-0199', 'POA-2844', 'MAC-9666', 'CRU-5533', 'NAT-6277',
-    ];
-    const placasEmOperacao = [
-      'VIT-1900', 'MAO-3188', 'LDB-7433', 'FZO-2566', 'AJU-8355',
-      'BOA-4722', 'PET-6088', 'SAL-0644', 'MOC-9155', 'ARA-5811',
-    ];
-    const placasLiberados = [
-      'CGB-1500', 'TBA-7266', 'IPT-3977', 'ATI-6311', 'LNS-2744',
-      'CXS-8099', 'TFC-4833', 'SBR-0477', 'COD-9622', 'REC-5288',
-      'FOR-1155', 'NTL-7399', 'MCA-3677', 'VDE-6422', 'JPE-2888',
-    ];
+  Future<void> _carregarDados() async {
+    setState(() {
+      _carregando = true;
+      _erro = false;
+    });
 
-    final veiculos = <_Veiculo>[];
+    try {
+      final usuario = UsuarioAtual.instance;
+      if (usuario == null) throw Exception('Usuário não autenticado');
 
-    // Usaremos tempos diferentes para simular a ordem de chegada
-    DateTime baseTime = DateTime.now();
+      final empresaId = usuario.empresaId;
+      if (empresaId == null || empresaId.isEmpty) {
+        throw Exception('Empresa não identificada');
+      }
 
-    for (int i = 0; i < placasProgramados.length; i++) {
-      final p = placasProgramados[i];
-      veiculos.add(_Veiculo(
-        placa: p,
-        estagio: 0,
-        produto: _getProdutoFicticio(p),
-        empresa: _getEmpresaFicticia(p),
-        tipoOp: _getTipoOpFicticio(p),
-        entrada: baseTime.add(Duration(minutes: i)),
-      ));
+      final response = await _supabase
+          .from('movimentacoes')
+          .select('''
+            id,
+            placa,
+            cliente,
+            tipo_op,
+            status_circuito_orig,
+            status_circuito_dest,
+            produtos!produto_id(nome_dois)
+          ''')
+          .eq('empresa_id', empresaId)
+          .order('data_mov', ascending: false);
+
+      final List<dynamic> data = response as List<dynamic>;
+      
+      final novosVeiculos = data.map((item) {
+        // Trata o campo placa que é text[] no banco
+        final placasRaw = item['placa'];
+        String placaLinha1 = '';
+        String placaLinha2 = 'SEM PLACA';
+        
+        if (placasRaw is List && placasRaw.isNotEmpty) {
+          if (placasRaw.length >= 3) {
+            // Se tiver 3 ou mais placas:
+            // Linha 1: Primeira placa
+            // Linha 2: Duas últimas placas
+            placaLinha1 = placasRaw.first.toString();
+            final ultimas = placasRaw.sublist(placasRaw.length - 2);
+            placaLinha2 = ultimas.join(' / ');
+          } else {
+            // Se tiver 1 ou 2 placas:
+            // Linha 1: Vazia
+            // Linha 2: Todas as placas (1 ou 2)
+            placaLinha1 = '';
+            placaLinha2 = placasRaw.join(' / ');
+          }
+        } else if (placasRaw is String) {
+          placaLinha1 = '';
+          placaLinha2 = placasRaw;
+        }
+
+        final status = item['status_circuito_orig']?.toString() ?? '0';
+        
+        int estagio = -1;
+        if (status == '1') {
+          estagio = 0;
+        } else if (status == '2') {
+          estagio = 1;
+        } else if (status == '3') {
+          estagio = 2;
+        } else if (status == '4') {
+          estagio = 3;
+        }
+
+        return _Veiculo(
+          placa: placaLinha2, // Mantendo por compatibilidade, mas agora usamos placaLinha1 também
+          placaLinha1: placaLinha1,
+          produto: item['produtos']?['nome_dois']?.toString() ?? 'N/A',
+          empresa: item['cliente']?.toString() ?? 'N/A',
+          tipoOp: item['tipo_op']?.toString() ?? 'N/A',
+          estagio: estagio,
+        );
+      }).where((v) => v.estagio != -1).toList();
+
+      setState(() {
+        _veiculos = novosVeiculos;
+        _carregando = false;
+      });
+    } catch (e) {
+      setState(() {
+        _erro = true;
+        _mensagemErro = e.toString();
+        _carregando = false;
+      });
     }
-    for (int i = 0; i < placasEmFila.length; i++) {
-      final p = placasEmFila[i];
-      veiculos.add(_Veiculo(
-        placa: p,
-        estagio: 1,
-        produto: _getProdutoFicticio(p),
-        empresa: _getEmpresaFicticia(p),
-        tipoOp: _getTipoOpFicticio(p),
-        entrada: baseTime.add(Duration(minutes: i)),
-      ));
-    }
-    for (int i = 0; i < placasEmOperacao.length; i++) {
-      final p = placasEmOperacao[i];
-      veiculos.add(_Veiculo(
-        placa: p,
-        estagio: 2,
-        produto: _getProdutoFicticio(p),
-        empresa: _getEmpresaFicticia(p),
-        tipoOp: _getTipoOpFicticio(p),
-        entrada: baseTime.add(Duration(minutes: i)),
-      ));
-    }
-    for (int i = 0; i < placasLiberados.length; i++) {
-      final p = placasLiberados[i];
-      veiculos.add(_Veiculo(
-        placa: p,
-        estagio: 3,
-        produto: _getProdutoFicticio(p),
-        empresa: _getEmpresaFicticia(p),
-        tipoOp: _getTipoOpFicticio(p),
-        entrada: baseTime.add(Duration(minutes: i)),
-      ));
-    }
-
-    return veiculos;
-  }
-
-  String _getProdutoFicticio(String placa) {
-    final rand = placa.hashCode % 4;
-    return ['GAS', 'S10', 'S500', 'A.H.'][rand];
-  }
-
-  String _getEmpresaFicticia(String placa) {
-    final rand = placa.hashCode % 3;
-    return ['Larco', 'Zema', 'Ale Comb.'][rand];
-  }
-
-  String _getTipoOpFicticio(String placa) {
-    final rand = placa.hashCode % 2;
-    return ['Carga', 'Descarga'][rand];
   }
 
   List<_Veiculo> _veiculosPorEstagio(int estagio) {
-    final list = _veiculos.where((v) {
+    return _veiculos.where((v) {
       if (v.estagio != estagio) return false;
 
       // Filtro de Empresa
@@ -164,10 +176,6 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       return v.placa.toLowerCase().contains(busca) ||
           v.produto.toLowerCase().contains(busca);
     }).toList();
-
-    // Ordenação por antiguidade (entrada)
-    list.sort((a, b) => a.entrada.compareTo(b.entrada));
-    return list;
   }
 
   void _avancarEstagio(_Veiculo v) {
@@ -178,146 +186,6 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   void _retrocederEstagio(_Veiculo v) {
     if (v.estagio <= 0) return;
     setState(() => v.estagio--);
-  }
-
-  void _mostrarDialogDetalhesVeiculo(BuildContext context, _Veiculo v) {
-    final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E293B);
-    final subTextColor = _isDarkMode ? Colors.white70 : Colors.black54;
-    final bgColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
-
-    // Dados fictícios para o dialog
-    const motorista = 'João da Silva';
-    const transportadora = 'TransLog Express';
-    final produtos = v.tipoOp == 'Carga' ? ['GAS', 'S10', 'S500'] : [v.produto];
-    final dataCriacao =
-        '${v.entrada.day.toString().padLeft(2, '0')}/${v.entrada.month.toString().padLeft(2, '0')}/${v.entrada.year}';
-
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: bgColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          width: 300,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'DETALHES DO VEÍCULO',
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.close, size: 18, color: subTextColor),
-                    onPressed: () => Navigator.pop(context),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              const Divider(),
-              _itemDetalhe('Placa', v.placa, textColor, subTextColor),
-              _itemDetalhe('Motorista', motorista, textColor, subTextColor),
-              _itemDetalhe('Transportadora', transportadora, textColor, subTextColor),
-              _itemDetalhe('Empresa', v.empresa, textColor, subTextColor),
-              _itemDetalhe('Operação', v.tipoOp, textColor, subTextColor),
-              _itemDetalhe('Produto(s)', produtos.join(', '), textColor, subTextColor),
-              _itemDetalhe('Data Criação', dataCriacao, textColor, subTextColor),
-              const SizedBox(height: 12),
-              _buildStatusDocumentos(v),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2196F3),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('FECHAR', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusDocumentos(_Veiculo v) {
-    // Aumentado para 30% com documentos vencidos (usando mod 10 < 3)
-    final int hash = v.placa.hashCode;
-    final bool documentoVencido = hash % 10 < 3;
-
-    String mensagem = 'Check-list ok';
-    Color cor = Colors.green;
-    IconData icone = Icons.check_circle_outline;
-
-    if (documentoVencido) {
-      cor = Colors.red;
-      icone = Icons.error_outline;
-      final pendencias = ['CIV vencido', 'IBAMA Vencido', 'Aferição vencida'];
-      mensagem = pendencias[hash % pendencias.length];
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: cor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: cor.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icone, size: 16, color: cor),
-          const SizedBox(width: 8),
-          Text(
-            mensagem,
-            style: TextStyle(
-              color: cor,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _itemDetalhe(String label, String valor, Color textColor, Color subTextColor) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(
-              '$label:',
-              style: TextStyle(color: subTextColor, fontSize: 11, fontWeight: FontWeight.w500),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              valor,
-              style: TextStyle(color: textColor, fontSize: 11, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   void _mostrarMenuVeiculo(BuildContext context, _Veiculo v, Offset posicao) {
@@ -384,6 +252,34 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_carregando) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_erro) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+              const SizedBox(height: 16),
+              Text('Erro ao carregar dados: $_mensagemErro'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _carregarDados,
+                child: const Text('Tentar Novamente'),
+              ),
+              const SizedBox(height: 8),
+              TextButton(onPressed: widget.onVoltar, child: const Text('Voltar')),
+            ],
+          ),
+        ),
+      );
+    }
+
     final bodyColor = _isDarkMode ? const Color(0xFF0A0F1A) : const Color(0xFFF1F5F9);
     return Scaffold(
       backgroundColor: bodyColor,
@@ -413,15 +309,15 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       child: Row(
         children: [
           Text(
-            'Por produto',
-            style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
+            '"Por produto"',
+            style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(width: 4),
           Transform.scale(
             scale: 0.8,
             child: Switch(
               value: _mostrarPorProduto,
-              activeThumbColor: const Color(0xFF2196F3),
+              activeColor: const Color(0xFF2196F3),
               onChanged: (val) => setState(() => _mostrarPorProduto = val),
             ),
           ),
@@ -465,7 +361,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 fillColor: _isDarkMode ? Colors.white : Colors.transparent,
                 hintText: 'Placa ou produto...',
                 hintStyle: TextStyle(
-                  color: _isDarkMode ? Colors.black38 : subTextColor.withValues(alpha: 0.5),
+                  color: _isDarkMode ? Colors.black38 : subTextColor.withOpacity(0.5),
                   fontSize: 13,
                 ),
                 border: OutlineInputBorder(
@@ -548,7 +444,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back, color: textColor.withValues(alpha: 0.7), size: 20),
+            icon: Icon(Icons.arrow_back, color: textColor.withOpacity(0.7), size: 20),
             tooltip: 'Voltar',
             onPressed: widget.onVoltar,
           ),
@@ -569,14 +465,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               Icon(
                 _isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
                 size: 18,
-                color: textColor.withValues(alpha: 0.5),
+                color: textColor.withOpacity(0.5),
               ),
               const SizedBox(width: 4),
               Transform.scale(
                 scale: 0.7,
                 child: Switch(
                   value: _isDarkMode,
-                  activeThumbColor: const Color(0xFF2196F3),
+                  activeColor: const Color(0xFF2196F3),
                   onChanged: (val) => setState(() => _isDarkMode = val),
                 ),
               ),
@@ -599,7 +495,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       ),
       child: Text(
         '$total veículos',
-        style: TextStyle(color: textColor.withValues(alpha: 0.6), fontSize: 11),
+        style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 11),
       ),
     );
   }
@@ -620,9 +516,6 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     final veiculos = _veiculosPorEstagio(estagioIndex);
     final colColor = _isDarkMode ? estagio.corFundo : Colors.white;
 
-    // Configuração específica para estágio "Em Fila" (Index 1)
-    final isFila = estagioIndex == 1;
-
     return Container(
       decoration: BoxDecoration(
         color: colColor,
@@ -639,20 +532,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(10),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: isFila ? 1 : 3,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
-                childAspectRatio: isFila ? 8.0 : 2.2,
+                childAspectRatio: 1.8, // Aumentado para acomodar a terceira linha
               ),
               itemCount: veiculos.length,
               itemBuilder: (context, index) {
-                return _buildChip(
-                  veiculos[index],
-                  estagio,
-                  borderColor,
-                  posicao: isFila ? index + 1 : null,
-                );
+                final v = veiculos[index];
+                return _buildChip(v, estagio, borderColor);
               },
             ),
           ),
@@ -665,9 +554,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.transparent : estagio.cor.withValues(alpha: 0.05),
+        color: _isDarkMode ? Colors.transparent : estagio.cor.withOpacity(0.05),
         border: Border(
-          bottom: BorderSide(color: estagio.cor.withValues(alpha: 0.4), width: 1),
+          bottom: BorderSide(color: estagio.cor.withOpacity(0.4), width: 1),
         ),
       ),
       child: Row(
@@ -696,9 +585,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: estagio.cor.withValues(alpha: 0.15),
+              color: estagio.cor.withOpacity(0.15),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: estagio.cor.withValues(alpha: 0.3)),
+              border: Border.all(color: estagio.cor.withOpacity(0.3)),
             ),
             child: Text(
               '$count',
@@ -714,97 +603,81 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     );
   }
 
-  Widget _buildChip(_Veiculo v, _Estagio estagio, Color borderColor, {int? posicao}) {
+  Widget _buildChip(_Veiculo v, _Estagio estagio, Color borderColor) {
     final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E293B);
-    var cardColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
-
-    final isProgramado = v.estagio == 0;
-    // Aumentado para 30% com documentos vencidos (usando mod 10 < 3)
-    final bool documentoVencido = isProgramado && (v.placa.hashCode % 10 < 3);
-
-    if (documentoVencido) {
-      cardColor = _isDarkMode ? Colors.red.withValues(alpha: 0.2) : Colors.red.withValues(alpha: 0.1);
-      borderColor = Colors.red.withValues(alpha: 0.5);
-    }
+    final cardColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
 
     return GestureDetector(
-      onSecondaryTapDown: (details) => isProgramado
-          ? _mostrarDialogDetalhesVeiculo(context, v)
-          : _mostrarMenuVeiculo(context, v, details.globalPosition),
-      onLongPressStart: (details) => isProgramado
-          ? _mostrarDialogDetalhesVeiculo(context, v)
-          : _mostrarMenuVeiculo(context, v, details.globalPosition),
-      onTapDown: (details) => isProgramado
-          ? _mostrarDialogDetalhesVeiculo(context, v)
-          : _mostrarMenuVeiculo(context, v, details.globalPosition),
+      onSecondaryTapDown: (details) =>
+          _mostrarMenuVeiculo(context, v, details.globalPosition),
+      onLongPressStart: (details) =>
+          _mostrarMenuVeiculo(context, v, details.globalPosition),
+      onTapDown: (details) => _mostrarMenuVeiculo(
+        context,
+        v,
+        details.globalPosition,
+      ),
       child: _ChipHover(
         cor: estagio.cor,
         child: Container(
           alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
-            color: documentoVencido ? cardColor : (_isDarkMode ? cardColor : estagio.cor.withValues(alpha: 0.08)),
+            color: _isDarkMode ? cardColor : estagio.cor.withOpacity(0.08),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: documentoVencido ? borderColor : (_isDarkMode ? borderColor : estagio.cor.withValues(alpha: 0.3)),
+              color: _isDarkMode ? borderColor : estagio.cor.withOpacity(0.3),
               width: 1,
             ),
             boxShadow: [
               if (!_isDarkMode)
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
             ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribui as linhas uniformemente
             children: [
-              if (posicao != null) ...[
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: estagio.cor,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+              if (v.placaLinha1.isNotEmpty)
+                FittedBox(
+                  fit: BoxFit.scaleDown,
                   child: Text(
-                    '$posicaoº',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
+                    v.placaLinha1,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _isDarkMode ? textColor.withOpacity(0.8) : estagio.cor.withOpacity(0.8),
                       fontWeight: FontWeight.bold,
+                      fontSize: 8.5, // Reduzido levemente para ganhar espaço
+                      fontFamily: 'monospace',
                     ),
+                  ),
+                )
+              else
+                const SizedBox(height: 0), // Espaçador neutro se não houver linha 1
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  v.placa, // Segunda linha (com as 2 últimas placas)
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _isDarkMode ? textColor : estagio.cor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 9.5, // Reduzido levemente para ganhar espaço
+                    fontFamily: 'monospace',
                   ),
                 ),
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: posicao != null ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      v.placa,
-                      style: TextStyle(
-                        color: _isDarkMode ? textColor : estagio.cor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        fontFamily: 'monospace',
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _mostrarPorProduto ? v.produto : v.empresa,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: _isDarkMode ? textColor.withValues(alpha: 0.9) : Colors.black54,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+              ),
+              Text(
+                _mostrarPorProduto ? v.produto : v.empresa,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 8, // Reduzido levemente para ganhar espaço
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -841,7 +714,7 @@ class _ChipHoverState extends State<_ChipHover> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(4),
           boxShadow: _hover
-              ? [BoxShadow(color: widget.cor.withValues(alpha: 0.5), blurRadius: 6)]
+              ? [BoxShadow(color: widget.cor.withOpacity(0.5), blurRadius: 6)]
               : null,
         ),
         child: widget.child,
@@ -865,19 +738,19 @@ class _Estagio {
 }
 
 class _Veiculo {
-  final String placa;
+  final String placa; // Agora representa a linha 2 de placas
+  final String placaLinha1;
   final String produto;
   final String empresa;
   final String tipoOp;
-  final DateTime entrada;
   int estagio;
 
   _Veiculo({
     required this.placa,
+    required this.placaLinha1,
     required this.produto,
     required this.empresa,
     required this.tipoOp,
-    required this.entrada,
     required this.estagio,
   });
 }
