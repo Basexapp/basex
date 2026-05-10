@@ -18,6 +18,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   bool _carregando = true;
   bool _erro = false;
   String _mensagemErro = '';
+  String? _usuarioTerminalId;
 
   // ── Controles ────────────────────────────────────────────────────────────
   bool _mostrarPorProduto = false;
@@ -73,6 +74,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       final usuario = UsuarioAtual.instance;
       if (usuario == null) throw Exception('Usuário não autenticado');
 
+      _usuarioTerminalId = usuario.terminalId;
+
       final empresaId = usuario.empresaId;
       if (empresaId == null || empresaId.isEmpty) {
         throw Exception('Empresa não identificada');
@@ -82,6 +85,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           .from('movimentacoes')
           .select('''
             id,
+            ordem_id,
             placa,
             cliente,
             tipo_op,
@@ -91,7 +95,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             motoristas!motorista_id(nome),
             transportadoras!transportadora_id(nome),
             produtos!produto_id(nome_dois),
-            empresas!empresa_id(nome_dois)
+            empresas!empresa_id(nome_dois),
+            ordens!ordem_id(em_fila, terminal_id_orig)
           ''')
           .eq('empresa_id', empresaId)
           .order('data_mov', ascending: false);
@@ -136,10 +141,15 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         }
 
         final status = item['status_circuito_orig']?.toString() ?? '0';
+        final emFila = item['ordens']?['em_fila'] == true;
         
         int estagio = -1;
         if (status == '1') {
-          estagio = 0;
+          if (emFila) {
+            estagio = 1;
+          } else {
+            estagio = 0;
+          }
         } else if (status == '2') {
           estagio = 1;
         } else if (status == '3') {
@@ -149,6 +159,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         }
 
         return _Veiculo(
+          id: item['id']?.toString() ?? '',
+          ordemId: item['ordem_id']?.toString() ?? '',
+          terminalIdOrig: item['ordens']?['terminal_id_orig']?.toString(),
           placa: placaLinha2, // Mantendo por compatibilidade, mas agora usamos placaLinha1 também
           placaLinha1: placaLinha1,
           placaCompleta: placaCompleta,
@@ -208,8 +221,100 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     setState(() => v.estagio--);
   }
 
+  Future<void> _enviarParaFila(_Veiculo v) async {
+    if (v.ordemId.isEmpty) return;
+
+    try {
+      // 1. Atualiza ordens.em_fila = true
+      await _supabase
+          .from('ordens')
+          .update({'em_fila': true})
+          .eq('id', v.ordemId);
+
+      // 2. Atualiza ordens.status_term_orig = 2 se terminal_id_orig for o mesmo do usuário
+      if (_usuarioTerminalId != null && 
+          _usuarioTerminalId!.isNotEmpty && 
+          v.terminalIdOrig == _usuarioTerminalId) {
+        await _supabase
+            .from('ordens')
+            .update({'status_term_orig': 2})
+            .eq('id', v.ordemId);
+      }
+
+      // Feedback visual e fecha dialog
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Veículo enviado para a fila!')),
+        );
+        _carregarDados();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao enviar para fila: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _sairDaFila(_Veiculo v) async {
+    if (v.ordemId.isEmpty) return;
+    try {
+      // 1. Atualiza em_fila para false e status_term_orig para 1
+      await _supabase
+          .from('ordens')
+          .update({
+            'em_fila': false,
+            'status_term_orig': 1,
+          })
+          .eq('id', v.ordemId);
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Veículo removido da fila!')),
+        );
+        _carregarDados();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao sair da fila: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _enviarParaOperacao(_Veiculo v) async {
+    if (v.ordemId.isEmpty) return;
+    try {
+      // Funcionalidade removida temporariamente (coluna em_operacao não existe)
+      /*
+      await _supabase
+          .from('ordens')
+          .update({'em_operacao': true})
+          .eq('id', v.ordemId);
+      */
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Veículo enviado para operação!')),
+        );
+        _carregarDados();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao enviar para operação: $e')),
+        );
+      }
+    }
+  }
+
   void _mostrarMenuVeiculo(BuildContext context, _Veiculo v, Offset posicao) {
-    if (v.estagio == 0) {
+    if (v.estagio == 0 || v.estagio == 1) {
       _mostrarDetalhesVeiculo(v);
       return;
     }
@@ -333,7 +438,10 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.close, size: 20, color: Colors.grey),
+                    child: const MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: Icon(Icons.close, size: 20, color: Colors.grey),
+                    ),
                   ),
                 ],
               ),
@@ -346,26 +454,76 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               _buildInfoRow('Produto:', v.produto),
               _buildInfoRow('Data Criação:', dataFormatada),
               const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+              if (v.estagio == 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Check-list ok',
+                        style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
-                    SizedBox(width: 6),
-                    Text(
-                      'Check-list ok',
-                      style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w500),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _enviarParaFila(v),
+                    icon: const Icon(Icons.queue, size: 18),
+                    label: const Text('ENVIAR PARA FILA', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade800,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 12),
+              ] else if (v.estagio == 1) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: null, // Desativado conforme solicitado
+                    icon: const Icon(Icons.play_arrow, size: 18),
+                    label: const Text('ENVIAR PARA OPERAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade700,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.green.shade700.withOpacity(0.6),
+                      disabledForegroundColor: Colors.white70,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _sairDaFila(v), // Ativado conforme solicitado
+                    icon: const Icon(Icons.exit_to_app, size: 18),
+                    label: const Text('SAIR DA FILA', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade700,
+                      side: BorderSide(color: Colors.red.shade700),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 height: 40,
@@ -902,6 +1060,9 @@ class _Estagio {
 }
 
 class _Veiculo {
+  final String id;
+  final String ordemId;
+  final String? terminalIdOrig;
   final String placa; // Agora representa a linha 2 de placas
   final String placaLinha1;
   final String placaCompleta;
@@ -914,6 +1075,9 @@ class _Veiculo {
   final String dataCriacao;
 
   _Veiculo({
+    required this.id,
+    required this.ordemId,
+    this.terminalIdOrig,
     required this.placa,
     required this.placaLinha1,
     required this.placaCompleta,
