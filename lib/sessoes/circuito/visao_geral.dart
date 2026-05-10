@@ -45,13 +45,13 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     ),
     _Estagio(
       titulo: 'Em Operação',
-      cor: Color(0xFF2E7D32),
-      corFundo: Color(0xFF001A02),
+      cor: Color(0xFF4A148C),
+      corFundo: Color(0xFF0E001A),
     ),
     _Estagio(
       titulo: 'Liberados',
-      cor: Color(0xFF4A148C),
-      corFundo: Color(0xFF0E001A),
+      cor: Color(0xFF2E7D32),
+      corFundo: Color(0xFF001A02),
     ),
   ];
 
@@ -96,7 +96,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             transportadoras!transportadora_id(nome),
             produtos!produto_id(nome_dois),
             empresas!empresa_id(nome_dois),
-            ordens!ordem_id(em_fila, terminal_id_orig)
+            ordens!ordem_id(em_fila, terminal_id_orig, status_term_orig)
           ''')
           .eq('empresa_id', empresaId)
           .order('data_mov', ascending: false);
@@ -142,10 +142,13 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
         final status = item['status_circuito_orig']?.toString() ?? '0';
         final emFila = item['ordens']?['em_fila'] == true;
+        final statusTermOrig = item['ordens']?['status_term_orig']?.toString() ?? '0';
         
         int estagio = -1;
         if (status == '1') {
-          if (emFila) {
+          if (statusTermOrig == '3') {
+            estagio = 2;
+          } else if (emFila) {
             estagio = 1;
           } else {
             estagio = 0;
@@ -198,8 +201,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       }
 
       // Filtro de Tipo Op
-      if (_tipoOpSelecionada != 'Todos' && v.tipoOp != _tipoOpSelecionada) {
-        return false;
+      if (_tipoOpSelecionada != 'Todos') {
+        final isCarga = v.terminalIdOrig == _usuarioTerminalId;
+        final tipoSelecionado = _tipoOpSelecionada.toLowerCase();
+
+        if (tipoSelecionado == 'carga' && !isCarga) return false;
+        if (tipoSelecionado == 'descarga' && isCarga) return false;
       }
 
       // Filtro de Busca (Placa ou Produto)
@@ -289,13 +296,21 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   Future<void> _enviarParaOperacao(_Veiculo v) async {
     if (v.ordemId.isEmpty) return;
     try {
-      // Funcionalidade removida temporariamente (coluna em_operacao não existe)
-      /*
+      // 1. Atualiza em_fila para false
       await _supabase
           .from('ordens')
-          .update({'em_operacao': true})
+          .update({'em_fila': false})
           .eq('id', v.ordemId);
-      */
+
+      // 2. Define status_term_orig para 3 se terminal_id_orig for o mesmo do usuário
+      if (_usuarioTerminalId != null &&
+          _usuarioTerminalId!.isNotEmpty &&
+          v.terminalIdOrig == _usuarioTerminalId) {
+        await _supabase
+            .from('ordens')
+            .update({'status_term_orig': 3})
+            .eq('id', v.ordemId);
+      }
 
       if (mounted) {
         Navigator.pop(context);
@@ -458,9 +473,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.green.withOpacity(0.3)),
+                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -495,14 +510,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: null, // Desativado conforme solicitado
+                    onPressed: () => _enviarParaOperacao(v),
                     icon: const Icon(Icons.play_arrow, size: 18),
                     label: const Text('ENVIAR PARA OPERAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.green.shade700.withOpacity(0.6),
-                      disabledForegroundColor: Colors.white70,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
                   ),
@@ -632,7 +645,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         children: [
           Text(
             '"Por produto"',
-            style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
           ),
           const SizedBox(width: 4),
           Transform.scale(
@@ -683,7 +696,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 fillColor: _isDarkMode ? Colors.white : Colors.transparent,
                 hintText: 'Placa ou produto...',
                 hintStyle: TextStyle(
-                  color: _isDarkMode ? Colors.black38 : subTextColor.withOpacity(0.5),
+                  color: _isDarkMode ? Colors.black38 : subTextColor.withValues(alpha: 0.5),
                   fontSize: 13,
                 ),
                 border: OutlineInputBorder(
@@ -766,7 +779,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back, color: textColor.withOpacity(0.7), size: 20),
+            icon: Icon(Icons.arrow_back, color: textColor.withValues(alpha: 0.7), size: 20),
             tooltip: 'Voltar',
             onPressed: widget.onVoltar,
           ),
@@ -817,7 +830,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       ),
       child: Text(
         '$total veículos',
-        style: TextStyle(color: textColor.withOpacity(0.6), fontSize: 11),
+        style: TextStyle(color: textColor.withValues(alpha: 0.6), fontSize: 11),
       ),
     );
   }
@@ -876,9 +889,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.transparent : estagio.cor.withOpacity(0.05),
+        color: _isDarkMode ? Colors.transparent : estagio.cor.withValues(alpha: 0.05),
         border: Border(
-          bottom: BorderSide(color: estagio.cor.withOpacity(0.4), width: 1),
+          bottom: BorderSide(color: estagio.cor.withValues(alpha: 0.4), width: 1),
         ),
       ),
       child: Row(
@@ -907,9 +920,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: estagio.cor.withOpacity(0.15),
+              color: estagio.cor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: estagio.cor.withOpacity(0.3)),
+              border: Border.all(color: estagio.cor.withValues(alpha: 0.3)),
             ),
             child: Text(
               '$count',
@@ -926,7 +939,6 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   }
 
   Widget _buildChip(_Veiculo v, _Estagio estagio, Color borderColor) {
-    final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E293B);
     final cardColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
 
     return GestureDetector(
@@ -945,16 +957,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
-            color: _isDarkMode ? cardColor : estagio.cor.withOpacity(0.08),
+            color: _isDarkMode ? cardColor : estagio.cor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _isDarkMode ? borderColor : estagio.cor.withOpacity(0.3),
+              color: _isDarkMode ? borderColor : estagio.cor.withValues(alpha: 0.3),
               width: 1,
             ),
             boxShadow: [
               if (!_isDarkMode)
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -970,7 +982,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     v.placaLinha1,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _isDarkMode ? textColor.withOpacity(0.8) : estagio.cor.withOpacity(0.8),
+                      color: estagio.cor,
                       fontWeight: FontWeight.bold,
                       fontSize: 8.5, // Reduzido levemente para ganhar espaço
                       fontFamily: 'monospace',
@@ -985,7 +997,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   v.placa, // Segunda linha (com as 2 últimas placas)
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: _isDarkMode ? textColor : estagio.cor,
+                    color: estagio.cor,
                     fontWeight: FontWeight.bold,
                     fontSize: 9.5, // Reduzido levemente para ganhar espaço
                     fontFamily: 'monospace',
@@ -996,8 +1008,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 _mostrarPorProduto ? v.produto : v.empresa,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.black,
+                style: TextStyle(
+                  color: _isDarkMode ? Colors.white : Colors.black,
                   fontSize: 8, // Reduzido levemente para ganhar espaço
                   fontWeight: FontWeight.w500,
                 ),
@@ -1036,7 +1048,7 @@ class _ChipHoverState extends State<_ChipHover> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(4),
           boxShadow: _hover
-              ? [BoxShadow(color: widget.cor.withOpacity(0.5), blurRadius: 6)]
+              ? [BoxShadow(color: widget.cor.withValues(alpha: 0.5), blurRadius: 6)]
               : null,
         ),
         child: widget.child,
