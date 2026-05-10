@@ -87,7 +87,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             tipo_op,
             status_circuito_orig,
             status_circuito_dest,
-            produtos!produto_id(nome_dois)
+            data_mov,
+            motoristas!motorista_id(nome),
+            transportadoras!transportadora_id(nome),
+            produtos!produto_id(nome_dois),
+            empresas!empresa_id(nome_dois)
           ''')
           .eq('empresa_id', empresaId)
           .order('data_mov', ascending: false);
@@ -95,12 +99,22 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       final List<dynamic> data = response as List<dynamic>;
       
       final novosVeiculos = data.map((item) {
+        // Lógica para cliente: se tipo_op for 'transf', usa o nome_dois da tabela empresas
+        final tipoOp = item['tipo_op']?.toString() ?? '';
+        String clienteFinal = item['cliente']?.toString() ?? 'N/A';
+        
+        if (tipoOp.toLowerCase() == 'transf') {
+          clienteFinal = item['empresas']?['nome_dois']?.toString() ?? clienteFinal;
+        }
+
         // Trata o campo placa que é text[] no banco
         final placasRaw = item['placa'];
         String placaLinha1 = '';
         String placaLinha2 = 'SEM PLACA';
+        String placaCompleta = '';
         
         if (placasRaw is List && placasRaw.isNotEmpty) {
+          placaCompleta = placasRaw.join(' / ');
           if (placasRaw.length >= 3) {
             // Se tiver 3 ou mais placas:
             // Linha 1: Primeira placa
@@ -118,6 +132,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         } else if (placasRaw is String) {
           placaLinha1 = '';
           placaLinha2 = placasRaw;
+          placaCompleta = placasRaw;
         }
 
         final status = item['status_circuito_orig']?.toString() ?? '0';
@@ -136,10 +151,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         return _Veiculo(
           placa: placaLinha2, // Mantendo por compatibilidade, mas agora usamos placaLinha1 também
           placaLinha1: placaLinha1,
+          placaCompleta: placaCompleta,
           produto: item['produtos']?['nome_dois']?.toString() ?? 'N/A',
-          empresa: item['cliente']?.toString() ?? 'N/A',
-          tipoOp: item['tipo_op']?.toString() ?? 'N/A',
+          empresa: clienteFinal,
+          tipoOp: tipoOp,
           estagio: estagio,
+          motorista: item['motoristas']?['nome']?.toString() ?? 'N/A',
+          transportadora: item['transportadoras']?['nome']?.toString() ?? 'N/A',
+          dataCriacao: item['data_mov']?.toString() ?? 'N/A',
         );
       }).where((v) => v.estagio != -1).toList();
 
@@ -174,6 +193,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       if (_filtroBusca.isEmpty) return true;
       final busca = _filtroBusca.toLowerCase();
       return v.placa.toLowerCase().contains(busca) ||
+          v.placaLinha1.toLowerCase().contains(busca) ||
           v.produto.toLowerCase().contains(busca);
     }).toList();
   }
@@ -189,6 +209,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   }
 
   void _mostrarMenuVeiculo(BuildContext context, _Veiculo v, Offset posicao) {
+    if (v.estagio == 0) {
+      _mostrarDetalhesVeiculo(v);
+      return;
+    }
+
     final podeAvancar = v.estagio < _estagios.length - 1;
     final podeRetroceder = v.estagio > 0;
 
@@ -206,7 +231,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         PopupMenuItem<String>(
           enabled: false,
           child: Text(
-            v.placa,
+            v.placaCompleta,
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 12,
@@ -215,6 +240,19 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           ),
         ),
         const PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'detalhes',
+          child: Row(
+            children: const [
+              Icon(Icons.info_outline, size: 14, color: Colors.blue),
+              SizedBox(width: 8),
+              Text(
+                'Ver detalhes',
+                style: TextStyle(color: Colors.white, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
         if (podeAvancar)
           PopupMenuItem<String>(
             value: 'avancar',
@@ -245,9 +283,135 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           ),
       ],
     ).then((value) {
+      if (value == 'detalhes') _mostrarDetalhesVeiculo(v);
       if (value == 'avancar') _avancarEstagio(v);
       if (value == 'retroceder') _retrocederEstagio(v);
     });
+  }
+
+  void _mostrarDetalhesVeiculo(_Veiculo v) {
+    String dataFormatada = v.dataCriacao;
+    try {
+      final data = DateTime.parse(v.dataCriacao);
+      dataFormatada = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+    } catch (_) {}
+
+    String operacaoTexto = v.tipoOp;
+    if (v.tipoOp.toLowerCase() == 'transf') {
+      operacaoTexto = 'Transferência';
+    } else if (v.tipoOp.toLowerCase() == 'compra') {
+      operacaoTexto = 'Compra';
+    } else if (v.tipoOp.toLowerCase() == 'venda') {
+      operacaoTexto = 'Venda comum';
+    } else if (v.tipoOp.toLowerCase() == 'carga') {
+      operacaoTexto = 'Carga';
+    } else if (v.tipoOp.toLowerCase() == 'descarga') {
+      operacaoTexto = 'Descarga';
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          width: 320,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'DETALHES DO VEÍCULO',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF455A64),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: const Icon(Icons.close, size: 20, color: Colors.grey),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              _buildInfoRow('Placa:', v.placaCompleta),
+              _buildInfoRow('Motorista:', v.motorista),
+              _buildInfoRow('Transportadora:', v.transportadora),
+              _buildInfoRow('Empresa:', v.empresa),
+              _buildInfoRow('Operação:', operacaoTexto),
+              _buildInfoRow('Produto:', v.produto),
+              _buildInfoRow('Data Criação:', dataFormatada),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.green.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                    SizedBox(width: 6),
+                    Text(
+                      'Check-list ok',
+                      style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 40,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2196F3),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('FECHAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Color(0xFF263238),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -532,11 +696,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Expanded(
             child: GridView.builder(
               padding: const EdgeInsets.all(10),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
                 crossAxisSpacing: 8,
                 mainAxisSpacing: 8,
-                childAspectRatio: 1.8, // Aumentado para acomodar a terceira linha
+                childAspectRatio: estagioIndex == 1 ? 1.8 : 2.0, // Altura reduzida exceto no estágio "Em Fila" (índice 1)
               ),
               itemCount: veiculos.length,
               itemBuilder: (context, index) {
@@ -740,17 +904,25 @@ class _Estagio {
 class _Veiculo {
   final String placa; // Agora representa a linha 2 de placas
   final String placaLinha1;
+  final String placaCompleta;
   final String produto;
   final String empresa;
   final String tipoOp;
   int estagio;
+  final String motorista;
+  final String transportadora;
+  final String dataCriacao;
 
   _Veiculo({
     required this.placa,
     required this.placaLinha1,
+    required this.placaCompleta,
     required this.produto,
     required this.empresa,
     required this.tipoOp,
     required this.estagio,
+    required this.motorista,
+    required this.transportadora,
+    required this.dataCriacao,
   });
 }

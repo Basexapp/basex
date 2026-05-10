@@ -215,7 +215,6 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         },
         filialId: widget.filialId!,
         filialNome: widget.filialNome,
-        terminalId: widget.terminalId,
         dataFiltro: _dataFiltro,
       ),
     );
@@ -402,7 +401,6 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         },
         filialId: widget.filialId!,
         filialNome: widget.filialNome,
-        terminalId: widget.terminalId,
         movimentacaoParaEdicao: movimentacao,
         ordemId: ordemId,
       ),

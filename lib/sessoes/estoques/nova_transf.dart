@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../login_page.dart';
 
 class AutocompleteField<T extends Object> extends StatefulWidget {
   final TextEditingController controller;
@@ -712,6 +713,18 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
 
     setState(() => _salvando = true);
 
+    final terminalUsuarioId = UsuarioAtual.instance?.terminalId;
+    if (terminalUsuarioId == null || terminalUsuarioId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('O seu usuário não possui um terminal vinculado. Contate o suporte.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _salvando = false);
+      return;
+    }
+
     try {
       final supabase = Supabase.instance.client;
 
@@ -848,6 +861,8 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
             'usuario_id': _usuarioId,
             'tipo': 'transferencia',
             'data_ordem': dataHoraSP,
+            'terminal_id_orig': terminalOrigId,
+            'terminal_id_dest': terminalDestId,
           })
           .select('id')
           .single();

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../login_page.dart';
 import '../gestao_de_frota/dialog_cadastro_placas.dart';
 
 class NovaVendaDialog extends StatefulWidget {
   final Function(bool, String?) onSalvar;
   final String filialId;
   final String? filialNome;
-  final String? terminalId;
   final Map<String, dynamic>? movimentacaoParaEdicao;
   final String? ordemId;
   final DateTime? dataFiltro;
@@ -17,7 +17,6 @@ class NovaVendaDialog extends StatefulWidget {
     required this.onSalvar,
     required this.filialId,
     this.filialNome,
-    this.terminalId,
     this.movimentacaoParaEdicao,
     this.ordemId,
     this.dataFiltro,
@@ -577,8 +576,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
   Future<void> _processarSalvamentoVenda() async {
     setState(() => _salvando = true);
 
-    if (widget.terminalId == null || widget.terminalId!.isEmpty) {
-      _mostrarErro('Terminal não informado. Contate o suporte.');
+    final terminalId = UsuarioAtual.instance?.terminalId;
+    if (terminalId == null || terminalId.isEmpty) {
+      _mostrarErro('O seu usuário não possui um terminal vinculado. Contate o suporte.');
       setState(() => _salvando = false);
       return;
     }
@@ -634,6 +634,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'tipo': 'venda',
             'data_ordem': dataMov,
             'veic_parcial': veicParcialOrdem,
+            'terminal_id_orig': terminalId,
           })
           .select('id')
           .single();
@@ -659,7 +660,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'ordem_id': ordemId,
             'filial_id': widget.filialId,
             'filial_origem_id': widget.filialId,
-            'terminal_orig_id': widget.terminalId,
+            'terminal_orig_id': terminalId,
             'empresa_id': empresaId,
             'usuario_id': user.id,
             'produto_id': tanque.produtoId,
@@ -704,6 +705,13 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
   
   Future<void> _processarEdicaoVenda() async {
     setState(() => _salvando = true);
+
+    final terminalId = UsuarioAtual.instance?.terminalId;
+    if (terminalId == null || terminalId.isEmpty) {
+      _mostrarErro('O seu usuário não possui um terminal vinculado. Contate o suporte.');
+      setState(() => _salvando = false);
+      return;
+    }
 
     try {
       final supabase = Supabase.instance.client;
@@ -762,6 +770,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
           .update({
             'data_ordem': dataMov,
             'veic_parcial': veicParcialOrdem,
+            'terminal_id_orig': terminalId,
           })
           .eq('id', ordemId);
 
@@ -793,7 +802,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'forma_pagamento': tanque.pagamentoController.text.trim(),
             'qtd_faturada': capacidadeLitros,
             'saida_amb': capacidadeLitros,
-            'terminal_orig_id': widget.terminalId,
+            'terminal_orig_id': terminalId,
           };
 
           if (tanque.movimentacaoId != null) {
