@@ -104,13 +104,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             transportadoras!transportadora_id(nome),
             produtos!produto_id(nome_dois),
             empresas!empresa_id(nome_dois),
-            ordens!ordem_id(terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest)
+            ordens!ordem_id(id, terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest, posicao_fila)
           ''')
           .eq('empresa_id', empresaId)
+          .order('ordens(posicao_fila)', ascending: true, nullsFirst: false)
           .order('data_mov', ascending: false);
 
       final List<dynamic> data = response as List<dynamic>;
-      
+
       // Agrupando movimentações por ordem_id
       final Map<String, List<dynamic>> ordensAgrupadas = {};
       for (var item in data) {
@@ -128,9 +129,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         // Lógica para cliente: se tipo_op for 'transf', usa o nome_dois da tabela empresas
         final tipoOp = primeiroItem['tipo_op']?.toString() ?? '';
         String clienteFinal = primeiroItem['cliente']?.toString() ?? 'N/A';
-        
+
         if (tipoOp.toLowerCase() == 'transf') {
-          clienteFinal = primeiroItem['empresas']?['nome_dois']?.toString() ?? clienteFinal;
+          clienteFinal =
+              primeiroItem['empresas']?['nome_dois']?.toString() ??
+              clienteFinal;
         }
 
         // Trata o campo placa que é text[] no banco
@@ -138,7 +141,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         String placaLinha1 = '';
         String placaLinha2 = 'SEM PLACA';
         String placaCompleta = '';
-        
+
         if (placasRaw is List && placasRaw.isNotEmpty) {
           placaCompleta = placasRaw.join(' / ');
           if (placasRaw.length >= 3) {
@@ -155,12 +158,18 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           placaCompleta = placasRaw;
         }
 
-        final isOrigem = primeiroItem['ordens']?['terminal_id_orig']?.toString() == _usuarioTerminalId;
-        final isDestino = primeiroItem['ordens']?['terminal_id_dest']?.toString() == _usuarioTerminalId;
-        
-        final statusTermOrig = primeiroItem['ordens']?['status_term_orig']?.toString() ?? '1';
-        final statusTermDest = primeiroItem['ordens']?['status_term_dest']?.toString() ?? '1';
-        
+        final isOrigem =
+            primeiroItem['ordens']?['terminal_id_orig']?.toString() ==
+            _usuarioTerminalId;
+        final isDestino =
+            primeiroItem['ordens']?['terminal_id_dest']?.toString() ==
+            _usuarioTerminalId;
+
+        final statusTermOrig =
+            primeiroItem['ordens']?['status_term_orig']?.toString() ?? '1';
+        final statusTermDest =
+            primeiroItem['ordens']?['status_term_dest']?.toString() ?? '1';
+
         // Determina o status baseado no terminal do usuário
         String statusAtual = '1';
         if (isOrigem) {
@@ -172,20 +181,30 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         // Mapeia produtos e quantidades de todas as movimentações desta ordem
         final numberFormat = NumberFormat.decimalPattern('pt_BR');
         final produtos = itens.map((i) {
-          final isSaida = i['tipo_mov'] == 'saida' || i['saida_amb'] != null && (i['saida_amb'] as num) > 0;
-          final num quantidadeValue = isSaida ? (i['saida_amb'] ?? 0) : (i['entrada_amb'] ?? 0);
-          
+          final isSaida =
+              i['tipo_mov'] == 'saida' ||
+              i['saida_amb'] != null && (i['saida_amb'] as num) > 0;
+          final num quantidadeValue = isSaida
+              ? (i['saida_amb'] ?? 0)
+              : (i['entrada_amb'] ?? 0);
+
           return _ProdutoItem(
             nome: i['produtos']?['nome_dois']?.toString() ?? 'N/A',
             quantidade: numberFormat.format(quantidadeValue),
           );
         }).toList();
 
+        final vendedor =
+            primeiroItem['empresas']?['nome_dois']?.toString() ?? 'N/A';
+        final comprador = primeiroItem['cliente']?.toString() ?? 'N/A';
+
         return _Veiculo(
           id: primeiroItem['id']?.toString() ?? '',
           ordemId: entry.key,
-          terminalIdOrig: primeiroItem['ordens']?['terminal_id_orig']?.toString(),
-          terminalIdDest: primeiroItem['ordens']?['terminal_id_dest']?.toString(),
+          terminalIdOrig:
+              primeiroItem['ordens']?['terminal_id_orig']?.toString(),
+          terminalIdDest:
+              primeiroItem['ordens']?['terminal_id_dest']?.toString(),
           placa: placaLinha2,
           placaLinha1: placaLinha1,
           placaCompleta: placaCompleta,
@@ -194,8 +213,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           tipoOp: tipoOp,
           statusAtual: statusAtual,
           motorista: primeiroItem['motoristas']?['nome']?.toString() ?? 'N/A',
-          transportadora: primeiroItem['transportadoras']?['nome']?.toString() ?? 'N/A',
+          transportadora:
+              primeiroItem['transportadoras']?['nome']?.toString() ?? 'N/A',
           dataCriacao: primeiroItem['data_mov']?.toString() ?? 'N/A',
+          posicaoFila: primeiroItem['ordens']?['posicao_fila']?.toString(),
+          vendedor: vendedor,
+          comprador: comprador,
         );
       }).toList();
 
@@ -240,11 +263,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       // Filtro de Busca (Placa ou Produto)
       if (_filtroBusca.isEmpty) return true;
       final busca = _filtroBusca.toLowerCase();
-      final placaMatch = v.placa.toLowerCase().contains(busca) ||
+      final placaMatch =
+          v.placa.toLowerCase().contains(busca) ||
           v.placaLinha1.toLowerCase().contains(busca);
-      
-      final produtoMatch = v.produtos.any((p) => p.nome.toLowerCase().contains(busca));
-      
+
+      final produtoMatch = v.produtos.any(
+        (p) => p.nome.toLowerCase().contains(busca),
+      );
+
       return placaMatch || produtoMatch;
     }).toList();
   }
@@ -263,10 +289,17 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         }
       }
 
-      await _supabase
-          .from('ordens')
-          .update(updates)
-          .eq('id', v.ordemId);
+      // Logica de fila baseada na solicitação
+      if (v.statusAtual == '1' && novoStatus == '2') {
+        // "Enviar para fila"
+        updates['posicao_fila'] = DateTime.now().toUtc().toIso8601String();
+      } else if ((v.statusAtual == '2' &&
+          (novoStatus == '1' || novoStatus == '3'))) {
+        // "Sair da fila" ou "Enviar para operação"
+        updates['posicao_fila'] = null;
+      }
+
+      await _supabase.from('ordens').update(updates).eq('id', v.ordemId);
 
       if (mounted) {
         Navigator.pop(context);
@@ -274,9 +307,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao atualizar status: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao atualizar status: $e')));
       }
     }
   }
@@ -285,7 +318,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     String dataFormatada = v.dataCriacao;
     try {
       final data = DateTime.parse(v.dataCriacao);
-      dataFormatada = '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+      dataFormatada =
+          '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
     } catch (_) {}
 
     String operacaoTexto = v.tipoOp;
@@ -327,7 +361,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     onTap: () => Navigator.pop(context),
                     child: const MouseRegion(
                       cursor: SystemMouseCursors.click,
-                      child: Icon(Icons.close, size: 22, color: Color(0xFFC62828)),
+                      child: Icon(
+                        Icons.close,
+                        size: 22,
+                        color: Color(0xFFC62828),
+                      ),
                     ),
                   ),
                 ],
@@ -345,50 +383,65 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   style: TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ),
-              ...v.produtos.map((p) => Padding(
-                padding: const EdgeInsets.only(left: 8, bottom: 4),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: _obterCorProduto(p.nome),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${p.nome} — ${p.quantidade}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                          color: Color(0xFF263238),
+              ...v.produtos.map(
+                (p) => Padding(
+                  padding: const EdgeInsets.only(left: 8, bottom: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _obterCorProduto(p.nome),
+                          shape: BoxShape.circle,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '${p.nome} — ${p.quantidade}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Color(0xFF263238),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              )),
+              ),
               _buildInfoRow('Data Criação:', dataFormatada),
               const SizedBox(height: 20),
               if (v.statusAtual == '1') ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: Colors.green.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      Icon(Icons.check_circle_outline, color: Colors.green, size: 16),
+                      Icon(
+                        Icons.check_circle_outline,
+                        color: Colors.green,
+                        size: 16,
+                      ),
                       SizedBox(width: 6),
                       Text(
                         'Check-list ok',
-                        style: TextStyle(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ],
                   ),
@@ -400,11 +453,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   child: ElevatedButton.icon(
                     onPressed: () => _atualizarStatus(v, '2'),
                     icon: const Icon(Icons.queue, size: 18),
-                    label: const Text('ENVIAR PARA FILA', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'ENVIAR PARA FILA',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange.shade800,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -416,11 +474,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   child: ElevatedButton.icon(
                     onPressed: () => _atualizarStatus(v, '3'),
                     icon: const Icon(Icons.play_arrow, size: 18),
-                    label: const Text('ENVIAR PARA OPERAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'ENVIAR PARA OPERAÇÃO',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -431,11 +494,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _atualizarStatus(v, '1'),
                     icon: const Icon(Icons.exit_to_app, size: 18),
-                    label: const Text('SAIR DA FILA', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'SAIR DA FILA',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade700,
                       side: BorderSide(color: Colors.red.shade700),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -447,12 +515,17 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   child: ElevatedButton.icon(
                     onPressed: null,
                     icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text('CERTIFICADO DE APURAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'CERTIFICADO DE APURAÇÃO',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueGrey,
                       disabledBackgroundColor: Colors.grey.shade300,
                       disabledForegroundColor: Colors.grey.shade500,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -463,11 +536,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   child: OutlinedButton.icon(
                     onPressed: () => _confirmarCancelamentoOperacao(v),
                     icon: const Icon(Icons.cancel_outlined, size: 18),
-                    label: const Text('CANCELAR OPERAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'CANCELAR OPERAÇÃO',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade800,
                       side: BorderSide(color: Colors.red.shade800),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -479,12 +557,17 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   child: ElevatedButton.icon(
                     onPressed: null,
                     icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text('CERTIFICADO DE APURAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'CERTIFICADO DE APURAÇÃO',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueGrey,
                       disabledBackgroundColor: Colors.grey.shade300,
                       disabledForegroundColor: Colors.grey.shade500,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -511,11 +594,19 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.red,
+                size: 32,
+              ),
               const SizedBox(height: 12),
               const Text(
                 'ATENÇÃO',
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 12),
               const Text(
@@ -535,9 +626,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     backgroundColor: Colors.red.shade800,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                   ),
-                  child: const Text('SIM, PROSSEGUIR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'SIM, PROSSEGUIR',
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
@@ -548,9 +644,18 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     side: BorderSide(color: Colors.grey.shade400),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                   ),
-                  child: const Text('VOLTAR', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'VOLTAR',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -645,9 +750,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   @override
   Widget build(BuildContext context) {
     if (_carregando) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (_erro) {
@@ -665,14 +768,19 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 child: const Text('Tentar Novamente'),
               ),
               const SizedBox(height: 8),
-              TextButton(onPressed: widget.onVoltar, child: const Text('Voltar')),
+              TextButton(
+                onPressed: widget.onVoltar,
+                child: const Text('Voltar'),
+              ),
             ],
           ),
         ),
       );
     }
 
-    final bodyColor = _isDarkMode ? const Color(0xFF0A0F1A) : const Color(0xFFF1F5F9);
+    final bodyColor = _isDarkMode
+        ? const Color(0xFF0A0F1A)
+        : const Color(0xFFF1F5F9);
     return Scaffold(
       backgroundColor: bodyColor,
       body: Column(
@@ -687,7 +795,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
   Widget _buildBarraControles() {
     final bgColor = _isDarkMode ? const Color(0xFF0F172A) : Colors.white;
-    final borderColor = _isDarkMode ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0);
+    final borderColor = _isDarkMode
+        ? const Color(0xFF1F2937)
+        : const Color(0xFFE2E8F0);
     final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E293B);
     final subTextColor = _isDarkMode ? Colors.white38 : Colors.black45;
 
@@ -702,14 +812,18 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         children: [
           Text(
             '"Por produto"',
-            style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 13, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              color: textColor.withValues(alpha: 0.7),
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(width: 4),
           Transform.scale(
             scale: 0.8,
             child: Switch(
               value: _mostrarPorProduto,
-              activeColor: const Color(0xFF2196F3),
+              activeThumbColor: const Color(0xFF2196F3),
               onChanged: (val) => setState(() => _mostrarPorProduto = val),
             ),
           ),
@@ -753,7 +867,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 fillColor: _isDarkMode ? Colors.white : Colors.transparent,
                 hintText: 'Placa ou produto...',
                 hintStyle: TextStyle(
-                  color: _isDarkMode ? Colors.black38 : subTextColor.withValues(alpha: 0.5),
+                  color: _isDarkMode
+                      ? Colors.black38
+                      : subTextColor.withValues(alpha: 0.5),
                   fontSize: 13,
                 ),
                 border: OutlineInputBorder(
@@ -761,7 +877,10 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   borderSide: BorderSide.none,
                 ),
                 isDense: true,
-                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 8,
+                ),
                 prefixIcon: Icon(
                   Icons.search,
                   size: 16,
@@ -796,23 +915,25 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          '$label:',
-          style: TextStyle(color: subTextColor, fontSize: 12),
-        ),
+        Text('$label:', style: TextStyle(color: subTextColor, fontSize: 12)),
         const SizedBox(width: 8),
         DropdownButtonHideUnderline(
           child: DropdownButton<String>(
             value: value,
             dropdownColor: _isDarkMode ? const Color(0xFF1E293B) : Colors.white,
-            icon: Icon(Icons.keyboard_arrow_down, size: 16, color: subTextColor),
-            style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w500),
+            icon: Icon(
+              Icons.keyboard_arrow_down,
+              size: 16,
+              color: subTextColor,
+            ),
+            style: TextStyle(
+              color: textColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
             onChanged: onChanged,
             items: items.map((String item) {
-              return DropdownMenuItem<String>(
-                value: item,
-                child: Text(item),
-              );
+              return DropdownMenuItem<String>(value: item, child: Text(item));
             }).toList(),
           ),
         ),
@@ -824,7 +945,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     final total = _veiculos.length;
     final bgColor = _isDarkMode ? const Color(0xFF111827) : Colors.white;
     final textColor = _isDarkMode ? Colors.white : const Color(0xFF1E293B);
-    final borderColor = _isDarkMode ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0);
+    final borderColor = _isDarkMode
+        ? const Color(0xFF1F2937)
+        : const Color(0xFFE2E8F0);
 
     return Container(
       height: 52,
@@ -836,7 +959,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back, color: textColor.withValues(alpha: 0.7), size: 20),
+            icon: Icon(
+              Icons.arrow_back,
+              color: textColor.withValues(alpha: 0.7),
+              size: 20,
+            ),
             tooltip: 'Voltar',
             onPressed: widget.onVoltar,
           ),
@@ -852,7 +979,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           ),
           const Spacer(),
           IconButton(
-            icon: Icon(Icons.refresh, color: textColor.withValues(alpha: 0.7), size: 20),
+            icon: Icon(
+              Icons.refresh,
+              color: textColor.withValues(alpha: 0.7),
+              size: 20,
+            ),
             tooltip: 'Atualizar dados',
             onPressed: _carregarDados,
           ),
@@ -860,7 +991,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Row(
             children: [
               Icon(
-                _isDarkMode ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+                _isDarkMode
+                    ? Icons.dark_mode_outlined
+                    : Icons.light_mode_outlined,
                 size: 18,
                 color: textColor.withOpacity(0.5),
               ),
@@ -869,7 +1002,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 scale: 0.7,
                 child: Switch(
                   value: _isDarkMode,
-                  activeColor: const Color(0xFF2196F3),
+                  activeThumbColor: const Color(0xFF2196F3),
                   onChanged: (val) => setState(() => _isDarkMode = val),
                 ),
               ),
@@ -898,7 +1031,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   }
 
   Widget _buildGrid() {
-    final borderColor = _isDarkMode ? const Color(0xFF1F2937) : const Color(0xFFE2E8F0);
+    final borderColor = _isDarkMode
+        ? const Color(0xFF1F2937)
+        : const Color(0xFFE2E8F0);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: List.generate(
@@ -914,20 +1049,26 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
     if (colunaIndex == 1) {
       // Coluna "Em Fila" (status 2) - Filtrada pelo switch
-      final veiculosFila = _veiculosPorStatus('2', subFila: _mostrarFilaCarga ? 'carga' : 'descarga');
+      final veiculosFila = _veiculosPorStatus(
+        '2',
+        subFila: _mostrarFilaCarga ? 'carga' : 'descarga',
+      );
 
       return Container(
         decoration: BoxDecoration(
           color: colColor,
-          border: Border(
-            right: BorderSide(color: borderColor, width: 1),
-          ),
+          border: Border(right: BorderSide(color: borderColor, width: 1)),
         ),
         child: Column(
           children: [
             _buildCabecalhoColunaFila(coluna, veiculosFila.length),
             Expanded(
-              child: _buildGridVeiculos(veiculosFila, coluna, borderColor, true),
+              child: _buildGridVeiculos(
+                veiculosFila,
+                coluna,
+                borderColor,
+                true,
+              ),
             ),
           ],
         ),
@@ -948,7 +1089,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       child: Column(
         children: [
           _buildCabecalhoColunaWidget(coluna, veiculos.length),
-          Expanded(child: _buildGridVeiculos(veiculos, coluna, borderColor, false)),
+          Expanded(
+            child: _buildGridVeiculos(veiculos, coluna, borderColor, false),
+          ),
         ],
       ),
     );
@@ -957,9 +1100,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   Widget _buildCabecalhoColunaFila(_ColunaInfo coluna, int count) {
     return Container(
       decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.transparent : coluna.cor.withValues(alpha: 0.05),
+        color: _isDarkMode
+            ? Colors.transparent
+            : coluna.cor.withValues(alpha: 0.05),
         border: Border(
-          bottom: BorderSide(color: coluna.cor.withValues(alpha: 0.4), width: 1),
+          bottom: BorderSide(
+            color: coluna.cor.withValues(alpha: 0.4),
+            width: 1,
+          ),
         ),
       ),
       child: Column(
@@ -990,11 +1138,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: coluna.cor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: coluna.cor.withValues(alpha: 0.3)),
+                    border: Border.all(
+                      color: coluna.cor.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Text(
                     '$count',
@@ -1008,7 +1161,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               ],
             ),
           ),
-          Divider(height: 1, thickness: 1, color: coluna.cor.withValues(alpha: 0.4)),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: coluna.cor.withValues(alpha: 0.4),
+          ),
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4),
             color: _isDarkMode ? Colors.white10 : Colors.grey.shade100,
@@ -1018,7 +1175,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 Text(
                   'DESCARGA',
                   style: TextStyle(
-                    color: !_mostrarFilaCarga ? const Color(0xFFD81B60) : Colors.grey,
+                    color: !_mostrarFilaCarga
+                        ? const Color(0xFFD81B60)
+                        : Colors.grey,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1031,12 +1190,19 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     fit: BoxFit.contain,
                     child: Switch(
                       value: _mostrarFilaCarga,
-                      activeTrackColor: const Color(0xFF00ACC1).withValues(alpha: 0.3),
-                      activeColor: const Color(0xFF00ACC1),
+                      activeTrackColor: const Color(
+                        0xFF00ACC1,
+                      ).withValues(alpha: 0.3),
+                      activeThumbColor: const Color(0xFF00ACC1),
                       inactiveThumbColor: const Color(0xFFD81B60),
-                      inactiveTrackColor: const Color(0xFFD81B60).withValues(alpha: 0.3),
-                      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
-                      onChanged: (val) => setState(() => _mostrarFilaCarga = val),
+                      inactiveTrackColor: const Color(
+                        0xFFD81B60,
+                      ).withValues(alpha: 0.3),
+                      trackOutlineColor: WidgetStateProperty.all(
+                        Colors.transparent,
+                      ),
+                      onChanged: (val) =>
+                          setState(() => _mostrarFilaCarga = val),
                     ),
                   ),
                 ),
@@ -1044,7 +1210,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 Text(
                   'CARGA',
                   style: TextStyle(
-                    color: _mostrarFilaCarga ? const Color(0xFF00ACC1) : Colors.grey,
+                    color: _mostrarFilaCarga
+                        ? const Color(0xFF00ACC1)
+                        : Colors.grey,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1057,7 +1225,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     );
   }
 
-  Widget _buildGridVeiculos(List<_Veiculo> veiculos, _ColunaInfo coluna, Color borderColor, bool isSubFila) {
+  Widget _buildGridVeiculos(
+    List<_Veiculo> veiculos,
+    _ColunaInfo coluna,
+    Color borderColor,
+    bool isSubFila,
+  ) {
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -1069,7 +1242,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       itemCount: veiculos.length,
       itemBuilder: (context, index) {
         final v = veiculos[index];
-        return _buildChip(v, coluna, borderColor);
+        return _buildChip(
+          v,
+          coluna,
+          borderColor,
+          indexInFila: isSubFila ? index + 1 : null,
+        );
       },
     );
   }
@@ -1078,9 +1256,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.transparent : coluna.cor.withValues(alpha: 0.05),
+        color: _isDarkMode
+            ? Colors.transparent
+            : coluna.cor.withValues(alpha: 0.05),
         border: Border(
-          bottom: BorderSide(color: coluna.cor.withValues(alpha: 0.4), width: 1),
+          bottom: BorderSide(
+            color: coluna.cor.withValues(alpha: 0.4),
+            width: 1,
+          ),
         ),
       ),
       child: Row(
@@ -1127,21 +1310,53 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     );
   }
 
-  Widget _buildChip(_Veiculo v, _ColunaInfo coluna, Color borderColor) {
+  Widget _buildChip(
+    _Veiculo v,
+    _ColunaInfo coluna,
+    Color borderColor, {
+    int? indexInFila,
+  }) {
     final cardColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
+
+    // Cores personalizadas para a tag de posição baseada no terminal do usuário
+    Color tagBgColor = coluna.cor;
+    Color tagTextColor = Colors.white;
+
+    if (indexInFila != null) {
+      final isCarga = v.terminalIdOrig == _usuarioTerminalId;
+      if (isCarga) {
+        // Carga: amarelo, cinza, branco
+        tagBgColor = const Color(0xFFFFD600); // Amarelo vibrante
+        tagTextColor = const Color(
+          0xFF263238,
+        ); // Cinza escuro/preto para contraste
+      } else {
+        // Descarga: verde e azul
+        tagBgColor = const Color(0xFF00B0FF); // Azul brilhante
+        tagTextColor = Colors.white;
+      }
+    }
 
     return GestureDetector(
       onTap: () => _mostrarDetalhesVeiculo(v),
       child: _ChipHover(
-        cor: coluna.cor,
+        cor: tagBgColor,
         child: Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
-            color: _isDarkMode ? cardColor : coluna.cor.withValues(alpha: 0.08),
+            color: _isDarkMode
+                ? cardColor
+                : (indexInFila != null
+                    ? Colors.grey[200]
+                    : coluna.cor.withValues(alpha: 0.08)),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _isDarkMode ? borderColor : coluna.cor.withValues(alpha: 0.3),
+              color: _isDarkMode
+                  ? borderColor
+                  : (indexInFila != null
+                      ? Colors.grey[400]!
+                      : coluna.cor.withValues(alpha: 0.3)),
               width: 1,
             ),
             boxShadow: [
@@ -1153,52 +1368,157 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 ),
             ],
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (v.placaLinha1.isNotEmpty)
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    v.placaLinha1,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: coluna.cor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 8.5,
-                      fontFamily: 'monospace',
+          child: indexInFila != null
+              ? Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: tagBgColor,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 28,
+                              minHeight: 28,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$indexInFilaº',
+                              style: TextStyle(
+                                color: tagTextColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Layout específico para FILA (Duas linhas)
+                              // Primeira Linha: Placas e Motorista
+                              Row(
+                                children: [
+                                  if (v.placaLinha1.isNotEmpty) ...[
+                                    Text(
+                                      v.placaLinha1,
+                                      style: TextStyle(
+                                        color: coluna.cor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Text(
+                                    v.placa,
+                                    style: TextStyle(
+                                      color: coluna.cor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                      fontFamily: 'monospace',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      v.motorista,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: _isDarkMode
+                                            ? Colors.white70
+                                            : Colors.black87,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              // Segunda Linha: Vendedor > Comprador
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      '${v.vendedor} > ${v.comprador}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: _isDarkMode
+                                            ? Colors.white54
+                                            : Colors.black54,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
+                  ],
                 )
-              else
-                const SizedBox(height: 0),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  v.placa,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: coluna.cor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 9.5,
-                    fontFamily: 'monospace',
-                  ),
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (v.placaLinha1.isNotEmpty)
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          v.placaLinha1,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: coluna.cor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 8.5,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      )
+                    else
+                      const SizedBox(height: 0),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        v.placa,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: coluna.cor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 9.5,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _mostrarPorProduto
+                          ? (v.produtos.length > 1
+                              ? '${v.produtos.first.nome} (+${v.produtos.length - 1})'
+                              : v.produtos.first.nome)
+                          : v.empresa,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: _isDarkMode ? Colors.white : Colors.black,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                _mostrarPorProduto 
-                    ? (v.produtos.length > 1 ? '${v.produtos.first.nome} (+${v.produtos.length - 1})' : v.produtos.first.nome)
-                    : v.empresa,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: _isDarkMode ? Colors.white : Colors.black,
-                  fontSize: 8,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -1229,7 +1549,12 @@ class _ChipHoverState extends State<_ChipHover> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(4),
           boxShadow: _hover
-              ? [BoxShadow(color: widget.cor.withValues(alpha: 0.5), blurRadius: 6)]
+              ? [
+                  BoxShadow(
+                    color: widget.cor.withValues(alpha: 0.5),
+                    blurRadius: 6,
+                  ),
+                ]
               : null,
         ),
         child: widget.child,
@@ -1274,6 +1599,9 @@ class _Veiculo {
   final String motorista;
   final String transportadora;
   final String dataCriacao;
+  final String? posicaoFila;
+  final String vendedor;
+  final String comprador;
 
   _Veiculo({
     required this.id,
@@ -1290,5 +1618,8 @@ class _Veiculo {
     required this.motorista,
     required this.transportadora,
     required this.dataCriacao,
+    this.posicaoFila,
+    required this.vendedor,
+    required this.comprador,
   });
 }
