@@ -103,7 +103,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
               codigo
             ),
             ordens:ordem_id (
-              veic_parcial
+              veic_parcial,
+              status_term_orig
             )
           """)
           .eq("tipo_op", "venda");
@@ -139,6 +140,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         final ordens = item['ordens'];
         if (ordens is Map<String, dynamic>) {
           item['veic_parcial_ordem'] = ordens['veic_parcial'];
+          item['status_term_orig_ordem'] = ordens['status_term_orig'];
         }
 
         dadosProcessados.add(item);
@@ -329,7 +331,18 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     }).toList();
   }  
 
-  String _obterTextoStatus(dynamic statusCircuito) {
+  String _obterTextoStatus(dynamic statusCircuito, {dynamic statusTerm}) {
+    // Se houver status do terminal (saída), ele tem prioridade para refletir a realidade local
+    if (statusTerm != null) {
+      final st = int.tryParse(statusTerm.toString()) ?? 0;
+      switch (st) {
+        case 1: return "Programado";
+        case 2: return "Em Fila";
+        case 3: return "Em Operação";
+        // Outros status podem ser adicionados conforme evolução do circuito
+      }
+    }
+
     if (statusCircuito == null) return "Programado";
     
     final statusNum = int.tryParse(statusCircuito.toString()) ?? 1;
@@ -344,7 +357,16 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     }
   }
 
-  Color _obterCorStatus(dynamic statusCircuito) {
+  Color _obterCorStatus(dynamic statusCircuito, {dynamic statusTerm}) {
+    if (statusTerm != null) {
+      final st = int.tryParse(statusTerm.toString()) ?? 0;
+      switch (st) {
+        case 1: return Colors.blue;
+        case 2: return const Color(0xFFE65100); // Laranja do estágio "Em Fila"
+        case 3: return const Color(0xFF4A148C); // Roxo do estágio "Em Operação"
+      }
+    }
+
     if (statusCircuito == null) return Colors.blue;
     
     final statusNum = int.tryParse(statusCircuito.toString()) ?? 1;
@@ -1157,8 +1179,10 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
                         }
 
                         final statusCircuito = t['status_circuito'];
-                        final statusTexto = _obterTextoStatus(statusCircuito);
-                        final corStatus = _obterCorStatus(statusCircuito);
+                        final statusTermOrig = t['status_term_orig_ordem'];
+                        
+                        final statusTexto = _obterTextoStatus(statusCircuito, statusTerm: statusTermOrig);
+                        final corStatus = _obterCorStatus(statusCircuito, statusTerm: statusTermOrig);
                         
                         String codigo = t["codigo"]?.toString() ?? "";
                         String uf = t["uf"]?.toString() ?? ""; 

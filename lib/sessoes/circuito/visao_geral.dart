@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
 
@@ -92,28 +93,43 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             status_circuito_orig,
             status_circuito_dest,
             data_mov,
+            entrada_amb,
+            saida_amb,
             motoristas!motorista_id(nome),
             transportadoras!transportadora_id(nome),
             produtos!produto_id(nome_dois),
             empresas!empresa_id(nome_dois),
-            ordens!ordem_id(em_fila, terminal_id_orig, status_term_orig)
+            ordens!ordem_id(em_fila, terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest)
           ''')
           .eq('empresa_id', empresaId)
           .order('data_mov', ascending: false);
 
       final List<dynamic> data = response as List<dynamic>;
       
-      final novosVeiculos = data.map((item) {
+      // Agrupando movimentações por ordem_id
+      final Map<String, List<dynamic>> ordensAgrupadas = {};
+      for (var item in data) {
+        final ordemId = item['ordem_id']?.toString() ?? 'sem_ordem';
+        if (!ordensAgrupadas.containsKey(ordemId)) {
+          ordensAgrupadas[ordemId] = [];
+        }
+        ordensAgrupadas[ordemId]!.add(item);
+      }
+
+      final novosVeiculos = ordensAgrupadas.entries.map((entry) {
+        final itens = entry.value;
+        final primeiroItem = itens.first;
+
         // Lógica para cliente: se tipo_op for 'transf', usa o nome_dois da tabela empresas
-        final tipoOp = item['tipo_op']?.toString() ?? '';
-        String clienteFinal = item['cliente']?.toString() ?? 'N/A';
+        final tipoOp = primeiroItem['tipo_op']?.toString() ?? '';
+        String clienteFinal = primeiroItem['cliente']?.toString() ?? 'N/A';
         
         if (tipoOp.toLowerCase() == 'transf') {
-          clienteFinal = item['empresas']?['nome_dois']?.toString() ?? clienteFinal;
+          clienteFinal = primeiroItem['empresas']?['nome_dois']?.toString() ?? clienteFinal;
         }
 
         // Trata o campo placa que é text[] no banco
-        final placasRaw = item['placa'];
+        final placasRaw = primeiroItem['placa'];
         String placaLinha1 = '';
         String placaLinha2 = 'SEM PLACA';
         String placaCompleta = '';
@@ -121,16 +137,10 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         if (placasRaw is List && placasRaw.isNotEmpty) {
           placaCompleta = placasRaw.join(' / ');
           if (placasRaw.length >= 3) {
-            // Se tiver 3 ou mais placas:
-            // Linha 1: Primeira placa
-            // Linha 2: Duas últimas placas
             placaLinha1 = placasRaw.first.toString();
             final ultimas = placasRaw.sublist(placasRaw.length - 2);
             placaLinha2 = ultimas.join(' / ');
           } else {
-            // Se tiver 1 ou 2 placas:
-            // Linha 1: Vazia
-            // Linha 2: Todas as placas (1 ou 2)
             placaLinha1 = '';
             placaLinha2 = placasRaw.join(' / ');
           }
@@ -140,41 +150,59 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           placaCompleta = placasRaw;
         }
 
-        final status = item['status_circuito_orig']?.toString() ?? '0';
-        final emFila = item['ordens']?['em_fila'] == true;
-        final statusTermOrig = item['ordens']?['status_term_orig']?.toString() ?? '0';
+        final status = primeiroItem['status_circuito_orig']?.toString() ?? '0';
+        final emFila = primeiroItem['ordens']?['em_fila'] == true;
+        final statusTermOrig = primeiroItem['ordens']?['status_term_orig']?.toString() ?? '0';
+        final statusTermDest = primeiroItem['ordens']?['status_term_dest']?.toString() ?? '0';
         
         int estagio = -1;
         if (status == '1') {
-          if (statusTermOrig == '3') {
-            estagio = 2;
+          // Lógica de estágios baseada no terminal do usuário
+          final isOrigem = primeiroItem['ordens']?['terminal_id_orig']?.toString() == _usuarioTerminalId;
+          final isDestino = primeiroItem['ordens']?['terminal_id_dest']?.toString() == _usuarioTerminalId;
+
+          if ((isOrigem && statusTermOrig == '3') || (isDestino && statusTermDest == '3')) {
+            estagio = 3; // Em Operação (antes era 2)
           } else if (emFila) {
-            estagio = 1;
+            estagio = 2; // Em Fila (antes era 1)
           } else {
-            estagio = 0;
+            estagio = 1; // Programados (antes era 0)
           }
         } else if (status == '2') {
-          estagio = 1;
+          estagio = 2; // Em Fila (antes era 1)
         } else if (status == '3') {
-          estagio = 2;
+          estagio = 3; // Em Operação (antes era 2)
         } else if (status == '4') {
-          estagio = 3;
+          estagio = 4; // Liberados (antes era 3)
         }
 
+        // Mapeia produtos e quantidades de todas as movimentações desta ordem
+        final numberFormat = NumberFormat.decimalPattern('pt_BR');
+        final produtos = itens.map((i) {
+          final isSaida = i['tipo_mov'] == 'saida' || i['saida_amb'] != null && (i['saida_amb'] as num) > 0;
+          final num quantidadeValue = isSaida ? (i['saida_amb'] ?? 0) : (i['entrada_amb'] ?? 0);
+          
+          return _ProdutoItem(
+            nome: i['produtos']?['nome_dois']?.toString() ?? 'N/A',
+            quantidade: numberFormat.format(quantidadeValue),
+          );
+        }).toList();
+
         return _Veiculo(
-          id: item['id']?.toString() ?? '',
-          ordemId: item['ordem_id']?.toString() ?? '',
-          terminalIdOrig: item['ordens']?['terminal_id_orig']?.toString(),
-          placa: placaLinha2, // Mantendo por compatibilidade, mas agora usamos placaLinha1 também
+          id: primeiroItem['id']?.toString() ?? '',
+          ordemId: entry.key,
+          terminalIdOrig: primeiroItem['ordens']?['terminal_id_orig']?.toString(),
+          terminalIdDest: primeiroItem['ordens']?['terminal_id_dest']?.toString(),
+          placa: placaLinha2,
           placaLinha1: placaLinha1,
           placaCompleta: placaCompleta,
-          produto: item['produtos']?['nome_dois']?.toString() ?? 'N/A',
+          produtos: produtos,
           empresa: clienteFinal,
           tipoOp: tipoOp,
           estagio: estagio,
-          motorista: item['motoristas']?['nome']?.toString() ?? 'N/A',
-          transportadora: item['transportadoras']?['nome']?.toString() ?? 'N/A',
-          dataCriacao: item['data_mov']?.toString() ?? 'N/A',
+          motorista: primeiroItem['motoristas']?['nome']?.toString() ?? 'N/A',
+          transportadora: primeiroItem['transportadoras']?['nome']?.toString() ?? 'N/A',
+          dataCriacao: primeiroItem['data_mov']?.toString() ?? 'N/A',
         );
       }).where((v) => v.estagio != -1).toList();
 
@@ -191,9 +219,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     }
   }
 
-  List<_Veiculo> _veiculosPorEstagio(int estagio) {
+  List<_Veiculo> _veiculosPorEstagio(int estagio, {String? subFila}) {
     return _veiculos.where((v) {
       if (v.estagio != estagio) return false;
+
+      // Se for estágio "Em Fila" (índice 2) e houver subFila especificada
+      if (estagio == 2 && subFila != null) {
+        final isCarga = v.terminalIdOrig == _usuarioTerminalId;
+        if (subFila == 'carga' && !isCarga) return false;
+        if (subFila == 'descarga' && isCarga) return false;
+      }
 
       // Filtro de Empresa
       if (_empresaSelecionada != 'Todas' && v.empresa != _empresaSelecionada) {
@@ -212,19 +247,22 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       // Filtro de Busca (Placa ou Produto)
       if (_filtroBusca.isEmpty) return true;
       final busca = _filtroBusca.toLowerCase();
-      return v.placa.toLowerCase().contains(busca) ||
-          v.placaLinha1.toLowerCase().contains(busca) ||
-          v.produto.toLowerCase().contains(busca);
+      final placaMatch = v.placa.toLowerCase().contains(busca) ||
+          v.placaLinha1.toLowerCase().contains(busca);
+      
+      final produtoMatch = v.produtos.any((p) => p.nome.toLowerCase().contains(busca));
+      
+      return placaMatch || produtoMatch;
     }).toList();
   }
 
   void _avancarEstagio(_Veiculo v) {
-    if (v.estagio >= _estagios.length - 1) return;
+    if (v.estagio >= _estagios.length) return;
     setState(() => v.estagio++);
   }
 
   void _retrocederEstagio(_Veiculo v) {
-    if (v.estagio <= 0) return;
+    if (v.estagio <= 1) return;
     setState(() => v.estagio--);
   }
 
@@ -233,20 +271,21 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
     try {
       // 1. Atualiza ordens.em_fila = true
+      final Map<String, dynamic> updates = {'em_fila': true};
+
+      // 2. Verifica se é Saída (usuário = origem) ou Entrada (usuário = destino)
+      if (_usuarioTerminalId != null && _usuarioTerminalId!.isNotEmpty) {
+        if (v.terminalIdOrig == _usuarioTerminalId) {
+          updates['status_term_orig'] = 2;
+        } else if (v.terminalIdDest == _usuarioTerminalId) {
+          updates['status_term_dest'] = 2;
+        }
+      }
+
       await _supabase
           .from('ordens')
-          .update({'em_fila': true})
+          .update(updates)
           .eq('id', v.ordemId);
-
-      // 2. Atualiza ordens.status_term_orig = 2 se terminal_id_orig for o mesmo do usuário
-      if (_usuarioTerminalId != null && 
-          _usuarioTerminalId!.isNotEmpty && 
-          v.terminalIdOrig == _usuarioTerminalId) {
-        await _supabase
-            .from('ordens')
-            .update({'status_term_orig': 2})
-            .eq('id', v.ordemId);
-      }
 
       // Feedback visual e fecha dialog
       if (mounted) {
@@ -297,20 +336,21 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     if (v.ordemId.isEmpty) return;
     try {
       // 1. Atualiza em_fila para false
+      final Map<String, dynamic> updates = {'em_fila': false};
+
+      // 2. Verifica se é Saída (usuário = origem) ou Entrada (usuário = destino)
+      if (_usuarioTerminalId != null && _usuarioTerminalId!.isNotEmpty) {
+        if (v.terminalIdOrig == _usuarioTerminalId) {
+          updates['status_term_orig'] = 3;
+        } else if (v.terminalIdDest == _usuarioTerminalId) {
+          updates['status_term_dest'] = 3;
+        }
+      }
+
       await _supabase
           .from('ordens')
-          .update({'em_fila': false})
+          .update(updates)
           .eq('id', v.ordemId);
-
-      // 2. Define status_term_orig para 3 se terminal_id_orig for o mesmo do usuário
-      if (_usuarioTerminalId != null &&
-          _usuarioTerminalId!.isNotEmpty &&
-          v.terminalIdOrig == _usuarioTerminalId) {
-        await _supabase
-            .from('ordens')
-            .update({'status_term_orig': 3})
-            .eq('id', v.ordemId);
-      }
 
       if (mounted) {
         Navigator.pop(context);
@@ -329,13 +369,13 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   }
 
   void _mostrarMenuVeiculo(BuildContext context, _Veiculo v, Offset posicao) {
-    if (v.estagio == 0 || v.estagio == 1) {
+    if (v.estagio == 1 || v.estagio == 2 || v.estagio == 3 || v.estagio == 4) {
       _mostrarDetalhesVeiculo(v);
       return;
     }
 
-    final podeAvancar = v.estagio < _estagios.length - 1;
-    final podeRetroceder = v.estagio > 0;
+    final podeAvancar = v.estagio < _estagios.length;
+    final podeRetroceder = v.estagio > 1;
 
     showMenu<String>(
       context: context,
@@ -378,10 +418,10 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             value: 'avancar',
             child: Row(
               children: [
-                Icon(Icons.arrow_forward, size: 14, color: _estagios[v.estagio + 1].cor),
+                Icon(Icons.arrow_forward, size: 14, color: _estagios[v.estagio].cor),
                 const SizedBox(width: 8),
                 Text(
-                  'Mover para ${_estagios[v.estagio + 1].titulo}',
+                  'Mover para ${_estagios[v.estagio].titulo}',
                   style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ],
@@ -392,10 +432,10 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             value: 'retroceder',
             child: Row(
               children: [
-                Icon(Icons.arrow_back, size: 14, color: _estagios[v.estagio - 1].cor),
+                Icon(Icons.arrow_back, size: 14, color: _estagios[v.estagio - 2].cor),
                 const SizedBox(width: 8),
                 Text(
-                  'Voltar para ${_estagios[v.estagio - 1].titulo}',
+                  'Voltar para ${_estagios[v.estagio - 2].titulo}',
                   style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ],
@@ -455,7 +495,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     onTap: () => Navigator.pop(context),
                     child: const MouseRegion(
                       cursor: SystemMouseCursors.click,
-                      child: Icon(Icons.close, size: 20, color: Colors.grey),
+                      child: Icon(Icons.close, size: 22, color: Color(0xFFC62828)), // Vermelho mais forte
                     ),
                   ),
                 ],
@@ -466,10 +506,42 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               _buildInfoRow('Transportadora:', v.transportadora),
               _buildInfoRow('Empresa:', v.empresa),
               _buildInfoRow('Operação:', operacaoTexto),
-              _buildInfoRow('Produto:', v.produto),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  'Produtos:',
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+              ...v.produtos.map((p) => Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _obterCorProduto(p.nome),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${p.nome} — ${p.quantidade}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: Color(0xFF263238),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
               _buildInfoRow('Data Criação:', dataFormatada),
               const SizedBox(height: 20),
-              if (v.estagio == 0) ...[
+              if (v.estagio == 1) ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -505,7 +577,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-              ] else if (v.estagio == 1) ...[
+              ] else if (v.estagio == 2) ...[
                 SizedBox(
                   width: double.infinity,
                   height: 40,
@@ -536,20 +608,24 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-              ],
-              SizedBox(
-                width: double.infinity,
-                height: 40,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2196F3),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ] else if (v.estagio == 3 || v.estagio == 4) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: null, // Inativo por enquanto
+                    icon: const Icon(Icons.description_outlined, size: 18),
+                    label: const Text('CERTIFICADO DE APURAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueGrey,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      disabledForegroundColor: Colors.grey.shade500,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
                   ),
-                  child: const Text('FECHAR', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-              ),
+                const SizedBox(height: 12),
+              ],
             ],
           ),
         ),
@@ -583,6 +659,60 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         ],
       ),
     );
+  }
+
+  Color _obterCorProduto(String nomeProduto) {
+    final Map<String, Color> mapeamentoExato = {
+      'G. Comum': const Color(0xFFFF6B35),
+      'G. Aditivada': const Color(0xFF00A8E8),
+      'Gasolina A': const Color(0xFFE91E63),
+      'S500': const Color(0xFF8D6A9F),
+      'S10': const Color(0xFF2E294E),
+      'S500 A': const Color(0xFF9C27B0),
+      'S10 A': const Color(0xFF673AB7),
+      'Hidratado': const Color(0xFF83B692),
+      'Anidro': const Color(0xFF4CAF50),
+      'B100': const Color(0xFF8BC34A),
+    };
+
+    if (mapeamentoExato.containsKey(nomeProduto)) {
+      return mapeamentoExato[nomeProduto]!;
+    }
+
+    final nomeLower = nomeProduto.toLowerCase();
+    for (var entry in mapeamentoExato.entries) {
+      if (entry.key.toLowerCase() == nomeLower) {
+        return entry.value;
+      }
+    }
+
+    if (nomeLower.contains('comum')) {
+      return const Color(0xFFFF6B35);
+    } else if (nomeLower.contains('aditivada')) {
+      return const Color(0xFF00A8E8);
+    } else if (nomeLower.contains('s500')) {
+      if (nomeLower.contains(' a')) {
+        return const Color(0xFF9C27B0);
+      }
+      return const Color(0xFF8D6A9F);
+    } else if (nomeLower.contains('s10')) {
+      if (nomeLower.contains(' a')) {
+        return const Color(0xFF673AB7);
+      }
+      return const Color(0xFF2E294E);
+    } else if (nomeLower.contains('hidratado')) {
+      return const Color(0xFF83B692);
+    } else if (nomeLower.contains('anidro')) {
+      return const Color(0xFF4CAF50);
+    } else if (nomeLower.contains('b100')) {
+      return const Color(0xFF8BC34A);
+    } else if (nomeLower.contains('gasolina a')) {
+      return const Color(0xFFE91E63);
+    } else if (nomeLower.contains('etanol')) {
+      return const Color(0xFF83B692);
+    }
+
+    return Colors.grey.shade600;
   }
 
   @override
@@ -794,6 +924,13 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             ),
           ),
           const Spacer(),
+          // Botão Atualizar
+          IconButton(
+            icon: Icon(Icons.refresh, color: textColor.withValues(alpha: 0.7), size: 20),
+            tooltip: 'Atualizar dados',
+            onPressed: _carregarDados,
+          ),
+          const SizedBox(width: 8),
           // Seletor de Tema
           Row(
             children: [
@@ -841,47 +978,118 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: List.generate(
         _estagios.length,
-        (i) => Expanded(child: _buildColuna(i, borderColor)),
+        (i) => Expanded(child: _buildColuna(i + 1, borderColor)), // i+1 porque estágios começam em 1
       ),
     );
   }
 
   Widget _buildColuna(int estagioIndex, Color borderColor) {
-    final estagio = _estagios[estagioIndex];
-    final veiculos = _veiculosPorEstagio(estagioIndex);
+    final estagio = _estagios[estagioIndex - 1]; // -1 porque lista começa no 0
     final colColor = _isDarkMode ? estagio.corFundo : Colors.white;
 
+    if (estagioIndex == 2) {
+      // Estágio "Em Fila" - subdividido
+      final veiculosCarga = _veiculosPorEstagio(2, subFila: 'carga');
+      final veiculosDescarga = _veiculosPorEstagio(2, subFila: 'descarga');
+
+      return Container(
+        decoration: BoxDecoration(
+          color: colColor,
+          border: Border(
+            right: BorderSide(color: borderColor, width: 1),
+          ),
+        ),
+        child: Column(
+          children: [
+            _buildCabecalhoColunaWidget(estagio, veiculosCarga.length + veiculosDescarga.length),
+            Expanded(
+              child: Row(
+                children: [
+                  // Sub-coluna DESCARGA (Entrada)
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border(right: BorderSide(color: borderColor.withValues(alpha: 0.5), width: 1)),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildSubCabecalho('DESCARGA', const Color(0xFFD81B60)), // Rosa escuro/Vibrante
+                          Expanded(child: _buildGridVeiculos(veiculosDescarga, estagio, borderColor, true)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Sub-coluna CARGA (Saída)
+                  Expanded(
+                    child: Column(
+                      children: [
+                        _buildSubCabecalho('CARGA', const Color(0xFF00ACC1)), // Ciano escuro/Vibrante
+                        Expanded(child: _buildGridVeiculos(veiculosCarga, estagio, borderColor, true)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final veiculos = _veiculosPorEstagio(estagioIndex);
     return Container(
       decoration: BoxDecoration(
         color: colColor,
         border: Border(
           right: BorderSide(
             color: borderColor,
-            width: estagioIndex < _estagios.length - 1 ? 1 : 0,
+            width: estagioIndex < _estagios.length ? 1 : 0,
           ),
         ),
       ),
       child: Column(
         children: [
           _buildCabecalhoColunaWidget(estagio, veiculos.length),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(10),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: estagioIndex == 1 ? 1.8 : 2.0, // Altura reduzida exceto no estágio "Em Fila" (índice 1)
-              ),
-              itemCount: veiculos.length,
-              itemBuilder: (context, index) {
-                final v = veiculos[index];
-                return _buildChip(v, estagio, borderColor);
-              },
-            ),
-          ),
+          Expanded(child: _buildGridVeiculos(veiculos, estagio, borderColor, false)),
         ],
       ),
+    );
+  }
+
+  Widget _buildSubCabecalho(String titulo, Color cor) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: cor.withValues(alpha: 0.1),
+      ),
+      child: Text(
+        titulo,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: cor,
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.0,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridVeiculos(List<_Veiculo> veiculos, _Estagio estagio, Color borderColor, bool isSubFila) {
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isSubFila ? 1 : 3,
+        crossAxisSpacing: 6,
+        mainAxisSpacing: 6,
+        childAspectRatio: isSubFila ? 2.8 : 2.0,
+      ),
+      itemCount: veiculos.length,
+      itemBuilder: (context, index) {
+        final v = veiculos[index];
+        return _buildChip(v, estagio, borderColor);
+      },
     );
   }
 
@@ -1005,7 +1213,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 ),
               ),
               Text(
-                _mostrarPorProduto ? v.produto : v.empresa,
+                _mostrarPorProduto 
+                    ? (v.produtos.length > 1 ? '${v.produtos.first.nome} (+${v.produtos.length - 1})' : v.produtos.first.nome)
+                    : v.empresa,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -1059,6 +1269,13 @@ class _ChipHoverState extends State<_ChipHover> {
 
 // ── Data models ─────────────────────────────────────────────────────────────
 
+class _ProdutoItem {
+  final String nome;
+  final String quantidade;
+
+  _ProdutoItem({required this.nome, required this.quantidade});
+}
+
 class _Estagio {
   final String titulo;
   final Color cor;
@@ -1075,10 +1292,11 @@ class _Veiculo {
   final String id;
   final String ordemId;
   final String? terminalIdOrig;
+  final String? terminalIdDest;
   final String placa; // Agora representa a linha 2 de placas
   final String placaLinha1;
   final String placaCompleta;
-  final String produto;
+  final List<_ProdutoItem> produtos;
   final String empresa;
   final String tipoOp;
   int estagio;
@@ -1090,10 +1308,11 @@ class _Veiculo {
     required this.id,
     required this.ordemId,
     this.terminalIdOrig,
+    this.terminalIdDest,
     required this.placa,
     required this.placaLinha1,
     required this.placaCompleta,
-    required this.produto,
+    required this.produtos,
     required this.empresa,
     required this.tipoOp,
     required this.estagio,
