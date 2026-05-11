@@ -24,6 +24,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   // ── Controles ────────────────────────────────────────────────────────────
   bool _mostrarPorProduto = false;
   bool _isDarkMode = false;
+  bool _mostrarFilaCarga = true; // true para Carga, false para Descarga
   String _filtroBusca = '';
   String _empresaSelecionada = 'Todas';
   String _tipoOpSelecionada = 'Todos';
@@ -32,27 +33,31 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   static const List<String> _empresas = ['Todas', 'Larco', 'Zema', 'Ale Comb.'];
   static const List<String> _tiposOp = ['Todos', 'Carga', 'Descarga'];
 
-  // ── Estágios ─────────────────────────────────────────────────────────────
-  static const List<_Estagio> _estagios = [
-    _Estagio(
+  // ── Estágios (apenas para UI, não armazena estado) ───────────────────────
+  static const List<_ColunaInfo> _colunas = [
+    _ColunaInfo(
       titulo: 'Programados',
       cor: Color(0xFF1565C0),
       corFundo: Color(0xFF0D1B2A),
+      statusNecessario: '1',
     ),
-    _Estagio(
+    _ColunaInfo(
       titulo: 'Em Fila',
       cor: Color(0xFFE65100),
       corFundo: Color(0xFF1A1200),
+      statusNecessario: '2',
     ),
-    _Estagio(
+    _ColunaInfo(
       titulo: 'Em Operação',
       cor: Color(0xFF4A148C),
       corFundo: Color(0xFF0E001A),
+      statusNecessario: '3',
     ),
-    _Estagio(
+    _ColunaInfo(
       titulo: 'Liberados',
       cor: Color(0xFF2E7D32),
       corFundo: Color(0xFF001A02),
+      statusNecessario: '4',
     ),
   ];
 
@@ -99,7 +104,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             transportadoras!transportadora_id(nome),
             produtos!produto_id(nome_dois),
             empresas!empresa_id(nome_dois),
-            ordens!ordem_id(em_fila, terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest)
+            ordens!ordem_id(terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest)
           ''')
           .eq('empresa_id', empresaId)
           .order('data_mov', ascending: false);
@@ -150,30 +155,18 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           placaCompleta = placasRaw;
         }
 
-        final status = primeiroItem['status_circuito_orig']?.toString() ?? '0';
-        final emFila = primeiroItem['ordens']?['em_fila'] == true;
-        final statusTermOrig = primeiroItem['ordens']?['status_term_orig']?.toString() ?? '0';
-        final statusTermDest = primeiroItem['ordens']?['status_term_dest']?.toString() ?? '0';
+        final isOrigem = primeiroItem['ordens']?['terminal_id_orig']?.toString() == _usuarioTerminalId;
+        final isDestino = primeiroItem['ordens']?['terminal_id_dest']?.toString() == _usuarioTerminalId;
         
-        int estagio = -1;
-        if (status == '1') {
-          // Lógica de estágios baseada no terminal do usuário
-          final isOrigem = primeiroItem['ordens']?['terminal_id_orig']?.toString() == _usuarioTerminalId;
-          final isDestino = primeiroItem['ordens']?['terminal_id_dest']?.toString() == _usuarioTerminalId;
-
-          if ((isOrigem && statusTermOrig == '3') || (isDestino && statusTermDest == '3')) {
-            estagio = 3; // Em Operação (antes era 2)
-          } else if (emFila) {
-            estagio = 2; // Em Fila (antes era 1)
-          } else {
-            estagio = 1; // Programados (antes era 0)
-          }
-        } else if (status == '2') {
-          estagio = 2; // Em Fila (antes era 1)
-        } else if (status == '3') {
-          estagio = 3; // Em Operação (antes era 2)
-        } else if (status == '4') {
-          estagio = 4; // Liberados (antes era 3)
+        final statusTermOrig = primeiroItem['ordens']?['status_term_orig']?.toString() ?? '1';
+        final statusTermDest = primeiroItem['ordens']?['status_term_dest']?.toString() ?? '1';
+        
+        // Determina o status baseado no terminal do usuário
+        String statusAtual = '1';
+        if (isOrigem) {
+          statusAtual = statusTermOrig;
+        } else if (isDestino) {
+          statusAtual = statusTermDest;
         }
 
         // Mapeia produtos e quantidades de todas as movimentações desta ordem
@@ -199,12 +192,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           produtos: produtos,
           empresa: clienteFinal,
           tipoOp: tipoOp,
-          estagio: estagio,
+          statusAtual: statusAtual,
           motorista: primeiroItem['motoristas']?['nome']?.toString() ?? 'N/A',
           transportadora: primeiroItem['transportadoras']?['nome']?.toString() ?? 'N/A',
           dataCriacao: primeiroItem['data_mov']?.toString() ?? 'N/A',
         );
-      }).where((v) => v.estagio != -1).toList();
+      }).toList();
 
       setState(() {
         _veiculos = novosVeiculos;
@@ -219,12 +212,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     }
   }
 
-  List<_Veiculo> _veiculosPorEstagio(int estagio, {String? subFila}) {
+  List<_Veiculo> _veiculosPorStatus(String status, {String? subFila}) {
     return _veiculos.where((v) {
-      if (v.estagio != estagio) return false;
+      if (v.statusAtual != status) return false;
 
-      // Se for estágio "Em Fila" (índice 2) e houver subFila especificada
-      if (estagio == 2 && subFila != null) {
+      // Se for status "Em Fila" (2) e houver subFila especificada
+      if (status == '2' && subFila != null) {
         final isCarga = v.terminalIdOrig == _usuarioTerminalId;
         if (subFila == 'carga' && !isCarga) return false;
         if (subFila == 'descarga' && isCarga) return false;
@@ -256,94 +249,17 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     }).toList();
   }
 
-  void _avancarEstagio(_Veiculo v) {
-    if (v.estagio >= _estagios.length) return;
-    setState(() => v.estagio++);
-  }
-
-  void _retrocederEstagio(_Veiculo v) {
-    if (v.estagio <= 1) return;
-    setState(() => v.estagio--);
-  }
-
-  Future<void> _enviarParaFila(_Veiculo v) async {
+  Future<void> _atualizarStatus(_Veiculo v, String novoStatus) async {
     if (v.ordemId.isEmpty) return;
 
     try {
-      // 1. Atualiza ordens.em_fila = true
-      final Map<String, dynamic> updates = {'em_fila': true};
+      final Map<String, dynamic> updates = {};
 
-      // 2. Verifica se é Saída (usuário = origem) ou Entrada (usuário = destino)
       if (_usuarioTerminalId != null && _usuarioTerminalId!.isNotEmpty) {
         if (v.terminalIdOrig == _usuarioTerminalId) {
-          updates['status_term_orig'] = 2;
+          updates['status_term_orig'] = novoStatus;
         } else if (v.terminalIdDest == _usuarioTerminalId) {
-          updates['status_term_dest'] = 2;
-        }
-      }
-
-      await _supabase
-          .from('ordens')
-          .update(updates)
-          .eq('id', v.ordemId);
-
-      // Feedback visual e fecha dialog
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veículo enviado para a fila!')),
-        );
-        _carregarDados();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao enviar para fila: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _sairDaFila(_Veiculo v) async {
-    if (v.ordemId.isEmpty) return;
-    try {
-      // 1. Atualiza em_fila para false e status_term_orig para 1
-      await _supabase
-          .from('ordens')
-          .update({
-            'em_fila': false,
-            'status_term_orig': 1,
-          })
-          .eq('id', v.ordemId);
-
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veículo removido da fila!')),
-        );
-        _carregarDados();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao sair da fila: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _enviarParaOperacao(_Veiculo v) async {
-    if (v.ordemId.isEmpty) return;
-    try {
-      // 1. Atualiza em_fila para false
-      final Map<String, dynamic> updates = {'em_fila': false};
-
-      // 2. Verifica se é Saída (usuário = origem) ou Entrada (usuário = destino)
-      if (_usuarioTerminalId != null && _usuarioTerminalId!.isNotEmpty) {
-        if (v.terminalIdOrig == _usuarioTerminalId) {
-          updates['status_term_orig'] = 3;
-        } else if (v.terminalIdDest == _usuarioTerminalId) {
-          updates['status_term_dest'] = 3;
+          updates['status_term_dest'] = novoStatus;
         }
       }
 
@@ -354,99 +270,15 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Veículo enviado para operação!')),
-        );
         _carregarDados();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao enviar para operação: $e')),
+          SnackBar(content: Text('Erro ao atualizar status: $e')),
         );
       }
     }
-  }
-
-  void _mostrarMenuVeiculo(BuildContext context, _Veiculo v, Offset posicao) {
-    if (v.estagio == 1 || v.estagio == 2 || v.estagio == 3 || v.estagio == 4) {
-      _mostrarDetalhesVeiculo(v);
-      return;
-    }
-
-    final podeAvancar = v.estagio < _estagios.length;
-    final podeRetroceder = v.estagio > 1;
-
-    showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        posicao.dx,
-        posicao.dy,
-        posicao.dx + 1,
-        posicao.dy + 1,
-      ),
-      color: const Color(0xFF1E2A38),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      items: [
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text(
-            v.placaCompleta,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'detalhes',
-          child: Row(
-            children: const [
-              Icon(Icons.info_outline, size: 14, color: Colors.blue),
-              SizedBox(width: 8),
-              Text(
-                'Ver detalhes',
-                style: TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-        if (podeAvancar)
-          PopupMenuItem<String>(
-            value: 'avancar',
-            child: Row(
-              children: [
-                Icon(Icons.arrow_forward, size: 14, color: _estagios[v.estagio].cor),
-                const SizedBox(width: 8),
-                Text(
-                  'Mover para ${_estagios[v.estagio].titulo}',
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        if (podeRetroceder)
-          PopupMenuItem<String>(
-            value: 'retroceder',
-            child: Row(
-              children: [
-                Icon(Icons.arrow_back, size: 14, color: _estagios[v.estagio - 2].cor),
-                const SizedBox(width: 8),
-                Text(
-                  'Voltar para ${_estagios[v.estagio - 2].titulo}',
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-      ],
-    ).then((value) {
-      if (value == 'detalhes') _mostrarDetalhesVeiculo(v);
-      if (value == 'avancar') _avancarEstagio(v);
-      if (value == 'retroceder') _retrocederEstagio(v);
-    });
   }
 
   void _mostrarDetalhesVeiculo(_Veiculo v) {
@@ -495,7 +327,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     onTap: () => Navigator.pop(context),
                     child: const MouseRegion(
                       cursor: SystemMouseCursors.click,
-                      child: Icon(Icons.close, size: 22, color: Color(0xFFC62828)), // Vermelho mais forte
+                      child: Icon(Icons.close, size: 22, color: Color(0xFFC62828)),
                     ),
                   ),
                 ],
@@ -541,7 +373,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               )),
               _buildInfoRow('Data Criação:', dataFormatada),
               const SizedBox(height: 20),
-              if (v.estagio == 1) ...[
+              if (v.statusAtual == '1') ...[
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -566,7 +398,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: () => _enviarParaFila(v),
+                    onPressed: () => _atualizarStatus(v, '2'),
                     icon: const Icon(Icons.queue, size: 18),
                     label: const Text('ENVIAR PARA FILA', style: TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
@@ -577,12 +409,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-              ] else if (v.estagio == 2) ...[
+              ] else if (v.statusAtual == '2') ...[
                 SizedBox(
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: () => _enviarParaOperacao(v),
+                    onPressed: () => _atualizarStatus(v, '3'),
                     icon: const Icon(Icons.play_arrow, size: 18),
                     label: const Text('ENVIAR PARA OPERAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
@@ -597,7 +429,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: OutlinedButton.icon(
-                    onPressed: () => _sairDaFila(v), // Ativado conforme solicitado
+                    onPressed: () => _atualizarStatus(v, '1'),
                     icon: const Icon(Icons.exit_to_app, size: 18),
                     label: const Text('SAIR DA FILA', style: TextStyle(fontWeight: FontWeight.bold)),
                     style: OutlinedButton.styleFrom(
@@ -608,12 +440,44 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   ),
                 ),
                 const SizedBox(height: 12),
-              ] else if (v.estagio == 3 || v.estagio == 4) ...[
+              ] else if (v.statusAtual == '3') ...[
                 SizedBox(
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: null, // Inativo por enquanto
+                    onPressed: null,
+                    icon: const Icon(Icons.description_outlined, size: 18),
+                    label: const Text('CERTIFICADO DE APURAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueGrey,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      disabledForegroundColor: Colors.grey.shade500,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmarCancelamentoOperacao(v),
+                    icon: const Icon(Icons.cancel_outlined, size: 18),
+                    label: const Text('CANCELAR OPERAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade800,
+                      side: BorderSide(color: Colors.red.shade800),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ] else if (v.statusAtual == '4') ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: null,
                     icon: const Icon(Icons.description_outlined, size: 18),
                     label: const Text('CERTIFICADO DE APURAÇÃO', style: TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
@@ -626,6 +490,69 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 ),
                 const SizedBox(height: 12),
               ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmarCancelamentoOperacao(_Veiculo v) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Colors.red, width: 1),
+        ),
+        child: Container(
+          width: 200, // Largura reduzida conforme solicitado
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
+              const SizedBox(height: 12),
+              const Text(
+                'ATENÇÃO',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red, fontSize: 13),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Ao cancelar, o veículo voltará para "Programados".',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _atualizarStatus(v, '1');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade800,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                  child: const Text('SIM, PROSSEGUIR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    side: BorderSide(color: Colors.grey.shade400),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                  ),
+                  child: const Text('VOLTAR', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ),
             ],
           ),
         ),
@@ -924,14 +851,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             ),
           ),
           const Spacer(),
-          // Botão Atualizar
           IconButton(
             icon: Icon(Icons.refresh, color: textColor.withValues(alpha: 0.7), size: 20),
             tooltip: 'Atualizar dados',
             onPressed: _carregarDados,
           ),
           const SizedBox(width: 8),
-          // Seletor de Tema
           Row(
             children: [
               Icon(
@@ -977,20 +902,19 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: List.generate(
-        _estagios.length,
-        (i) => Expanded(child: _buildColuna(i + 1, borderColor)), // i+1 porque estágios começam em 1
+        _colunas.length,
+        (i) => Expanded(child: _buildColuna(i, borderColor)),
       ),
     );
   }
 
-  Widget _buildColuna(int estagioIndex, Color borderColor) {
-    final estagio = _estagios[estagioIndex - 1]; // -1 porque lista começa no 0
-    final colColor = _isDarkMode ? estagio.corFundo : Colors.white;
+  Widget _buildColuna(int colunaIndex, Color borderColor) {
+    final coluna = _colunas[colunaIndex];
+    final colColor = _isDarkMode ? coluna.corFundo : Colors.white;
 
-    if (estagioIndex == 2) {
-      // Estágio "Em Fila" - subdividido
-      final veiculosCarga = _veiculosPorEstagio(2, subFila: 'carga');
-      final veiculosDescarga = _veiculosPorEstagio(2, subFila: 'descarga');
+    if (colunaIndex == 1) {
+      // Coluna "Em Fila" (status 2) - Filtrada pelo switch
+      final veiculosFila = _veiculosPorStatus('2', subFila: _mostrarFilaCarga ? 'carga' : 'descarga');
 
       return Container(
         decoration: BoxDecoration(
@@ -1001,105 +925,162 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         ),
         child: Column(
           children: [
-            _buildCabecalhoColunaWidget(estagio, veiculosCarga.length + veiculosDescarga.length),
+            _buildCabecalhoColunaFila(coluna, veiculosFila.length),
             Expanded(
-              child: Row(
-                children: [
-                  // Sub-coluna DESCARGA (Entrada)
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border(right: BorderSide(color: borderColor.withValues(alpha: 0.5), width: 1)),
-                      ),
-                      child: Column(
-                        children: [
-                          _buildSubCabecalho('DESCARGA', const Color(0xFFD81B60)), // Rosa escuro/Vibrante
-                          Expanded(child: _buildGridVeiculos(veiculosDescarga, estagio, borderColor, true)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  // Sub-coluna CARGA (Saída)
-                  Expanded(
-                    child: Column(
-                      children: [
-                        _buildSubCabecalho('CARGA', const Color(0xFF00ACC1)), // Ciano escuro/Vibrante
-                        Expanded(child: _buildGridVeiculos(veiculosCarga, estagio, borderColor, true)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              child: _buildGridVeiculos(veiculosFila, coluna, borderColor, true),
             ),
           ],
         ),
       );
     }
 
-    final veiculos = _veiculosPorEstagio(estagioIndex);
+    final veiculos = _veiculosPorStatus(coluna.statusNecessario);
     return Container(
       decoration: BoxDecoration(
         color: colColor,
         border: Border(
           right: BorderSide(
             color: borderColor,
-            width: estagioIndex < _estagios.length ? 1 : 0,
+            width: colunaIndex < _colunas.length - 1 ? 1 : 0,
           ),
         ),
       ),
       child: Column(
         children: [
-          _buildCabecalhoColunaWidget(estagio, veiculos.length),
-          Expanded(child: _buildGridVeiculos(veiculos, estagio, borderColor, false)),
+          _buildCabecalhoColunaWidget(coluna, veiculos.length),
+          Expanded(child: _buildGridVeiculos(veiculos, coluna, borderColor, false)),
         ],
       ),
     );
   }
 
-  Widget _buildSubCabecalho(String titulo, Color cor) {
+  Widget _buildCabecalhoColunaFila(_ColunaInfo coluna, int count) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: cor.withValues(alpha: 0.1),
-      ),
-      child: Text(
-        titulo,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          color: cor,
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.0,
+        color: _isDarkMode ? Colors.transparent : coluna.cor.withValues(alpha: 0.05),
+        border: Border(
+          bottom: BorderSide(color: coluna.cor.withValues(alpha: 0.4), width: 1),
         ),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: coluna.cor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    coluna.titulo.toUpperCase(),
+                    style: TextStyle(
+                      color: coluna.cor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: coluna.cor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: coluna.cor.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      color: coluna.cor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, color: coluna.cor.withValues(alpha: 0.4)),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            color: _isDarkMode ? Colors.white10 : Colors.grey.shade100,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'DESCARGA',
+                  style: TextStyle(
+                    color: !_mostrarFilaCarga ? const Color(0xFFD81B60) : Colors.grey,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                SizedBox(
+                  height: 24,
+                  width: 44,
+                  child: FittedBox(
+                    fit: BoxFit.contain,
+                    child: Switch(
+                      value: _mostrarFilaCarga,
+                      activeTrackColor: const Color(0xFF00ACC1).withValues(alpha: 0.3),
+                      activeColor: const Color(0xFF00ACC1),
+                      inactiveThumbColor: const Color(0xFFD81B60),
+                      inactiveTrackColor: const Color(0xFFD81B60).withValues(alpha: 0.3),
+                      trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
+                      onChanged: (val) => setState(() => _mostrarFilaCarga = val),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'CARGA',
+                  style: TextStyle(
+                    color: _mostrarFilaCarga ? const Color(0xFF00ACC1) : Colors.grey,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildGridVeiculos(List<_Veiculo> veiculos, _Estagio estagio, Color borderColor, bool isSubFila) {
+  Widget _buildGridVeiculos(List<_Veiculo> veiculos, _ColunaInfo coluna, Color borderColor, bool isSubFila) {
     return GridView.builder(
       padding: const EdgeInsets.all(8),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: isSubFila ? 1 : 3,
         crossAxisSpacing: 6,
         mainAxisSpacing: 6,
-        childAspectRatio: isSubFila ? 2.8 : 2.0,
+        childAspectRatio: isSubFila ? 7.0 : 2.0,
       ),
       itemCount: veiculos.length,
       itemBuilder: (context, index) {
         final v = veiculos[index];
-        return _buildChip(v, estagio, borderColor);
+        return _buildChip(v, coluna, borderColor);
       },
     );
   }
 
-  Widget _buildCabecalhoColunaWidget(_Estagio estagio, int count) {
+  Widget _buildCabecalhoColunaWidget(_ColunaInfo coluna, int count) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.transparent : estagio.cor.withValues(alpha: 0.05),
+        color: _isDarkMode ? Colors.transparent : coluna.cor.withValues(alpha: 0.05),
         border: Border(
-          bottom: BorderSide(color: estagio.cor.withValues(alpha: 0.4), width: 1),
+          bottom: BorderSide(color: coluna.cor.withValues(alpha: 0.4), width: 1),
         ),
       ),
       child: Row(
@@ -1108,16 +1089,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             width: 8,
             height: 8,
             decoration: BoxDecoration(
-              color: estagio.cor,
+              color: coluna.cor,
               shape: BoxShape.circle,
             ),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              estagio.titulo.toUpperCase(),
+              coluna.titulo.toUpperCase(),
               style: TextStyle(
-                color: estagio.cor,
+                color: coluna.cor,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.2,
@@ -1128,14 +1109,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: estagio.cor.withValues(alpha: 0.15),
+              color: coluna.cor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: estagio.cor.withValues(alpha: 0.3)),
+              border: Border.all(color: coluna.cor.withValues(alpha: 0.3)),
             ),
             child: Text(
               '$count',
               style: TextStyle(
-                color: estagio.cor,
+                color: coluna.cor,
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
               ),
@@ -1146,29 +1127,21 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     );
   }
 
-  Widget _buildChip(_Veiculo v, _Estagio estagio, Color borderColor) {
+  Widget _buildChip(_Veiculo v, _ColunaInfo coluna, Color borderColor) {
     final cardColor = _isDarkMode ? const Color(0xFF1E293B) : Colors.white;
 
     return GestureDetector(
-      onSecondaryTapDown: (details) =>
-          _mostrarMenuVeiculo(context, v, details.globalPosition),
-      onLongPressStart: (details) =>
-          _mostrarMenuVeiculo(context, v, details.globalPosition),
-      onTapDown: (details) => _mostrarMenuVeiculo(
-        context,
-        v,
-        details.globalPosition,
-      ),
+      onTap: () => _mostrarDetalhesVeiculo(v),
       child: _ChipHover(
-        cor: estagio.cor,
+        cor: coluna.cor,
         child: Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
-            color: _isDarkMode ? cardColor : estagio.cor.withValues(alpha: 0.08),
+            color: _isDarkMode ? cardColor : coluna.cor.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: _isDarkMode ? borderColor : estagio.cor.withValues(alpha: 0.3),
+              color: _isDarkMode ? borderColor : coluna.cor.withValues(alpha: 0.3),
               width: 1,
             ),
             boxShadow: [
@@ -1181,7 +1154,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             ],
           ),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Distribui as linhas uniformemente
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (v.placaLinha1.isNotEmpty)
                 FittedBox(
@@ -1190,24 +1163,24 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     v.placaLinha1,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: estagio.cor,
+                      color: coluna.cor,
                       fontWeight: FontWeight.bold,
-                      fontSize: 8.5, // Reduzido levemente para ganhar espaço
+                      fontSize: 8.5,
                       fontFamily: 'monospace',
                     ),
                   ),
                 )
               else
-                const SizedBox(height: 0), // Espaçador neutro se não houver linha 1
+                const SizedBox(height: 0),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  v.placa, // Segunda linha (com as 2 últimas placas)
+                  v.placa,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: estagio.cor,
+                    color: coluna.cor,
                     fontWeight: FontWeight.bold,
-                    fontSize: 9.5, // Reduzido levemente para ganhar espaço
+                    fontSize: 9.5,
                     fontFamily: 'monospace',
                   ),
                 ),
@@ -1220,7 +1193,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: _isDarkMode ? Colors.white : Colors.black,
-                  fontSize: 8, // Reduzido levemente para ganhar espaço
+                  fontSize: 8,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1231,8 +1204,6 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     );
   }
 }
-
-// ── Hover helper ────────────────────────────────────────────────────────────
 
 class _ChipHover extends StatefulWidget {
   final Widget child;
@@ -1267,8 +1238,6 @@ class _ChipHoverState extends State<_ChipHover> {
   }
 }
 
-// ── Data models ─────────────────────────────────────────────────────────────
-
 class _ProdutoItem {
   final String nome;
   final String quantidade;
@@ -1276,15 +1245,17 @@ class _ProdutoItem {
   _ProdutoItem({required this.nome, required this.quantidade});
 }
 
-class _Estagio {
+class _ColunaInfo {
   final String titulo;
   final Color cor;
   final Color corFundo;
+  final String statusNecessario;
 
-  const _Estagio({
+  const _ColunaInfo({
     required this.titulo,
     required this.cor,
     required this.corFundo,
+    required this.statusNecessario,
   });
 }
 
@@ -1293,13 +1264,13 @@ class _Veiculo {
   final String ordemId;
   final String? terminalIdOrig;
   final String? terminalIdDest;
-  final String placa; // Agora representa a linha 2 de placas
+  final String placa;
   final String placaLinha1;
   final String placaCompleta;
   final List<_ProdutoItem> produtos;
   final String empresa;
   final String tipoOp;
-  int estagio;
+  final String statusAtual;
   final String motorista;
   final String transportadora;
   final String dataCriacao;
@@ -1315,7 +1286,7 @@ class _Veiculo {
     required this.produtos,
     required this.empresa,
     required this.tipoOp,
-    required this.estagio,
+    required this.statusAtual,
     required this.motorista,
     required this.transportadora,
     required this.dataCriacao,
