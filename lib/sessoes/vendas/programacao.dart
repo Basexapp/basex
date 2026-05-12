@@ -1,5 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:printing/printing.dart';
+import '../circuito/ordem_carregamento.dart';
 import 'nova_venda.dart';
 import 'dialog_venda_total.dart';
 import 'dart:async';
@@ -780,6 +782,25 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     }
   }
 
+  Future<void> _visualizarOrdem(Map<String, dynamic> movimentacao) async {
+    try {
+      final pdf = await OrdemCarregamentoPdf.gerar(dados: movimentacao);
+      await Printing.layoutPdf(
+        onLayout: (format) async => pdf.save(),
+        name: 'Ordem_Carregamento_${movimentacao['ordem_id'] ?? 'venda'}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao visualizar ordem: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -876,6 +897,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           FloatingActionButton(
+            heroTag: 'btnNovaVenda',
             onPressed: _mostrarDialogNovaVenda,
             backgroundColor: const Color(0xFF0D47A1),
             foregroundColor: Colors.white,
@@ -888,6 +910,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           ),
           const SizedBox(height: 12),
           FloatingActionButton(
+            heroTag: 'btnTotaisDia',
             onPressed: _mostrarDialogTotais,
             backgroundColor: Colors.white,
             foregroundColor: const Color(0xFF0D47A1),
@@ -1310,52 +1333,71 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       width: 50,
       alignment: Alignment.center,
       child: PopupMenuButton<String>(
+        padding: EdgeInsets.zero,
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+          side: const BorderSide(color: Colors.black, width: 0.5),
+        ),
         itemBuilder: (BuildContext context) => [
           const PopupMenuItem<String>(
-            value: 'editar_ordem',
+            value: 'visualizar_ordem',
+            height: 32,
             child: Row(
               children: [
-                Icon(Icons.edit, size: 18),
+                Icon(Icons.visibility_outlined, size: 16),
                 SizedBox(width: 8),
-                Text('Editar ordem'),
+                Text('Visualizar ordem', style: TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+          const PopupMenuItem<String>(
+            value: 'editar_ordem',
+            height: 32,
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 16),
+                SizedBox(width: 8),
+                Text('Editar ordem', style: TextStyle(fontSize: 12)),
               ],
             ),
           ),
           const PopupMenuItem<String>(
             value: 'excluir',
+            height: 32,
             child: Row(
               children: [
-                Icon(Icons.delete, size: 18, color: Colors.red),
+                Icon(Icons.delete_outline, size: 16, color: Colors.red),
                 SizedBox(width: 8),
                 Text(
                   'Excluir programação',
-                  style: TextStyle(color: Colors.red),
+                  style: TextStyle(color: Colors.red, fontSize: 12),
                 ),
               ],
             ),
           ),
         ],
         onSelected: (String value) {
-          if (value == 'editar_ordem') {
+          if (value == 'visualizar_ordem') {
+            _visualizarOrdem(item);
+          } else if (value == 'editar_ordem') {
             _editarOrdem(item);
           } else if (value == 'excluir') {
             _excluirOrdem(item);
           }
         },
         tooltip: 'Opções',
-        offset: const Offset(0, 40),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        offset: const Offset(0, 30),
         child: Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(2),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(4),
             color: Colors.transparent,
           ),
           child: const Icon(
             Icons.more_vert,
-            size: 20,
+            size: 14,
             color: Colors.grey,
           ),
         ),

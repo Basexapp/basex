@@ -1450,7 +1450,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                                 children: [
                                   Expanded(
                                     child: Text(
-                                      '${v.vendedor} > ${v.comprador}',
+                                      '${v.vendedor} → ${v.comprador}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
