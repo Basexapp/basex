@@ -3776,34 +3776,29 @@ class _CalcPageState extends State<CalcPage> {
 
     // Lista dos campos OBRIGATÓRIOS para medição final
     final camposObrigatorios = [
-      'cmFinal', // Altura total cm
-      'mmFinal', // Altura total mm
-      'alturaAguaFinal', // Altura da água
+      'horarioFinal', // Horário final
       'tempTanqueFinal', // Temperatura tanque
       'densidadeFinal', // Densidade observada
       'tempAmostraFinal', // Temperatura amostra
-      'horarioFinal', // Horário final
+      'cmFinal', // Altura total cm
+      // 'mmFinal', // Opcional se cm estiver preenchido
     ];
 
-    // Verifica cada campo
+    // Verifica cada campo básico
     for (var campo in camposObrigatorios) {
-      final valor = medicoes[campo]?.toString() ?? '';
-
-      // Permite "0" apenas para mmFinal
-      final bool zeroEhValido = campo == 'mmFinal' && valor == '0';
-
-      if (valor.isEmpty || valor == '-' || (!zeroEhValido && valor == '0')) {
-        return false; // Dados finais incompletos
+      final valor = medicoes[campo]?.toString().trim() ?? '';
+      if (valor.isEmpty || valor == '-') {
+        return false;
       }
     }
 
-    // ✅ NOVA REGRA: Volume total do produto a 20ºC da segunda medição deve ser > 0
-    final volume20Final = _extrairNumero(medicoes['volume20Final']?.toString());
-    if (volume20Final <= 0) {
-      return false; // Volume a 20ºC não calculado ou zero
+    // Validação específica da altura total (pelo menos cm deve existir)
+    final cmFinalValue = medicoes['cmFinal']?.toString().trim() ?? '';
+    if (cmFinalValue.isEmpty || cmFinalValue == '-') {
+      return false;
     }
 
-    return true; // Todos os dados finais estão preenchidos e válidos
+    return true; // Se chegou aqui com os campos básicos, consideramos completo
   }
 
   bool _temVolumeMinimoValido() {

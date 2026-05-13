@@ -1611,7 +1611,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                   Expanded(
                     child: _buildCardAcao(
                       icon: Icons.inventory_2,
-                      titulo: 'Movimentação tanque',
+                      titulo: 'Movimentação do tanque',
                       descricao: 'Consultar movimentação do tanque',
                       onTap: _abrirEstoqueTanque,
                     ),
@@ -1645,6 +1645,15 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                       titulo: 'Editar Tanque',
                       descricao: 'Atualizar dados do tanque',
                       onTap: _abrirEdicaoTanque,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildCardAcao(
+                      icon: Icons.add_chart,
+                      titulo: 'Lançar movimentação avulsa',
+                      descricao: 'Registrar entrada ou saída manual',
+                      onTap: _showDialogMovimentacaoAvulsa,
                     ),
                   ),
                 ],
@@ -2059,6 +2068,288 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     }
 
     return card;
+  }
+
+  void _showDialogMovimentacaoAvulsa() {
+    final TextEditingController dataMovController = TextEditingController(
+      text: DateFormat('dd/MM/yyyy').format(DateTime.now()),
+    );
+    final TextEditingController descricaoController = TextEditingController();
+    final TextEditingController quantidadeController = TextEditingController();
+    DateTime dataSelecionada = DateTime.now();
+    String tipoMovimento = 'Entrada';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            final Color backgroundColor = tipoMovimento == 'Entrada' 
+                ? const Color(0xFFE3F2FD) // Azul claro
+                : const Color(0xFFFCE4EC); // Rosa claro
+                
+            final Color borderColor = tipoMovimento == 'Entrada'
+                ? Colors.blue // Azul comum
+                : Colors.red; // Vermelho
+
+            return Dialog(
+              backgroundColor: backgroundColor,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: borderColor, width: 0.8),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Lançar Movimentação Avulsa',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _ink,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      // Seletor de Tipo (Entrada/Saída)
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setStateDialog(() => tipoMovimento = 'Entrada'),
+                              child: Row(
+                                children: [
+                                  Radio<String>(
+                                    value: 'Entrada',
+                                    groupValue: tipoMovimento,
+                                    activeColor: tipoMovimento == 'Entrada' ? Colors.blue : _muted,
+                                    onChanged: (value) => setStateDialog(() => tipoMovimento = value!),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  const Text('Entrada', style: TextStyle(fontSize: 13, color: _ink)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setStateDialog(() => tipoMovimento = 'Saída'),
+                              child: Row(
+                                children: [
+                                  Radio<String>(
+                                    value: 'Saída',
+                                    groupValue: tipoMovimento,
+                                    activeColor: tipoMovimento == 'Saída' ? Colors.red : _muted,
+                                    onChanged: (value) => setStateDialog(() => tipoMovimento = value!),
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                  const Text('Saída', style: TextStyle(fontSize: 13, color: _ink)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Data de lançamento',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
+                      const SizedBox(height: 6),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: dataSelecionada,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2101),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: ColorScheme.light(
+                                    primary: borderColor,
+                                    onPrimary: Colors.white,
+                                    onSurface: _ink,
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null) {
+                            setStateDialog(() {
+                              dataSelecionada = picked;
+                              dataMovController.text = DateFormat('dd/MM/yyyy').format(picked);
+                            });
+                          }
+                        },
+                        child: IgnorePointer(
+                          child: TextField(
+                            controller: dataMovController,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: 'dd/mm/aaaa',
+                              prefixIcon: Icon(Icons.calendar_today, size: 16, color: borderColor),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: borderColor.withOpacity(0.5)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: borderColor),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Quantidade (Litros)',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: quantidadeController,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(fontSize: 13),
+                        maxLength: 7,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        onChanged: (value) {
+                          if (value.isNotEmpty) {
+                            final formatted = _formatarMilhar(value);
+                            quantidadeController.value = TextEditingValue(
+                              text: formatted,
+                              selection: TextSelection.collapsed(offset: formatted.length),
+                            );
+                          }
+                          setStateDialog(() {});
+                        },
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          counterText: '',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: borderColor.withOpacity(0.5)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: borderColor),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text('Descrição',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: descricaoController,
+                        style: const TextStyle(fontSize: 13),
+                        maxLines: 4,
+                        minLines: 4,
+                        maxLength: 200,
+                        keyboardType: TextInputType.multiline,
+                        onChanged: (_) => setStateDialog(() {}),
+                        decoration: InputDecoration(
+                          hintText: 'Digite...',
+                          counterText: '',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: borderColor.withOpacity(0.5)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide(color: borderColor),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          isDense: true,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: borderColor, width: 0.8),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: Text('Voltar', style: TextStyle(color: borderColor, fontSize: 13)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: (descricaoController.text.trim().isEmpty || 
+                                         quantidadeController.text.trim().isEmpty)
+                                  ? null 
+                                  : () {
+                                      Navigator.pop(context);
+                                      _salvarMovimentacaoAvulsa(
+                                        dataSelecionada,
+                                        descricaoController.text,
+                                        quantidadeController.text,
+                                        tipoMovimento,
+                                      );
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: borderColor,
+                                disabledBackgroundColor: Colors.grey.shade400,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('Salvar', style: TextStyle(color: Colors.white, fontSize: 13)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _salvarMovimentacaoAvulsa(
+      DateTime data, String descricao, String quantidade, String tipo) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final tanqueId = _tanqueSelecionadoParaAcoes?['id'];
+
+      if (tanqueId == null) return;
+
+      final valorNumerico =
+          double.tryParse(quantidade.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+
+      await supabase.from('movimentacoes_tanque').insert({
+        'tanque_id': tanqueId,
+        'data_mov': data.toIso8601String(),
+        'descricao': descricao,
+        'tipo_mov': tipo,
+        'entrada_vinte': tipo == 'Entrada' ? valorNumerico : 0,
+        'saida_vinte': tipo == 'Saída' ? valorNumerico : 0,
+        'terminal_id':
+            widget.terminalSelecionadoId ?? UsuarioAtual.instance?.terminalId,
+      });
+
+      _mostrarAviso('Movimentação lançada com sucesso!', erro: false);
+      _carregarDados();
+    } catch (e) {
+      _mostrarAviso('Erro ao salvar movimentação: $e');
+    }
   }
 }
 
