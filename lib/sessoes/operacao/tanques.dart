@@ -43,7 +43,9 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
   bool _carregandoCacls = false;
   List<Map<String, dynamic>> _caclesTanque = [];
   int? _hoverCaclIndex;
-  bool _terminalEmiteCacl = false;
+
+  bool _exaSelecionado = false;
+  bool _lctSelecionado = false;
 
   final List<String> _statusOptions = ['Em operação', 'Operação suspensa'];
   
@@ -70,11 +72,17 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     final statusOriginal = _tanqueEditando!['status']?.toString();
     final lastroOriginal = _formatarMilhar(_tanqueEditando!['lastro']);
 
+    final tipoOriginal = _tanqueEditando!['tipo_abastecimento']?.toString() ?? '';
+    final exaOriginal = tipoOriginal.contains('exa') || tipoOriginal == 'all';
+    final lctOriginal = tipoOriginal.contains('lct') || tipoOriginal == 'all';
+
     return _referenciaController.text != refOriginal ||
         _capacidadeController.text != capOriginal ||
         _produtoSelecionado != prodOriginal ||
         _statusSelecionado != statusOriginal ||
-        _lastroController.text != lastroOriginal;
+        _lastroController.text != lastroOriginal ||
+        _exaSelecionado != exaOriginal ||
+        _lctSelecionado != lctOriginal;
   }
 
   @override
@@ -266,6 +274,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
             lastro,
             status,
             id_produto,
+            tipo_abastecimento,
             produtos (nome),
             terminais!inner (nome)
           ''')
@@ -273,24 +282,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           .order('referencia');
 
       final tanquesResponse = await query;
-
-      bool terminalEmite = false;
-      final String? usuarioTerminalId = usuario.terminalId;
-      if (usuarioTerminalId != null) {
-        try {
-          final terminalResp = await supabase
-              .from('terminais')
-              .select('emite_cacl_mov')
-              .eq('id', usuarioTerminalId)
-              .maybeSingle();
-
-          if (terminalResp != null) {
-            terminalEmite = terminalResp['emite_cacl_mov'] == true;
-          }
-        } catch (_) {
-          terminalEmite = false;
-        }
-      }
 
       final List<Map<String, dynamic>> tanquesFormatados = [];
       
@@ -303,6 +294,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           'lastro': tanque['lastro']?.toString(),
           'status': tanque['status']?.toString() ?? 'Em operação',
           'id_produto': tanque['id_produto'],
+          'tipo_abastecimento': tanque['tipo_abastecimento'],
           'terminal_nome': tanque['terminais']?['nome']?.toString() ?? nomeTerminal,
         });
       }
@@ -320,7 +312,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         tanques = tanquesFormatados;
         _carregando = false;
         _nomeTerminal = nomeTerminal;
-        _terminalEmiteCacl = terminalEmite;
       });
     } catch (e) {
       setState(() {
@@ -347,6 +338,10 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
       _produtoSelecionado = tanque['id_produto']?.toString();
       _statusSelecionado = tanque['status'];
       _lastroController.text = _formatarMilhar(tanque['lastro']);
+      
+      final tipo = tanque['tipo_abastecimento']?.toString() ?? '';
+      _exaSelecionado = tipo.contains('exa') || tipo == 'all';
+      _lctSelecionado = tipo.contains('lct') || tipo == 'all';
     });
   }
 
@@ -359,6 +354,8 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
       _lastroController.clear();
       _produtoSelecionado = null;
       _statusSelecionado = null;
+      _exaSelecionado = false;
+      _lctSelecionado = false;
       _mostrandoCardsAcoes = true;
     });
   }
@@ -1082,12 +1079,22 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         }
       }
 
+      String tipoAbastecimento = '';
+      if (_exaSelecionado && _lctSelecionado) {
+        tipoAbastecimento = 'all';
+      } else if (_exaSelecionado) {
+        tipoAbastecimento = 'exa';
+      } else if (_lctSelecionado) {
+        tipoAbastecimento = 'lct';
+      }
+
       final Map<String, dynamic> dadosAtualizados = {
         'referencia': _referenciaController.text.trim(),
         'capacidade': capacidadeTexto.replaceAll('.', ''),
         'lastro': lastroValor,
         'status': _statusSelecionado,
         'id_produto': _produtoSelecionado,
+        'tipo_abastecimento': tipoAbastecimento.isEmpty ? null : tipoAbastecimento,
         'terminal_id': idTerminal,
       };
 
@@ -1512,6 +1519,47 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                                 },
                               ),
                             ),
+                            SizedBox(
+                              width: fieldWidth,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Tipo de abastecimento:',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: _ink,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Checkbox(
+                                        value: _exaSelecionado,
+                                        activeColor: _accent,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _exaSelecionado = value ?? false;
+                                          });
+                                        },
+                                      ),
+                                      const Text('EXA', style: TextStyle(color: _ink)),
+                                      const SizedBox(width: 20),
+                                      Checkbox(
+                                        value: _lctSelecionado,
+                                        activeColor: _accent,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _lctSelecionado = value ?? false;
+                                          });
+                                        },
+                                      ),
+                                      const Text('LCT', style: TextStyle(color: _ink)),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 24),
@@ -1618,13 +1666,26 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                   ),
                   const SizedBox(width: 16),
                   Expanded(
-                    child: _buildCardAcao(
-                      icon: Icons.analytics,
-                      titulo: 'CACL Movimentação',
-                      descricao: 'Emitir CACL Movimentação',
-                      onTap: _abrirCACL,
-                      enabled: _terminalEmiteCacl,
-                      tooltip: 'Disponível apenas para apuração de bombeios.',
+                    child: Builder(
+                      builder: (context) {
+                        final tanqueAtual = tanques.firstWhere(
+                          (t) => t['id'] == _tanqueSelecionadoParaAcoes!['id'],
+                          orElse: () => _tanqueSelecionadoParaAcoes!,
+                        );
+                        final tipo = tanqueAtual['tipo_abastecimento']?.toString() ?? '';
+                        final disponivelParaTipo = tipo == 'all' || tipo == 'exa';
+                        
+                        return _buildCardAcao(
+                          icon: Icons.analytics,
+                          titulo: 'CACL Movimentação',
+                          descricao: 'Emitir CACL Movimentação',
+                          onTap: _abrirCACL,
+                          enabled: disponivelParaTipo,
+                          tooltip: !disponivelParaTipo 
+                              ? 'Disponível apenas para tanques com tipo EXA.' 
+                              : null,
+                        );
+                      }
                     ),
                   ),
                   const SizedBox(width: 16),

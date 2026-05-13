@@ -631,7 +631,7 @@ class _HomePageState extends State<HomePage>
       },
       {
         'id': 'ebd85bc2-3334-4078-a22a-3458fbdad8f1',
-        'icon': Icons.add_chart,
+        'icon': Icons.style,
         'label': 'Controle de Aditivos',
         'descricao': 'Gestão e monitoramento de aditivos',
         'tipo': 'controle_aditivo',

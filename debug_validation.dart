@@ -1,5 +1,4 @@
 
-import 'package:flutter/material.dart';
 
 void main() {
   // Simulação dos dados que o usuário descreveu
