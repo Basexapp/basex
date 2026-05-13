@@ -1,7 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:printing/printing.dart';
-import '../circuito/ordem_carregamento.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
+import 'dart:convert' show base64Encode;
+import 'dart:js' as js;
+import 'ordem_carregamento_venda_pdf.dart';
 import 'nova_venda.dart';
 import 'dialog_venda_total.dart';
 import 'dart:async';
@@ -105,6 +109,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
               codigo
             ),
             ordens:ordem_id (
+              id,
+              n_controle,
               veic_parcial,
               status_term_orig
             )
@@ -784,11 +790,17 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
 
   Future<void> _visualizarOrdem(Map<String, dynamic> movimentacao) async {
     try {
-      final pdf = await OrdemCarregamentoPdf.gerar(dados: movimentacao);
-      await Printing.layoutPdf(
-        onLayout: (format) async => pdf.save(),
-        name: 'Ordem_Carregamento_${movimentacao['ordem_id'] ?? 'venda'}.pdf',
-      );
+      final pdf = await OrdemCarregamentoVendaPDF.gerar(dados: movimentacao);
+      final pdfBytes = await pdf.save();
+
+      if (kIsWeb) {
+        await _downloadForWeb(pdfBytes, movimentacao['ordem_id']?.toString() ?? 'venda');
+      } else {
+        await Printing.layoutPdf(
+          onLayout: (format) async => pdfBytes,
+          name: 'Ordem_Carregamento_${movimentacao['ordem_id'] ?? 'venda'}.pdf',
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -798,6 +810,42 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _downloadForWeb(Uint8List bytes, String ordemId) async {
+    try {
+      final base64 = base64Encode(bytes);
+      final content = base64;
+      
+      js.context.callMethod('eval', [
+        """
+        (function() {
+          var base64Data = '$content';
+          var byteCharacters = atob(base64Data);
+          var byteNumbers = new Array(byteCharacters.length);
+          for (var i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          var byteArray = new Uint8Array(byteNumbers);
+          var blob = new Blob([byteArray], {type: 'application/pdf'});
+          var url = URL.createObjectURL(blob);
+          
+          var win = window.open();
+          if (win) {
+            win.location.href = url;
+          } else {
+            // Fallback se o popup for bloqueado
+            var link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.click();
+          }
+        })();
+        """
+      ]);
+    } catch (e) {
+      debugPrint('Erro no download web: $e');
     }
   }
 

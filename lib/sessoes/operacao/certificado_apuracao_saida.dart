@@ -2583,6 +2583,19 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       final agoraSaoPaulo =
           agoraUtc.subtract(const Duration(hours: 3));
 
+      // Buscar ordem_id da movimentação
+      String? ordemId;
+      try {
+        final movRef = await supabase
+            .from('movimentacoes')
+            .select('ordem_id')
+            .eq('id', widget.idMovimentacao!)
+            .maybeSingle();
+        ordemId = movRef?['ordem_id']?.toString();
+      } catch (e) {
+        print('Erro ao buscar ordem_id: $e');
+      }
+
       final dadosOrdem = {
         'data_criacao': agoraSaoPaulo.toIso8601String(),
         'transportadora': campos['transportadora']!.text,
@@ -2613,6 +2626,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         'movimentacao_id': widget.idMovimentacao,
         'tipo_analise': 'origem',
         'terminal_id': terminalIdEfetivo,
+        'ordem_id': ordemId,
       };
 
       final response = await supabase

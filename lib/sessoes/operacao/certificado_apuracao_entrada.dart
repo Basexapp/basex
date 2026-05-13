@@ -2153,6 +2153,21 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
       final produtoId = await _resolverProdutoId(produtoSelecionado!);
 
+      // Buscar ordem_id da movimentação
+      String? ordemId;
+      try {
+        if (widget.idMovimentacao != null) {
+          final movRef = await supabase
+              .from('movimentacoes')
+              .select('ordem_id')
+              .eq('id', widget.idMovimentacao!)
+              .maybeSingle();
+          ordemId = movRef?['ordem_id']?.toString();
+        }
+      } catch (e) {
+        print('Erro ao buscar ordem_id: $e');
+      }
+
       final dadosOrdem = {
         
         'transportadora': campos['transportadora']!.text,
@@ -2177,6 +2192,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         'movimentacao_id': widget.idMovimentacao,
         'tipo_analise': 'destino',
         'terminal_id': terminalIdEfetivo,
+        'ordem_id': ordemId,
       };
 
       final response = await supabase

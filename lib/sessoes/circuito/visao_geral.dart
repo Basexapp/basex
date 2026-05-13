@@ -316,7 +316,41 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     }
   }
 
-  void _mostrarDetalhesVeiculo(_Veiculo v) {
+  Future<bool> _verificarCertificadoEmitido(_Veiculo v) async {
+    try {
+      final isSaida = v.terminalIdOrig == _usuarioTerminalId;
+      final tipoBusca = isSaida ? 'origem' : 'destino';
+
+      final response = await _supabase
+          .from('movimentacoes')
+          .select('id')
+          .eq('ordem_id', v.ordemId)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) return false;
+      final movimentacaoId = response['id']?.toString();
+      if (movimentacaoId == null) return false;
+
+      final analises = await _supabase
+          .from('ordens_analises')
+          .select('id')
+          .eq('movimentacao_id', movimentacaoId)
+          .eq('tipo_analise', tipoBusca)
+          .limit(1);
+
+      return (analises as List).isNotEmpty;
+    } catch (e) {
+      debugPrint('Erro ao verificar certificado: $e');
+      return false;
+    }
+  }
+
+  void _mostrarDetalhesVeiculo(_Veiculo v) async {
+    final bool certificadoEmitido = await _verificarCertificadoEmitido(v);
+
+    if (!mounted) return;
+
     String dataFormatada = v.dataCriacao;
     try {
       final data = DateTime.parse(v.dataCriacao);
@@ -518,13 +552,21 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   height: 40,
                   child: ElevatedButton.icon(
                     onPressed: () => _abrirCertificadoApuracao(v),
-                    icon: const Icon(Icons.description_outlined, size: 18),
-                    label: const Text(
-                      'CERTIFICADO DE APURAÇÃO',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    icon: Icon(
+                      certificadoEmitido
+                          ? Icons.check_circle_outline
+                          : Icons.description_outlined,
+                      size: 18,
+                    ),
+                    label: Text(
+                      certificadoEmitido
+                          ? 'CERTIFICADO EMITIDO'
+                          : 'EMITIR CERTIFICADO DE APURAÇÃO',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey,
+                      backgroundColor:
+                          certificadoEmitido ? Colors.green : Colors.blueGrey,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -532,12 +574,38 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     ),
                   ),
                 ),
+                if (certificadoEmitido) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // Ação de liberar futuramente
+                      },
+                      icon: const Icon(Icons.local_shipping_outlined, size: 18),
+                      label: const Text(
+                        'LIBERAR VEÍCULO',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 40,
                   child: OutlinedButton.icon(
-                    onPressed: () => _confirmarCancelamentoOperacao(v),
+                    onPressed: certificadoEmitido
+                        ? null
+                        : () => _confirmarCancelamentoOperacao(v),
                     icon: const Icon(Icons.cancel_outlined, size: 18),
                     label: const Text(
                       'CANCELAR OPERAÇÃO',
@@ -545,7 +613,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red.shade800,
-                      side: BorderSide(color: Colors.red.shade800),
+                      disabledForegroundColor: Colors.grey.shade400,
+                      side: BorderSide(
+                        color: certificadoEmitido
+                            ? Colors.grey.shade400
+                            : Colors.red.shade800,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -1294,7 +1367,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         children: [
           _buildCabecalhoColunaWidget(coluna, veiculos.length),
           Expanded(
-            child: _buildGridVeiculos(veiculos, coluna, borderColor, false),
+            child: _buildGridVeiculos(
+              veiculos,
+              coluna,
+              borderColor,
+              colunaIndex == 2, // 1 por linha se for "Em Operação"
+            ),
           ),
         ],
       ),
@@ -1380,7 +1458,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   'DESCARGA',
                   style: TextStyle(
                     color: !_mostrarFilaCarga
-                        ? const Color(0xFFD81B60)
+                        ? const Color(0xFF00ACC1)
                         : Colors.grey,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
@@ -1395,12 +1473,12 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     child: Switch(
                       value: _mostrarFilaCarga,
                       activeTrackColor: const Color(
-                        0xFF00ACC1,
-                      ).withValues(alpha: 0.3),
-                      activeThumbColor: const Color(0xFF00ACC1),
-                      inactiveThumbColor: const Color(0xFFD81B60),
-                      inactiveTrackColor: const Color(
                         0xFFD81B60,
+                      ).withValues(alpha: 0.3),
+                      activeThumbColor: const Color(0xFFD81B60),
+                      inactiveThumbColor: const Color(0xFF00ACC1),
+                      inactiveTrackColor: const Color(
+                        0xFF00ACC1,
                       ).withValues(alpha: 0.3),
                       trackOutlineColor: WidgetStateProperty.all(
                         Colors.transparent,
@@ -1415,7 +1493,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   'CARGA',
                   style: TextStyle(
                     color: _mostrarFilaCarga
-                        ? const Color(0xFF00ACC1)
+                        ? const Color(0xFFD81B60)
                         : Colors.grey,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
@@ -1578,29 +1656,32 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   children: [
                     Row(
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: tagBgColor,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 28,
-                              minHeight: 28,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              '$indexInFilaº',
-                              style: TextStyle(
-                                color: tagTextColor,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
+                        if (v.statusAtual == '2')
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: tagBgColor,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 28,
+                                minHeight: 28,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '$indexInFilaº',
+                                style: TextStyle(
+                                  color: tagTextColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
-                          ),
-                        ),
+                          )
+                        else
+                          const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -1663,6 +1744,43 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                                             : Colors.black54,
                                         fontSize: 10,
                                         fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 1,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (v.terminalIdOrig ==
+                                              _usuarioTerminalId)
+                                          ? const Color(0xFFD81B60)
+                                              .withValues(alpha: 0.15)
+                                          : const Color(0xFF00ACC1)
+                                              .withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: (v.terminalIdOrig ==
+                                                _usuarioTerminalId)
+                                            ? const Color(0xFFD81B60)
+                                                .withValues(alpha: 0.3)
+                                            : const Color(0xFF00ACC1)
+                                                .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      (v.terminalIdOrig == _usuarioTerminalId)
+                                          ? 'SAÍDA'
+                                          : 'ENTRADA',
+                                      style: TextStyle(
+                                        color: (v.terminalIdOrig ==
+                                                _usuarioTerminalId)
+                                            ? const Color(0xFFD81B60)
+                                            : const Color(0xFF00ACC1),
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   ),
