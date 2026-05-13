@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
+import '../operacao/certificado_apuracao_saida.dart';
+import '../operacao/certificado_apuracao_entrada.dart';
 
 /// Flight-controller-style dashboard for the Circuito session.
 /// Shows every vehicle as a tiny chip organised in 4 stage columns.
@@ -509,11 +511,13 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 ),
                 const SizedBox(height: 12),
               ] else if (v.statusAtual == '3') ...[
+                if (v.terminalIdOrig == _usuarioTerminalId)
+                  _buildTimelineStatus(v),
                 SizedBox(
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: null,
+                    onPressed: () => _abrirCertificadoApuracao(v),
                     icon: const Icon(Icons.description_outlined, size: 18),
                     label: const Text(
                       'CERTIFICADO DE APURAÇÃO',
@@ -521,8 +525,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueGrey,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      disabledForegroundColor: Colors.grey.shade500,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -578,6 +581,135 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         ),
       ),
     );
+  }
+
+  void _abrirCertificadoApuracao(_Veiculo v) async {
+    try {
+      final isSaida = v.terminalIdOrig == _usuarioTerminalId;
+
+      if (isSaida) {
+        // FLUXO DE SAÍDA: certificado_apuracao_saida
+        final response = await _supabase
+            .from('movimentacoes')
+            .select(
+                'id, produtos!produto_id(id, nome, nome_dois), saida_amb, saida_vinte')
+            .eq('ordem_id', v.ordemId)
+            .order('id', ascending: true);
+
+        final List<dynamic> movimentacoes = response as List<dynamic>;
+        if (movimentacoes.isEmpty) return;
+
+        final List<Map<String, dynamic>> tanquesDaOrdem = [];
+        for (var mov in movimentacoes) {
+          final produtoNome = mov['produtos']?['nome_dois']?.toString() ??
+              mov['produtos']?['nome']?.toString() ??
+              'Produto não identificado';
+          final produtoId = mov['produtos']?['id']?.toString();
+          tanquesDaOrdem.add({
+            'movimentacao_id': mov['id']?.toString(),
+            'produto_nome': produtoNome,
+            'produto_id': produtoId,
+            'saida_amb': mov['saida_amb'],
+            'saida_vinte': mov['saida_vinte'],
+          });
+        }
+
+        final movimentacaoId = movimentacoes.first['id']?.toString();
+        if (movimentacaoId == null) return;
+
+        final analises = await _supabase
+            .from('ordens_analises')
+            .select('id, tipo_analise')
+            .eq('movimentacao_id', movimentacaoId)
+            .eq('tipo_analise', 'origem');
+
+        bool modoSomenteVisualizacao = false;
+        String? idAnaliseExistente;
+
+        for (var analise in analises) {
+          final tipoAnalise =
+              analise['tipo_analise']?.toString().toLowerCase() ?? '';
+          if (tipoAnalise.contains('origem')) {
+            modoSomenteVisualizacao = true;
+            idAnaliseExistente = analise['id']?.toString();
+            break;
+          }
+        }
+
+        if (!mounted) return;
+        Navigator.pop(context);
+
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EmitirCertificadoPage(
+              idCertificado: idAnaliseExistente,
+              idMovimentacao: movimentacaoId,
+              tanquesDaOrdem: tanquesDaOrdem,
+              terminalId: v.terminalIdOrig,
+              tipoOp: v.tipoOp,
+              onVoltar: () {
+                Navigator.of(context).pop(true);
+              },
+              modoSomenteVisualizacao: modoSomenteVisualizacao,
+            ),
+          ),
+        );
+      } else {
+        // FLUXO DE ENTRADA: certificado_apuracao_entrada
+        final response = await _supabase
+            .from('movimentacoes')
+            .select('id')
+            .eq('ordem_id', v.ordemId)
+            .limit(1)
+            .maybeSingle();
+
+        if (response == null) return;
+        final movimentacaoId = response['id']?.toString();
+        if (movimentacaoId == null) return;
+
+        // Verifica se existe análise com "destino"
+        final analises = await _supabase
+            .from('ordens_analises')
+            .select('id, tipo_analise')
+            .eq('movimentacao_id', movimentacaoId)
+            .eq('tipo_analise', 'destino');
+
+        bool modoSomenteVisualizacao = false;
+        String? idAnaliseExistente;
+
+        for (var analise in analises) {
+          final tipoAnalise =
+              analise['tipo_analise']?.toString().toLowerCase() ?? '';
+          if (tipoAnalise.contains('destino')) {
+            modoSomenteVisualizacao = true;
+            idAnaliseExistente = analise['id']?.toString();
+            break;
+          }
+        }
+
+        if (!mounted) return;
+        Navigator.pop(context);
+
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EmitirCertificadoEntrada(
+              onVoltar: () {
+                Navigator.of(context).pop(true);
+              },
+              terminalId: v.terminalIdDest ?? '',
+              dataFiltro: DateFormat('dd/MM/yyyy').format(DateTime.now()),
+              idMovimentacao: movimentacaoId,
+              modoSomenteVisualizacao: modoSomenteVisualizacao,
+              idAnaliseExistente: idAnaliseExistente,
+            ),
+          ),
+        );
+      }
+
+      _carregarDados();
+    } catch (e) {
+      debugPrint('Erro ao abrir certificado: $e');
+    }
   }
 
   void _confirmarCancelamentoOperacao(_Veiculo v) {
@@ -662,6 +794,78 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTimelineStatus(_Veiculo v) {
+    bool isVenda = v.tipoOp.toLowerCase() == 'venda';
+    // Se isVenda: NF -> Carregamento
+    // Se !isVenda (transf): Carregamento -> NF
+
+    String etapa1Label = isVenda ? 'NF emitida' : 'CARREGAMENTO';
+    String etapa2Label = isVenda ? 'CARREGAMENTO' : 'NF emitida';
+
+    // Para fins de visualização, como o statusAtual é '3' (Em Operação),
+    // vamos assumir que a primeira etapa está ocorrendo ou concluída, 
+    // e a segunda ainda vai ocorrer.
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 8.0),
+          child: Text(
+            'STATUS DA OPERAÇÃO',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+              color: Color(0xFF455A64),
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            _buildTimelineStep(etapa1Label, true, true),
+            Container(
+              width: 40,
+              height: 2,
+              color: Colors.grey.shade300,
+            ),
+            _buildTimelineStep(etapa2Label, false, false),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildTimelineStep(String label, bool isCurrent, bool isCompleted) {
+    return Column(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: isCompleted ? Colors.green : (isCurrent ? Colors.blue : Colors.grey.shade300),
+            shape: BoxShape.circle,
+            border: isCurrent ? Border.all(color: Colors.blue.shade800, width: 2) : null,
+          ),
+          child: Icon(
+            isCompleted ? Icons.check : (isCurrent ? Icons.play_arrow : Icons.schedule),
+            size: 14,
+            color: isCompleted || isCurrent ? Colors.white : Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+            color: isCurrent ? Colors.blue.shade900 : Colors.grey.shade600,
+          ),
+        ),
+      ],
     );
   }
 
