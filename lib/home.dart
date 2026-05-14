@@ -2506,6 +2506,7 @@ class _HomePageState extends State<HomePage>
             required DateTime dataFinal,
             required String produtoId,
             required String produtoNome,
+            required String tipoRelatorio,
           }) {
             Navigator.push(
               context,
@@ -2519,6 +2520,7 @@ class _HomePageState extends State<HomePage>
                   dataFinal: dataFinal,
                   produtoId: produtoId,
                   produtoNome: produtoNome,
+                  tipoRelatorio: tipoRelatorio,
                 ),
               ),
             );

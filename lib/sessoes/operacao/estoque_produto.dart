@@ -11,6 +11,7 @@ class EstoqueProdutoPage extends StatefulWidget {
   final DateTime dataFinal;
   final String produtoId;
   final String produtoNome;
+  final String tipoRelatorio;
 
   const EstoqueProdutoPage({
     super.key,
@@ -22,6 +23,7 @@ class EstoqueProdutoPage extends StatefulWidget {
     required this.dataFinal,
     required this.produtoId,
     required this.produtoNome,
+    required this.tipoRelatorio,
   });
 
   @override
@@ -205,8 +207,51 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
           .gte('data_mov', dataInicio)
           .lte('data_mov', dataFim);
 
-      final List<Map<String, dynamic>> listaOrdenadaParaUI =
+      List<Map<String, dynamic>> registrosBrutos =
           List<Map<String, dynamic>>.from(dados);
+
+      // Aplicar agrupamento se for Sintético
+      if (widget.tipoRelatorio == 'sintetico') {
+        final Map<String, Map<String, dynamic>> agrupados = {};
+
+        for (var reg in registrosBrutos) {
+          final dtStr = reg['data_mov']?.toString() ?? '';
+          if (dtStr.isEmpty) continue;
+          
+          // Tratar formatos como "2026-03-11T16:17:00.068 00:00:00" ou ISO puro
+          final dataLimpa = dtStr.split(' ')[0]; // Pega a primeira parte se houver espaço
+          final dataApenas = dataLimpa.contains('T') 
+              ? dataLimpa.split('T')[0] 
+              : dataLimpa; // yyyy-MM-dd
+
+          if (!agrupados.containsKey(dataApenas)) {
+            agrupados[dataApenas] = {
+              'id': 'agrupado_$dataApenas',
+              'movimentacao_id': null,
+              'data_mov': '${dataApenas}T00:00:00',
+              'cliente': 'MOVIMENTAÇÕES DO DIA',
+              'descricao': '',
+              'entrada_amb': 0.0,
+              'entrada_vinte': 0.0,
+              'saida_amb': 0.0,
+              'saida_vinte': 0.0,
+            };
+          }
+
+          final a = agrupados[dataApenas]!;
+          a['entrada_amb'] =
+              (a['entrada_amb'] as num) + (reg['entrada_amb'] ?? 0);
+          a['entrada_vinte'] =
+              (a['entrada_vinte'] as num) + (reg['entrada_vinte'] ?? 0);
+          a['saida_amb'] = (a['saida_amb'] as num) + (reg['saida_amb'] ?? 0);
+          a['saida_vinte'] =
+              (a['saida_vinte'] as num) + (reg['saida_vinte'] ?? 0);
+        }
+
+        registrosBrutos = agrupados.values.toList();
+      }
+
+      final List<Map<String, dynamic>> listaOrdenadaParaUI = registrosBrutos;
 
       listaOrdenadaParaUI.sort((a, b) {
         final da = DateTime.parse(a['data_mov']);

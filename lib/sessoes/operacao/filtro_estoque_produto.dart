@@ -17,6 +17,7 @@ class FiltroEstoqueProdutoPage extends StatefulWidget {
     required DateTime dataFinal,
     required String produtoId,
     required String produtoNome,
+    required String tipoRelatorio,
   })
   onConsultarEstoqueProduto;
   final VoidCallback onVoltar;
@@ -41,6 +42,7 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
   final SupabaseClient _supabase = Supabase.instance.client;
   DateTime _dataInicial = DateTime.now();
   DateTime _dataFinal = DateTime.now();
+  String _tipoRelatorio = 'sintetico';
   String? _produtoSelecionadoId;
   String? _produtoSelecionadoNome;
   String? _filialSelecionadaId;
@@ -910,6 +912,7 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
       dataFinal: _dataFinal,
       produtoId: _produtoSelecionadoId!,
       produtoNome: _produtoSelecionadoNome!,
+      tipoRelatorio: _tipoRelatorio,
     );
   }
 
@@ -918,6 +921,7 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
     setState(() {
       _dataInicial = agora;
       _dataFinal = agora;
+      _tipoRelatorio = 'sintetico';
       _produtoSelecionadoId = '';
       _produtoSelecionadoNome = null;
 
@@ -1193,6 +1197,70 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
                               Icons.calendar_today,
                               color: Colors.grey.shade600,
                               size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              // 6 - Campo Tipo de Relatório
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Tipo de relatório',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(
+                          color: Colors.grey.shade400,
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _tipoRelatorio,
+                          isExpanded: true,
+                          itemHeight: 50,
+                          icon: const Icon(Icons.arrow_drop_down, size: 20),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Colors.black,
+                          ),
+                          onChanged: (String? novoValor) {
+                            setState(() {
+                              _tipoRelatorio = novoValor!;
+                            });
+                          },
+                          items: const [
+                            DropdownMenuItem<String>(
+                              value: 'sintetico',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 12),
+                                child: Text('Sintético'),
+                              ),
+                            ),
+                            DropdownMenuItem<String>(
+                              value: 'analitico',
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 12),
+                                child: Text('Analítico'),
+                              ),
                             ),
                           ],
                         ),
@@ -1610,6 +1678,11 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
                         orElse: () => {'id': '', 'nome': 'Não selecionado'},
                       )['nome']!
                     : 'Não selecionado',
+              ),
+              _buildItemResumo(
+                icon: Icons.assessment,
+                label: 'Tipo de relatório',
+                value: _tipoRelatorio == 'sintetico' ? 'Sintético' : 'Analítico',
               ),
             ],
           ),

@@ -961,11 +961,11 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
                               horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
                             color: selecionado
-                                ? const Color(0xFF0D47A1).withOpacity(0.1)
+                                ? Colors.green.withOpacity(0.1)
                                 : Colors.white,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: const Color(0xFF0D47A1),
+                              color: selecionado ? Colors.green.shade700 : const Color(0xFF0D47A1),
                               width: selecionado ? 1.5 : 0.8,
                             ),
                           ),
@@ -977,7 +977,7 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
                                 fontWeight: selecionado
                                     ? FontWeight.bold
                                     : FontWeight.w500,
-                                color: const Color(0xFF0D47A1),
+                                color: selecionado ? Colors.green.shade700 : const Color(0xFF0D47A1),
                               ),
                             ),
                           ),
@@ -995,6 +995,98 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
             // FILTROS DE DATA
             Row(
               children: [
+                // Botão Hoje
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () async {
+                      final hoje = DateTime.now();
+                      setState(() {
+                        _dataInicial = hoje;
+                        _dataFinal = hoje;
+                      });
+                      await _carregarProdutosDoTerminal();
+                    },
+                    child: Builder(
+                      builder: (context) {
+                        final hoje = DateTime.now();
+                        final isHoje = DateUtils.isSameDay(_dataInicial, hoje) && 
+                                      DateUtils.isSameDay(_dataFinal, hoje);
+                        
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isHoje ? Colors.green.withOpacity(0.1) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isHoje ? Colors.green.shade700 : const Color(0xFF0D47A1), 
+                              width: isHoje ? 1.5 : 0.8
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Hoje',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isHoje ? FontWeight.bold : FontWeight.w600,
+                                color: isHoje ? Colors.green.shade700 : const Color(0xFF0D47A1),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Botão Ontem
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () async {
+                      final ontem = DateTime.now().subtract(const Duration(days: 1));
+                      setState(() {
+                        _dataInicial = ontem;
+                        _dataFinal = ontem;
+                      });
+                      await _carregarProdutosDoTerminal();
+                    },
+                    child: Builder(
+                      builder: (context) {
+                        final ontem = DateTime.now().subtract(const Duration(days: 1));
+                        final isOntem = DateUtils.isSameDay(_dataInicial, ontem) && 
+                                       DateUtils.isSameDay(_dataFinal, ontem);
+                        
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isOntem ? Colors.green.withOpacity(0.1) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isOntem ? Colors.green.shade700 : const Color(0xFF0D47A1), 
+                              width: isOntem ? 1.5 : 0.8
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Ontem',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isOntem ? FontWeight.bold : FontWeight.w600,
+                                color: isOntem ? Colors.green.shade700 : const Color(0xFF0D47A1),
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 _buildCampoData(
                   label: 'Data Inicial',
                   data: _dataInicial,
@@ -1056,13 +1148,17 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
                         _mostrarTransito = !_mostrarTransito;
                       });
                     },
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       height: 36,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
-                        color: _mostrarTransito ? const Color(0xFF0D47A1) : Colors.white,
+                        color: _mostrarTransito ? Colors.green.withOpacity(0.1) : Colors.white,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF0D47A1), width: 0.8),
+                        border: Border.all(
+                          color: _mostrarTransito ? Colors.green.shade700 : const Color(0xFF0D47A1),
+                          width: _mostrarTransito ? 1.5 : 0.8,
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1070,15 +1166,15 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
                           Icon(
                             Icons.local_shipping_outlined,
                             size: 16,
-                            color: _mostrarTransito ? Colors.white : const Color(0xFF0D47A1),
+                            color: _mostrarTransito ? Colors.green.shade700 : const Color(0xFF0D47A1),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             'Em Trânsito',
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _mostrarTransito ? Colors.white : const Color(0xFF0D47A1),
+                              fontWeight: _mostrarTransito ? FontWeight.bold : FontWeight.w600,
+                              color: _mostrarTransito ? Colors.green.shade700 : const Color(0xFF0D47A1),
                             ),
                           ),
                         ],
