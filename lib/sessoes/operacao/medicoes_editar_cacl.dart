@@ -94,6 +94,28 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
     }
   }
   
+  String _formatarCapacidade(dynamic valor) {
+    if (valor == null) return '0 L';
+    String str = valor.toString().replaceAll(RegExp(r'[^\d]'), '');
+    if (str.isEmpty) return '0 L';
+    
+    int numero = int.tryParse(str) ?? 0;
+    String formatado = numero.toString();
+    
+    if (formatado.length > 3) {
+      final buffer = StringBuffer();
+      for (int i = 0; i < formatado.length; i++) {
+        if (i > 0 && (formatado.length - i) % 3 == 0) {
+          buffer.write('.');
+        }
+        buffer.write(formatado[i]);
+      }
+      formatado = buffer.toString();
+    }
+    
+    return '$formatado L';
+  }
+
   Future<void> _carregarDadosCacl() async {
     setState(() {
       _carregando = true;
@@ -141,7 +163,7 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
         _tanqueInfo = {
           'numero': tanque['referencia']?.toString() ?? '',
           'produto': tanque['produtos']?['nome']?.toString() ?? cacl['produto']?.toString() ?? '',
-          'capacidade': '${tanque['capacidade']?.toString() ?? '0'} L',
+          'capacidade': _formatarCapacidade(tanque['capacidade']),
         };
         
         // ✅ Capturar referência do tanque
@@ -166,7 +188,7 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
             _tanqueInfo = {
               'numero': tanqueInfo['referencia']?.toString() ?? '',
               'produto': tanqueInfo['produtos']?['nome']?.toString() ?? cacl['produto']?.toString() ?? '',
-              'capacidade': '${tanqueInfo['capacidade']?.toString() ?? '0'} L',
+              'capacidade': _formatarCapacidade(tanqueInfo['capacidade']),
             };
             
             // ✅ Capturar referência do tanque

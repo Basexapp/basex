@@ -1660,7 +1660,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                     child: _buildCardAcao(
                       icon: Icons.inventory_2,
                       titulo: 'Movimentação do tanque',
-                      descricao: 'Consultar movimentação do tanque',
+                      descricao: 'Consultar movimentação',
                       onTap: _abrirEstoqueTanque,
                     ),
                   ),
@@ -1702,19 +1702,19 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildCardAcao(
-                      icon: Icons.edit,
-                      titulo: 'Editar Tanque',
-                      descricao: 'Atualizar dados do tanque',
-                      onTap: _abrirEdicaoTanque,
+                      icon: Icons.add_chart,
+                      titulo: 'Entrada/Saída manual',
+                      descricao: 'Registrar entrada ou saída manual',
+                      onTap: _showDialogMovimentacaoAvulsa,
                     ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: _buildCardAcao(
-                      icon: Icons.add_chart,
-                      titulo: 'Lançar movimentação avulsa',
-                      descricao: 'Registrar entrada ou saída manual',
-                      onTap: _showDialogMovimentacaoAvulsa,
+                      icon: Icons.settings,
+                      titulo: 'Ajustes',
+                      descricao: 'Atualizar dados do tanque',
+                      onTap: _abrirEdicaoTanque,
                     ),
                   ),
                 ],
