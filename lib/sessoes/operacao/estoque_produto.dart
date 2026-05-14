@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'cacl_mov_visualiz.dart';
 import '../../login_page.dart';
 
 class EstoqueProdutoPage extends StatefulWidget {
@@ -183,7 +184,7 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
           '${fim.year}-${fim.month.toString().padLeft(2, '0')}-${fim.day.toString().padLeft(2, '0')} 23:59:59';
 
       // Buscar movimentações do produto no terminal
-      final dados = await _supabase
+      final dadosMov = await _supabase
           .from('movimentacoes_tanque')
           .select('''
             id,
@@ -207,8 +208,56 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
           .gte('data_mov', dataInicio)
           .lte('data_mov', dataFim);
 
-      List<Map<String, dynamic>> registrosBrutos =
-          List<Map<String, dynamic>>.from(dados);
+      // Buscar CACLS do tipo 'movimentacao'
+      final dadosCacl = await _supabase
+          .from('cacl')
+          .select('''
+            id,
+            data,
+            horario_inicial,
+            produto,
+            entrada_saida_ambiente,
+            entrada_saida_20,
+            tipo,
+            numero_controle,
+            tanques!inner (
+              id_produto,
+              terminais!inner (
+                id
+              )
+            )
+          ''')
+          .eq('tipo', 'movimentacao')
+          .eq('tanques.id_produto', widget.produtoId)
+          .eq('tanques.terminais.id', terminalId)
+          .gte('data', dataInicio.split(' ')[0])
+          .lte('data', dataFim.split(' ')[0]);
+
+      List<Map<String, dynamic>> registrosBrutos = [];
+
+      // Adicionar movimentações normais
+      for (var m in (dadosMov as List)) {
+        registrosBrutos.add(Map<String, dynamic>.from(m));
+      }
+
+      // Adicionar CACLS de movimentação como entradas
+      for (var c in (dadosCacl as List)) {
+        final volume20 = (c['entrada_saida_20'] ?? 0) as num;
+        final volumeAmb = (c['entrada_saida_ambiente'] ?? 0) as num;
+        final nControle = c['numero_controle']?.toString() ?? c['id'].toString().substring(0, 8);
+        
+        registrosBrutos.add({
+          'id': c['id'],
+          'movimentacao_id': null,
+          'data_mov': c['horario_inicial'] ?? '${c['data']}T00:00:00',
+          'cliente': 'CACL Mov. $nControle',
+          'descricao': 'CACL Mov. $nControle',
+          'entrada_amb': volumeAmb,
+          'entrada_vinte': volume20,
+          'saida_amb': 0,
+          'saida_vinte': 0,
+        });
+      }
 
       // Aplicar agrupamento se for Sintético
       if (widget.tipoRelatorio == 'sintetico') {
@@ -680,13 +729,24 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
               }
 
               final e = _movsOrdenadas[i - 1];
+              final isCacl = e['id'] != null && e['movimentacao_id'] == null && (e['descricao'] ?? '').toString().startsWith('CACL');
+              
               return Container(
                 height: _hRow,
                 color: (i - 1) % 2 == 0 ? Colors.grey.shade50 : Colors.white,
                 child: Row(
                   children: [
                     _cell(_fmtData(e['data_mov']), _wData),
-                    _cell(e['descricao'] ?? '-', _wDesc),
+                    isCacl 
+                      ? _clickableCell(e['descricao'] ?? '-', _wDesc, () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CaclMovVisualizPage(caclId: e['id']),
+                            ),
+                          );
+                        })
+                      : _cell(e['descricao'] ?? '-', _wDesc),
                     _cell(_fmtNum(e['entrada_amb']), _wNum, bg: _bgEntrada()),
                     _cell(_fmtNum(e['entrada_vinte']), _wNum, bg: _bgEntrada()),
                     _cell(_fmtNum(e['saida_amb']), _wNum, bg: _bgSaida()),
@@ -757,6 +817,31 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
           fontSize: 12,
           color: cor ?? Colors.grey.shade700,
           fontWeight: fw,
+        ),
+      ),
+    );
+  }
+
+  Widget _clickableCell(String t, double w, VoidCallback onTap, {Color? bg, Color? cor, FontWeight? fw}) {
+    return SelectionContainer.disabled(
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: w,
+            alignment: Alignment.center,
+            color: bg,
+            child: Text(
+              t.isEmpty ? '-' : t,
+              style: TextStyle(
+                fontSize: 12,
+                color: cor ?? Colors.blue.shade700,
+                fontWeight: fw ?? FontWeight.bold,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
         ),
       ),
     );
