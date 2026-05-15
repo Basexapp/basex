@@ -1207,7 +1207,12 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                   child: _editando 
                       ? _buildFormularioEdicao()
                       : (_mostrandoMedicoes
-                          ? MedicoesPage(onVoltar: () => setState(() => _mostrandoMedicoes = false))
+                          ? MedicoesPage(
+                              onVoltar: () => setState(() => _mostrandoMedicoes = false),
+                              produtoNome: _tanqueSelecionadoParaAcoes != null 
+                                  ? _tanqueSelecionadoParaAcoes!['produto'] 
+                                  : null,
+                            )
                           : (_mostrandoCardsAcoes ? _buildCardsAcoesDoTanque() : _buildListaTanques())),
                 ),
               ],

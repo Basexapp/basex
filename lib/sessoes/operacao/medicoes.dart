@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 class MedicoesPage extends StatefulWidget {
   final VoidCallback onVoltar;
+  final String? produtoNome;
 
   const MedicoesPage({
     super.key,
     required this.onVoltar,
+    this.produtoNome,
   });
 
   @override
@@ -13,6 +15,8 @@ class MedicoesPage extends StatefulWidget {
 }
 
 class _MedicoesPageState extends State<MedicoesPage> {
+  int? _hoverIndex;
+
   // Dados fictícios para teste de layout
   final List<Map<String, dynamic>> _medicoesFicticias = [
     {
@@ -57,98 +61,125 @@ class _MedicoesPageState extends State<MedicoesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      body: Column(
-        children: [
-          // Cabeçalho similar ao HistoricoCaclPage
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF8F9FA),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
-                  onPressed: widget.onVoltar,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Medições',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF0D47A1),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 15.0),
+        child: Column(
+          children: [
+            // Cabeçalho similar ao HistoricoCaclPage
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(0, 8, 16, 8),
+              decoration: const BoxDecoration(
+                color: Color(0xFFF8F9FA),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
+                    onPressed: widget.onVoltar,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.produtoNome != null 
+                              ? 'Medições - ${widget.produtoNome}'
+                              : 'Medições',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0D47A1),
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Lista de todas as medições realizadas',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
+                        const Text(
+                          'Lista de todas as medições realizadas',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          const Divider(height: 1),
+            const Divider(height: 1),
 
-          // Cabeçalho da Tabela
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                _buildHeaderCell('Tanque', flex: 2),
-                _buildHeaderCell('Data', flex: 2),
-                _buildHeaderCell('Alt. cm', flex: 2),
-                _buildHeaderCell('Alt. mm', flex: 2),
-                _buildHeaderCell('Vol. Amb', flex: 3),
-                _buildHeaderCell('Temp. Tq', flex: 2),
-                _buildHeaderCell('Dens. Obs', flex: 2),
-                _buildHeaderCell('Temp. Am', flex: 2),
-                _buildHeaderCell('Vol. 20°C', flex: 3),
-                _buildHeaderCell('Massa', flex: 3),
-              ],
+            // Cabeçalho da Tabela
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Row(
+                children: [
+                  Container(width: 4), // Espaço para barra colorida
+                  const SizedBox(width: 12),
+                  _buildHeaderCell('Tanque', flex: 2),
+                  _buildHeaderCell('Data', flex: 2),
+                  _buildHeaderCell('Alt. cm', flex: 2),
+                  _buildHeaderCell('Alt. mm', flex: 2),
+                  _buildHeaderCell('Vol. Amb', flex: 3),
+                  _buildHeaderCell('Temp. Tq', flex: 2),
+                  _buildHeaderCell('Dens. Obs', flex: 2),
+                  _buildHeaderCell('Temp. Am', flex: 2),
+                  _buildHeaderCell('Vol. 20°C', flex: 3),
+                  _buildHeaderCell('Massa', flex: 3),
+                  const SizedBox(width: 24), // Espaço para o ícone
+                ],
+              ),
             ),
-          ),
 
-          const Divider(height: 1),
+            const Divider(height: 1),
 
-          // Lista de Medições
-          Expanded(
-            child: ListView.separated(
-              itemCount: _medicoesFicticias.length,
-              separatorBuilder: (context, index) => const Divider(height: 1),
-              itemBuilder: (context, index) {
-                final medicao = _medicoesFicticias[index];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      _buildDataCell(medicao['tanque'], flex: 2),
-                      _buildDataCell(medicao['data'], flex: 2),
-                      _buildDataCell(medicao['altura_cm'], flex: 2),
-                      _buildDataCell(medicao['altura_mm'], flex: 2),
-                      _buildDataCell(medicao['volume_amb'], flex: 3),
-                      _buildDataCell(medicao['temp_tanque'], flex: 2),
-                      _buildDataCell(medicao['densidade'], flex: 2),
-                      _buildDataCell(medicao['temp_amostra'], flex: 2),
-                      _buildDataCell(medicao['volume_20'], flex: 3),
-                      _buildDataCell(medicao['massa'], flex: 3),
-                    ],
-                  ),
-                );
-              },
+            // Lista de Medições
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                itemCount: _medicoesFicticias.length,
+                itemBuilder: (context, index) {
+                  final medicao = _medicoesFicticias[index];
+                  return MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    onEnter: (_) => setState(() => _hoverIndex = index),
+                    onExit: (_) => setState(() => _hoverIndex = null),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                      color: _hoverIndex == index 
+                          ? Colors.grey.shade200 
+                          : (index.isEven ? Colors.white : Colors.grey.shade50),
+                      child: Row(
+                        children: [
+                          // Indicador de status (decorativo)
+                          Container(
+                            width: 4,
+                            height: 24,
+                            color: const Color(0xFF0D47A1).withOpacity(0.5),
+                          ),
+                          const SizedBox(width: 12),
+                          
+                          _buildDataCell(medicao['tanque'], flex: 2),
+                          _buildDataCell(medicao['data'], flex: 2),
+                          _buildDataCell(medicao['altura_cm'], flex: 2),
+                          _buildDataCell(medicao['altura_mm'], flex: 2),
+                          _buildDataCell(medicao['volume_amb'], flex: 3),
+                          _buildDataCell(medicao['temp_tanque'], flex: 2),
+                          _buildDataCell(medicao['densidade'], flex: 2),
+                          _buildDataCell(medicao['temp_amostra'], flex: 2),
+                          _buildDataCell(medicao['volume_20'], flex: 3),
+                          _buildDataCell(medicao['massa'], flex: 3),
+                          
+                          const SizedBox(width: 24), // Espaço para manter alinhamento
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -176,8 +207,10 @@ class _MedicoesPageState extends State<MedicoesPage> {
         textAlign: TextAlign.center,
         style: const TextStyle(
           fontSize: 12,
+          fontWeight: FontWeight.w500,
           color: Colors.black87,
         ),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
