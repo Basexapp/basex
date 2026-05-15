@@ -10,6 +10,7 @@ class MedicaoTanquesPage extends StatefulWidget {
   final VoidCallback? onFinalizarCACL;
   final List<Map<String, dynamic>>? caclesHoje;
   final bool caclBloqueadoComoVerificacao;
+  final bool caclBloqueadoComoMovimentacao;
   final double? estoqueFinalCalculado20;
   final String? movimentacaoIdReferencia;
 
@@ -21,6 +22,7 @@ class MedicaoTanquesPage extends StatefulWidget {
     this.onFinalizarCACL,
     this.caclesHoje,
     this.caclBloqueadoComoVerificacao = false,
+    this.caclBloqueadoComoMovimentacao = false,
     this.estoqueFinalCalculado20,
     this.movimentacaoIdReferencia,
   });
@@ -69,6 +71,12 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
     if (widget.caclBloqueadoComoVerificacao) {
       _caclVerificacao = true;
       _caclMovimentacao = false;
+    }
+
+    // Se foi aberto via botão "CACL Movimentação", já vem como movimentação
+    if (widget.caclBloqueadoComoMovimentacao) {
+      _caclMovimentacao = true;
+      _caclVerificacao = false;
     }
     
     _carregarDadosDoUsuario();
@@ -748,9 +756,8 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
                                       children: [
                                         Checkbox(
                                           value: _caclVerificacao,
-                                          onChanged:
-                                              widget
-                                                  .caclBloqueadoComoVerificacao
+                                          onChanged: (widget.caclBloqueadoComoVerificacao ||
+                                                  widget.caclBloqueadoComoMovimentacao)
                                               ? null
                                               : (value) {
                                                   setState(() {
@@ -772,9 +779,8 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w500,
-                                            color:
-                                                widget
-                                                    .caclBloqueadoComoVerificacao
+                                            color: (widget.caclBloqueadoComoVerificacao ||
+                                                    widget.caclBloqueadoComoMovimentacao)
                                                 ? Colors.grey
                                                 : Colors.black,
                                           ),
@@ -788,8 +794,8 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
                                     children: [
                                       Checkbox(
                                         value: _caclMovimentacao,
-                                        onChanged:
-                                            widget.caclBloqueadoComoVerificacao
+                                        onChanged: (widget.caclBloqueadoComoVerificacao ||
+                                                widget.caclBloqueadoComoMovimentacao)
                                             ? null
                                             : (value) {
                                                 setState(() {
@@ -811,9 +817,8 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
                                         style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,
-                                          color:
-                                              widget
-                                                  .caclBloqueadoComoVerificacao
+                                          color: (widget.caclBloqueadoComoVerificacao ||
+                                                  widget.caclBloqueadoComoMovimentacao)
                                               ? Colors.grey
                                               : Colors.black,
                                         ),

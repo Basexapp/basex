@@ -8,6 +8,7 @@ import 'cacl_visualizacao.dart';
 import 'estoque_tanque_dia.dart';
 import 'estoque_tanque_mensal.dart';
 import 'medicoes_editar_cacl.dart';
+import 'medicoes.dart';
 
 class GerenciamentoTanquesPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -41,6 +42,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
   Map<String, dynamic>? _tanqueSelecionadoParaAcoes;
   String? _nomeTerminal;
   bool _carregandoCacls = false;
+  bool _mostrandoMedicoes = false;
   List<Map<String, dynamic>> _caclesTanque = [];
   int? _hoverCaclIndex;
 
@@ -740,6 +742,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         builder: (context) => MedicaoTanquesPage(
           onVoltar: () => Navigator.pop(context),
           tanqueSelecionadoId: tanqueId,
+          caclBloqueadoComoMovimentacao: true,
           onFinalizarCACL: () {
             caclFinalizado = true;
           },
@@ -1151,58 +1154,61 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
             backgroundColor: Colors.white,
             body: Column(
               children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(bottom: BorderSide(color: _line, width: 1)),
-                  ),
-                  child: Row(children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: _ink),
-                      onPressed: _editando 
-                          ? _cancelarEdicao 
-                          : (_mostrandoCardsAcoes 
-                              ? () => setState(() => _mostrandoCardsAcoes = false) 
-                          : widget.onVoltar),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
+                if (!_mostrandoMedicoes)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(bottom: BorderSide(color: _line, width: 1)),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _editando 
-                                ? 'Editar Tanque' 
-                                : (_mostrandoCardsAcoes 
-                                    ? 'Ações do Tanque' 
-                                    : 'Gerenciamento de Tanques'),
-                            style: const TextStyle(
-                              fontSize: 19, 
-                              fontWeight: FontWeight.bold, 
-                              color: _ink
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (!_editando && !_mostrandoCardsAcoes)
+                    child: Row(children: [
                       IconButton(
-                        icon: const Icon(Icons.refresh, color: _ink),
-                        onPressed: _carregarDados,
-                        tooltip: 'Recarregar',
+                        icon: const Icon(Icons.arrow_back, color: _ink),
+                        onPressed: _editando 
+                            ? _cancelarEdicao 
+                            : (_mostrandoCardsAcoes 
+                                ? () => setState(() => _mostrandoCardsAcoes = false) 
+                            : widget.onVoltar),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
                       ),
-                  ]),
-                ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _editando 
+                                  ? 'Editar Tanque' 
+                                  : (_mostrandoCardsAcoes 
+                                      ? 'Ações do Tanque' 
+                                      : 'Gerenciamento de Tanques'),
+                              style: const TextStyle(
+                                fontSize: 19, 
+                                fontWeight: FontWeight.bold, 
+                                color: _ink
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!_editando && !_mostrandoCardsAcoes)
+                        IconButton(
+                          icon: const Icon(Icons.refresh, color: _ink),
+                          onPressed: _carregarDados,
+                          tooltip: 'Recarregar',
+                        ),
+                    ]),
+                  ),
 
                 Expanded(
                   child: _editando 
                       ? _buildFormularioEdicao()
-                      : (_mostrandoCardsAcoes ? _buildCardsAcoesDoTanque() : _buildListaTanques()),
+                      : (_mostrandoMedicoes
+                          ? MedicoesPage(onVoltar: () => setState(() => _mostrandoMedicoes = false))
+                          : (_mostrandoCardsAcoes ? _buildCardsAcoesDoTanque() : _buildListaTanques())),
                 ),
               ],
             ),
@@ -1573,7 +1579,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                                   side: const BorderSide(color: _accent, width: 1.4),
                                   foregroundColor: _accent,
                                 ),
-                                child: const Text('Cancelar'),
+                                child: const Text('Voltar'),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -1662,6 +1668,15 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                       titulo: 'Movimentação do tanque',
                       descricao: 'Consultar movimentação',
                       onTap: _abrirEstoqueTanque,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildCardAcao(
+                      icon: Icons.list_alt,
+                      titulo: 'Medições',
+                      descricao: 'Consultar medições realizadas',
+                      onTap: () => setState(() => _mostrandoMedicoes = true),
                     ),
                   ),
                   const SizedBox(width: 16),
