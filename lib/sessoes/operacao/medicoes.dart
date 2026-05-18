@@ -22,6 +22,8 @@ class MedicoesPage extends StatefulWidget {
 
 class _MedicoesPageState extends State<MedicoesPage> {
   int? _hoverIndex;
+  List<Map<String, dynamic>> _medicoesReais = [];
+  bool _carregandoLista = false;
 
   // Controllers para o diálogo de inserção
   final TextEditingController _tanqueCtrl = TextEditingController();
@@ -30,6 +32,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
   final TextEditingController _cmCtrl = TextEditingController();
   final TextEditingController _mmCtrl = TextEditingController();
   final TextEditingController _volCalcCtrl = TextEditingController();
+  final TextEditingController _volAmbProdutoCtrl = TextEditingController();
   final TextEditingController _tempTanqueCtrl = TextEditingController();
   final TextEditingController _densidadeObsCtrl = TextEditingController();
   final TextEditingController _densidade20Ctrl = TextEditingController();
@@ -50,7 +53,8 @@ class _MedicoesPageState extends State<MedicoesPage> {
   // Estados de cálculo
   bool _calculandoVolume = false;
   bool _calculandoVolume20 = false;
-  double _volumeAmbienteRaw = 0;
+  double _volumeTotalRaw = 0;
+  double _volumeAguaRaw = 0;
 
   // Debouncers
   Timer? _debounceVolume;
@@ -59,6 +63,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
   @override
   void initState() {
     super.initState();
+    _carregarMedicoes();
     _cmCtrl.addListener(_onAlturaChanged);
     _mmCtrl.addListener(_onAlturaChanged);
     _aguaCmCtrl.addListener(_onAlturaAguaChanged);
@@ -90,6 +95,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
     _cmCtrl.dispose();
     _mmCtrl.dispose();
     _volCalcCtrl.dispose();
+    _volAmbProdutoCtrl.dispose();
     _tempTanqueCtrl.dispose();
     _densidadeObsCtrl.dispose();
     _tempObsCtrl.dispose();
@@ -173,8 +179,8 @@ class _MedicoesPageState extends State<MedicoesPage> {
       if (mounted) {
         setState(() {
           _volCalcCtrl.text = '';
-          _volumeAmbienteRaw = 0;
-          _vol20Ctrl.text = '';
+          _volumeTotalRaw = 0;
+          _atualizarVolumeLiquido();
         });
       }
       return;
@@ -186,18 +192,19 @@ class _MedicoesPageState extends State<MedicoesPage> {
       final mm = _mmCtrl.text.trim();
       final volume = await _buscarVolumeReal(cm, mm);
       
-      _volumeAmbienteRaw = volume;
+      _volumeTotalRaw = volume;
       _volCalcCtrl.text = volume > 0 ? _formatarVolume(volume).replaceAll(' L', '') : '';
       
-      if (mounted) setState(() => _calculandoVolume = false);
+      _atualizarVolumeLiquido();
       
-      if (volume > 0) _calcularVolume20();
+      if (mounted) setState(() => _calculandoVolume = false);
     } catch (_) {
       if (mounted) {
         setState(() {
           _volCalcCtrl.text = '';
-          _volumeAmbienteRaw = 0;
+          _volumeTotalRaw = 0;
           _calculandoVolume = false;
+          _atualizarVolumeLiquido();
         });
       }
     }
@@ -209,6 +216,8 @@ class _MedicoesPageState extends State<MedicoesPage> {
       if (mounted) {
         setState(() {
           _volAguaCtrl.text = '';
+          _volumeAguaRaw = 0;
+          _atualizarVolumeLiquido();
         });
       }
       return;
@@ -220,16 +229,146 @@ class _MedicoesPageState extends State<MedicoesPage> {
       final mm = _aguaMmCtrl.text.trim();
       final volume = await _buscarVolumeReal(cm, mm);
       
+      _volumeAguaRaw = volume;
       _volAguaCtrl.text = volume > 0 ? _formatarVolume(volume).replaceAll(' L', '') : '';
+      
+      _atualizarVolumeLiquido();
       
       if (mounted) setState(() => _calculandoVolume = false);
     } catch (_) {
       if (mounted) {
         setState(() {
           _volAguaCtrl.text = '';
+          _volumeAguaRaw = 0;
           _calculandoVolume = false;
+          _atualizarVolumeLiquido();
         });
       }
+    }
+  }
+
+  void _atualizarVolumeLiquido() {
+    final liquido = _volumeTotalRaw - _volumeAguaRaw;
+    final valorFinal = liquido > 0 ? liquido : 0.0;
+    
+    _volAmbProdutoCtrl.text = valorFinal > 0 ? _formatarVolume(valorFinal).replaceAll(' L', '') : '';
+    
+    // Dispara o cálculo de 20C se houver volume de produto
+    if (valorFinal > 0) {
+      _calcularVolume20();
+    } else {
+      _vol20Ctrl.text = '';
+      _massaCtrl.text = '';
+    }
+  }
+
+  // ── Persistência e busca de dados ─────────────────────────────────────────
+
+  Future<void> _carregarMedicoes() async {
+    if (mounted) setState(() => _carregandoLista = true);
+    final supabase = Supabase.instance.client;
+    try {
+      final terminalId = UsuarioAtual.instance?.terminalId;
+      if (terminalId == null) return;
+
+      final res = await supabase
+          .from('medicoes')
+          .select('*, tanques(referencia)')
+          .eq('terminal_id', terminalId)
+          .order('data', ascending: false)
+          .order('horario', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _medicoesReais = List<Map<String, dynamic>>.from(res);
+          _carregandoLista = false;
+        });
+      }
+    } catch (e) {
+      print('Erro ao carregar medições: $e');
+      if (mounted) setState(() => _carregandoLista = false);
+    }
+  }
+
+  double? _parseNumero(String v) {
+    if (v.isEmpty || v == '-') return null;
+    final t = v.replaceAll('.', '').replaceAll(',', '.').replaceAll(' L', '').trim();
+    return double.tryParse(t);
+  }
+
+  Future<void> _salvarMedicao() async {
+    final supabase = Supabase.instance.client;
+    
+    // Validações básicas antes de salvar
+    if (_horarioCtrl.text.isEmpty || _cmCtrl.text.isEmpty || _tempTanqueCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, preencha os campos obrigatórios.'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    try {
+      // 1. Buscar IDs necessários
+      final prodRes = await supabase
+          .from('produtos')
+          .select('id')
+          .eq('nome', widget.produtoNome ?? '')
+          .maybeSingle();
+      
+      final tqRes = await supabase
+          .from('tanques')
+          .select('id')
+          .eq('referencia', widget.tanqueReferencia ?? '')
+          .maybeSingle();
+
+      if (prodRes == null) throw 'Produto não encontrado.';
+      
+      // 2. Formatar data e horário
+      DateTime dataFormatada = DateFormat('dd/MM/yyyy').parse(_dataCtrl.text);
+      String isoData = DateFormat('yyyy-MM-dd').format(dataFormatada);
+      String isoHorario = _horarioCtrl.text.replaceAll(' h', '').trim();
+      if (isoHorario.length == 4 && !isoHorario.contains(':')) {
+        isoHorario = '${isoHorario.substring(0, 2)}:${isoHorario.substring(2, 4)}';
+      }
+
+      // 3. Montar payload
+      final payload = {
+        'data': isoData,
+        'horario': isoHorario,
+        'produto_id': prodRes['id'],
+        'tanque_id': tqRes?['id'],
+        'terminal_id': UsuarioAtual.instance?.terminalId,
+        'usuario_id': supabase.auth.currentUser?.id,
+        'altura_total_cm': _parseNumero(_cmCtrl.text),
+        'altura_total_mm': _parseNumero(_mmCtrl.text),
+        'volume_total_liquido': _parseNumero(_volAmbProdutoCtrl.text),
+        'agua_cm': _parseNumero(_aguaCmCtrl.text),
+        'agua_mm': _parseNumero(_aguaMmCtrl.text),
+        'vol_agua': _parseNumero(_volAguaCtrl.text),
+        'temperatura_tanque': _parseNumero(_tempTanqueCtrl.text),
+        'densidade_observada': _parseNumero(_densidadeObsCtrl.text),
+        'temperatura_amostra': _parseNumero(_tempObsCtrl.text),
+        'densidade_20': _parseNumero(_densidade20Ctrl.text),
+        'fcv': _parseNumero(_fcvCtrl.text),
+        'massa': _parseNumero(_massaCtrl.text),
+        'volume_20': _parseNumero(_vol20Ctrl.text),
+        'volume_ambiente': _parseNumero(_volCalcCtrl.text),
+        'observacoes': _observacoesCtrl.text.trim(),
+      };
+
+      await supabase.from('medicoes').insert(payload);
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Medição salva com sucesso!'), backgroundColor: Colors.green),
+        );
+        _carregarMedicoes();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao salvar medição: $e'), backgroundColor: Colors.red),
+      );
     }
   }
 
@@ -245,7 +384,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
       return;
     }
 
-    final volAmb = _volumeAmbienteRaw;
+    final volAmb = _volumeTotalRaw - _volumeAguaRaw;
     if (volAmb <= 0) {
       if (mounted) setState(() => _vol20Ctrl.text = '');
       return;
@@ -256,18 +395,19 @@ class _MedicoesPageState extends State<MedicoesPage> {
     if (mounted) setState(() => _calculandoVolume20 = true);
 
     try {
-      final dens20 = await _buscarDensidade20C(
+      final dens20Data = await _buscarDensidade20C(
         temperaturaAmostra: tempAmostra,
         densidadeObservada: densObs,
         produtoNome: produtoNome,
       );
+
+      final dens20 = dens20Data['valor'] ?? '-';
 
       if (dens20 == '-') {
         if (mounted) {
           setState(() {
             _vol20Ctrl.text = '';
             _densidade20Ctrl.text = '';
-            _fcvCtrl.text = '';
             _calculandoVolume20 = false;
           });
         }
@@ -406,7 +546,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
     }
   }
 
-  Future<String> _buscarDensidade20C({
+  Future<Map<String, String>> _buscarDensidade20C({
     required String temperaturaAmostra,
     required String densidadeObservada,
     required String produtoNome,
@@ -418,7 +558,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
     try {
       if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) {
         print('DEBUG DENS20: Parâmetros vazios.');
-        return '-';
+        return {'valor': '-', 'fcd': '-'};
       }
 
       final tempNum = double.tryParse(
@@ -433,7 +573,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
       
       if (tempNum == null || densNum == null) {
         print('DEBUG DENS20: Falha ao converter valores para double.');
-        return '-';
+        return {'valor': '-', 'fcd': '-'};
       }
 
       final int alvo = (densNum * 1000).round();
@@ -461,11 +601,12 @@ class _MedicoesPageState extends State<MedicoesPage> {
       
       if (linha == null) {
         print('DEBUG DENS20: Nenhuma linha encontrada para as temperaturas testadas.');
-        return '-';
+        return {'valor': '-', 'fcd': '-'};
       }
 
       int? melhorDelta;
       dynamic melhorValor;
+      String? melhorColuna;
       for (final entry in linha.entries) {
         if (!entry.key.startsWith('d_')) continue;
         final cod = int.tryParse(entry.key.replaceFirst('d_', ''));
@@ -475,13 +616,14 @@ class _MedicoesPageState extends State<MedicoesPage> {
         final delta = (cod - alvo).abs();
         if (melhorDelta == null || delta < melhorDelta) {
           melhorDelta = delta;
+          melhorColuna = entry.key;
           melhorValor = valor;
         }
       }
       
       if (melhorValor == null) {
         print('DEBUG DENS20: Nenhum valor de coluna d_XXX encontrado na linha.');
-        return '-';
+        return {'valor': '-', 'fcd': '-'};
       }
 
       print('DEBUG DENS20: Melhor valor encontrado: $melhorValor (delta: $melhorDelta)');
@@ -489,9 +631,16 @@ class _MedicoesPageState extends State<MedicoesPage> {
       if (!valorFinal.contains(',')) valorFinal = '$valorFinal,0';
       final partes = valorFinal.split(',');
       String parteDecimal = (partes.length > 1 ? partes[1] : '0').padRight(4, '0').substring(0, 4);
-      return '${partes[0]},$parteDecimal';
+      
+      String fcdValue = '-';
+      if (melhorColuna != null) {
+        final fcdNumStr = melhorColuna.replaceFirst('d_', '');
+        fcdValue = '0,$fcdNumStr';
+      }
+
+      return {'valor': '${partes[0]},$parteDecimal', 'fcd': fcdValue};
     } catch (_) {
-      return '-';
+      return {'valor': '-', 'fcd': '-'};
     }
   }
 
@@ -726,6 +875,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
     _cmCtrl.clear();
     _mmCtrl.clear();
     _volCalcCtrl.clear();
+    _volAmbProdutoCtrl.clear();
     _tempTanqueCtrl.clear();
     _densidadeObsCtrl.clear();
     _tempObsCtrl.clear();
@@ -738,7 +888,8 @@ class _MedicoesPageState extends State<MedicoesPage> {
     _vol20Ctrl.clear();
     _observacoesCtrl.clear();
     
-    _volumeAmbienteRaw = 0;
+    _volumeTotalRaw = 0;
+    _volumeAguaRaw = 0;
     
     showDialog(
       context: context,
@@ -761,15 +912,16 @@ class _MedicoesPageState extends State<MedicoesPage> {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: _buildField('Tanque', 'Ex: TQ-01', controller: _tanqueCtrl, enabled: false)),
+                      Expanded(child: _buildField('Tanque', 'Ex: TQ-01', controller: _tanqueCtrl, enabled: false, setStateDialog: setStateDialog)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildField('Data', '00/00/0000', controller: _dataCtrl)),
+                      Expanded(child: _buildField('Data', '00/00/0000', controller: _dataCtrl, setStateDialog: setStateDialog)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildField(
                           'Horário',
                           '00:00 h',
                           controller: _horarioCtrl,
+                          setStateDialog: setStateDialog,
                           onChanged: (v, controller, antigo) {
                             final masked = _aplicarMascaraHorario(v, antigo);
                             if (masked != v) {
@@ -786,18 +938,19 @@ class _MedicoesPageState extends State<MedicoesPage> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _buildField('Alt. cm (Produto)', '0', controller: _cmCtrl, maxLength: 4)),
+                      Expanded(child: _buildField('Alt. cm', '0', controller: _cmCtrl, maxLength: 4, setStateDialog: setStateDialog)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildField('Alt. mm (Produto)', '0', controller: _mmCtrl, maxLength: 1)),
+                      Expanded(child: _buildField('Alt. mm', '0', controller: _mmCtrl, maxLength: 1, setStateDialog: setStateDialog)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildField(
-                          'Volume Calculado',
+                          'Vol. total ocupado',
                           '0',
                           controller: _volCalcCtrl,
                           maxLength: 10,
                           enabled: false,
                           isLoading: _calculandoVolume,
+                          setStateDialog: setStateDialog,
                         ),
                       ),
                     ],
@@ -805,9 +958,9 @@ class _MedicoesPageState extends State<MedicoesPage> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, maxLength: 4)),
+                      Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, maxLength: 4, setStateDialog: setStateDialog)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, maxLength: 1)),
+                      Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, maxLength: 1, setStateDialog: setStateDialog)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildField(
@@ -815,6 +968,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           '0',
                           controller: _volAguaCtrl,
                           enabled: false,
+                          setStateDialog: setStateDialog,
                         ),
                       ),
                     ],
@@ -828,6 +982,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           '00,0',
                           controller: _tempTanqueCtrl,
                           focusNode: _tempTanqueFocus,
+                          setStateDialog: setStateDialog,
                           onChanged: (v, controller, antigo) {
                             final masked = _aplicarMascaraTemperatura(v, antigo);
                             if (masked != v) {
@@ -846,6 +1001,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           '0,000',
                           controller: _densidadeObsCtrl,
                           focusNode: _densidadeObsFocus,
+                          setStateDialog: setStateDialog,
                           onChanged: (v, controller, antigo) {
                             final masked = _aplicarMascaraDensidade(v, antigo);
                             if (masked != v) {
@@ -864,6 +1020,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           '00,0',
                           controller: _tempObsCtrl,
                           focusNode: _tempObsFocus,
+                          setStateDialog: setStateDialog,
                           onChanged: (v, controller, antigo) {
                             final masked = _aplicarMascaraTemperatura(v, antigo);
                             if (masked != v) {
@@ -882,6 +1039,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           '0,0000',
                           controller: _densidade20Ctrl,
                           enabled: false,
+                          setStateDialog: setStateDialog,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -890,8 +1048,8 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           'FCV',
                           '0,0000',
                           controller: _fcvCtrl,
-                          maxLength: 6,
                           enabled: false,
+                          setStateDialog: setStateDialog,
                         ),
                       ),
                     ],
@@ -906,6 +1064,17 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           controller: _massaCtrl,
                           maxLength: 15,
                           enabled: false,
+                          setStateDialog: setStateDialog,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildField(
+                          'Vol. amb. (Produto)',
+                          '0',
+                          controller: _volAmbProdutoCtrl,
+                          enabled: false,
+                          setStateDialog: setStateDialog,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -917,12 +1086,13 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           maxLength: 15,
                           enabled: false,
                           isLoading: _calculandoVolume20,
+                          setStateDialog: setStateDialog,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildField('Observações', '', controller: _observacoesCtrl, maxLines: 2),
+                  _buildField('Observações', '', controller: _observacoesCtrl, maxLines: 2, setStateDialog: setStateDialog),
                 ],
               ),
             ),
@@ -935,7 +1105,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
           ),
           SizedBox(
             child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: _salvarMedicao,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0D47A1),
                 foregroundColor: Colors.white,
@@ -962,10 +1132,24 @@ class _MedicoesPageState extends State<MedicoesPage> {
     bool enabled = true,
     bool isLoading = false,
     void Function(String, TextEditingController, String)? onChanged,
+    void Function(void Function())? setStateDialog,
   }) {
     final effectiveController = controller ?? TextEditingController();
     String valorAntigo = effectiveController.text;
-    
+
+    // Define se o campo é obrigatório
+    final isMandatory = [
+      'Horário',
+      'Alt. cm',
+      'Alt. mm',
+      'Temp. Tanque',
+      'Densid. Obs.',
+      'Temp. Obs.'
+    ].contains(label);
+
+    // Validação básica: se for obrigatório e estiver vazio, exibe alerta
+    final bool showWarning = isMandatory && effectiveController.text.trim().isEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -974,10 +1158,10 @@ class _MedicoesPageState extends State<MedicoesPage> {
           children: [
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
-                color: Colors.black87,
+                color: showWarning ? Colors.red.shade700 : Colors.black87,
               ),
             ),
             if (isLoading) ...[
@@ -999,6 +1183,11 @@ class _MedicoesPageState extends State<MedicoesPage> {
           maxLength: maxLength,
           enabled: enabled,
           onChanged: (v) {
+            // Força a reconstrução do diálogo usando o setStateDialog fornecido pelo StatefulBuilder
+            if (setStateDialog != null) {
+              setStateDialog(() {});
+            }
+
             if (onChanged != null) {
               onChanged(v, effectiveController, valorAntigo);
               valorAntigo = effectiveController.text;
@@ -1006,12 +1195,42 @@ class _MedicoesPageState extends State<MedicoesPage> {
               valorAntigo = v;
             }
           },
-          keyboardType: maxLength != null || label.contains('Temp') || label.contains('Dens') || label.contains('Alt') || label.contains('Vol') || label.contains('FCD') || label.contains('FCV') || label.contains('Massa') || label.contains('Água') ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+          keyboardType: maxLength != null ||
+                  label.contains('Temp') ||
+                  label.contains('Dens') ||
+                  label.contains('Alt') ||
+                  label.contains('Vol') ||
+                  label.contains('FCD') ||
+                  label.contains('FCV') ||
+                  label.contains('Massa') ||
+                  label.contains('Água')
+              ? const TextInputType.numberWithOptions(decimal: true)
+              : TextInputType.text,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(
+                color: showWarning ? Colors.red : Colors.grey,
+                width: showWarning ? 1.5 : 1,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(
+                color: showWarning ? Colors.red : Colors.grey,
+                width: showWarning ? 1.5 : 1,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(4),
+              borderSide: BorderSide(
+                color: showWarning ? Colors.red : const Color(0xFF0D47A1),
+                width: 2,
+              ),
+            ),
             filled: !enabled,
             fillColor: Colors.grey.shade100,
             isDense: true,
@@ -1021,55 +1240,6 @@ class _MedicoesPageState extends State<MedicoesPage> {
       ],
     );
   }
-
-  // Dados fictícios para teste de layout
-  final List<Map<String, dynamic>> _medicoesFicticias = [
-    {
-      'tanque': 'TQ-01',
-      'data': '15/05/2026',
-      'horario': '08:00 h',
-      'altura_cm': '500',
-      'altura_mm': '5',
-      'volume_amb': '50.000',
-      'temp_tanque': '25,5',
-      'densidade': '0,850',
-      'temp_amostra': '24,0',
-      'fcd': '1,0002',
-      'fcv': '0,9970',
-      'volume_20': '49.850',
-      'massa': '42.372',
-    },
-    {
-      'tanque': 'TQ-02',
-      'data': '15/05/2026',
-      'horario': '09:30 h',
-      'altura_cm': '320',
-      'altura_mm': '2',
-      'volume_amb': '32.000',
-      'temp_tanque': '26,0',
-      'densidade': '0,845',
-      'temp_amostra': '25,0',
-      'fcd': '1,0001',
-      'fcv': '0,9950',
-      'volume_20': '31.840',
-      'massa': '26.905',
-    },
-    {
-      'tanque': 'TQ-03',
-      'data': '14/05/2026',
-      'horario': '14:15 h',
-      'altura_cm': '450',
-      'altura_mm': '0',
-      'volume_amb': '45.000',
-      'temp_tanque': '24,8',
-      'densidade': '0,852',
-      'temp_amostra': '24,5',
-      'fcd': '1,0003',
-      'fcv': '0,9980',
-      'volume_20': '44.910',
-      'massa': '38.263',
-    },
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -1151,52 +1321,72 @@ class _MedicoesPageState extends State<MedicoesPage> {
 
             // Lista de Medições
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: _medicoesFicticias.length,
-                itemBuilder: (context, index) {
-                  final medicao = _medicoesFicticias[index];
-                  return MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    onEnter: (_) => setState(() => _hoverIndex = index),
-                    onExit: (_) => setState(() => _hoverIndex = null),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                      color: _hoverIndex == index 
-                          ? Colors.grey.shade200 
-                          : (index.isEven ? Colors.white : Colors.grey.shade50),
-                      child: Row(
-                        children: [
-                          // Indicador de status (decorativo)
-                          Container(
-                            width: 4,
-                            height: 24,
-                            color: const Color(0xFF0D47A1).withOpacity(0.5),
-                          ),
-                          const SizedBox(width: 12),
-                          
-                          _buildDataCell(medicao['tanque'], flex: 2),
-                          _buildDataCell(medicao['data'], flex: 2),
-                          _buildDataCell(medicao['horario'], flex: 2),
-                          _buildDataCell(medicao['altura_cm'], flex: 2),
-                          _buildDataCell(medicao['altura_mm'], flex: 2),
-                          _buildDataCell(medicao['volume_amb'], flex: 3),
-                          _buildDataCell(medicao['temp_tanque'], flex: 2),
-                          _buildDataCell(medicao['densidade'], flex: 2),
-                          _buildDataCell(medicao['temp_amostra'], flex: 2),
-                          _buildDataCell(medicao['fcd'], flex: 2),
-                          _buildDataCell(medicao['fcv'], flex: 2),
-                          _buildDataCell(medicao['massa'], flex: 3),
-                          _buildDataCell(medicao['volume_20'], flex: 3),
-                          
-                          const SizedBox(width: 24), // Espaço para manter alinhamento
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+              child: _carregandoLista
+                  ? const Center(child: CircularProgressIndicator())
+                  : _medicoesReais.isEmpty
+                      ? const Center(child: Text('Nenhuma medição encontrada.'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: _medicoesReais.length,
+                          itemBuilder: (context, index) {
+                            final medicao = _medicoesReais[index];
+                            return MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              onEnter: (_) => setState(() => _hoverIndex = index),
+                              onExit: (_) => setState(() => _hoverIndex = null),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                                color: _hoverIndex == index
+                                    ? Colors.grey.shade200
+                                    : (index.isEven ? Colors.white : Colors.grey.shade50),
+                                child: Row(
+                                  children: [
+                                    // Indicador de status (decorativo)
+                                    Container(
+                                      width: 4,
+                                      height: 24,
+                                      color: const Color(0xFF0D47A1).withOpacity(0.5),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    _buildDataCell(medicao['tanques']?['referencia'], flex: 2),
+                                    _buildDataCell(
+                                        medicao['data'] != null
+                                            ? DateFormat('dd/MM/yyyy').format(DateTime.parse(medicao['data']))
+                                            : '-',
+                                        flex: 2),
+                                    _buildDataCell(
+                                        medicao['horario'] != null ? '${medicao['horario'].toString().substring(0, 5)} h' : '-',
+                                        flex: 2),
+                                    _buildDataCell(medicao['altura_total_cm']?.toString(), flex: 2),
+                                    _buildDataCell(medicao['altura_total_mm']?.toString(), flex: 2),
+                                    _buildDataCell(
+                                        medicao['volume_ambiente'] != null
+                                            ? _formatarVolume(medicao['volume_ambiente'].toDouble()).replaceAll(' L', '')
+                                            : '-',
+                                        flex: 3),
+                                    _buildDataCell(medicao['temperatura_tanque']?.toString().replaceAll('.', ','), flex: 2),
+                                    _buildDataCell(medicao['densidade_observada']?.toString().replaceAll('.', ','), flex: 2),
+                                    _buildDataCell(medicao['temperatura_amostra']?.toString().replaceAll('.', ','), flex: 2),
+                                    _buildDataCell(medicao['fcd']?.toString().replaceAll('.', ','), flex: 2),
+                                    _buildDataCell(medicao['fcv']?.toString().replaceAll('.', ','), flex: 2),
+                                    _buildDataCell(
+                                        medicao['massa'] != null
+                                            ? _formatarVolume(medicao['massa'].toDouble()).replaceAll(' L', '')
+                                            : '-',
+                                        flex: 3),
+                                    _buildDataCell(
+                                        medicao['volume_20'] != null
+                                            ? _formatarVolume(medicao['volume_20'].toDouble()).replaceAll(' L', '')
+                                            : '-',
+                                        flex: 3),
+                                    const SizedBox(width: 24), // Espaço para manter alinhamento
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
@@ -1228,7 +1418,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
     return Expanded(
       flex: flex,
       child: Text(
-        value ?? '-',
+        (value == null || value == 'null') ? '-' : value,
         textAlign: TextAlign.center,
         style: const TextStyle(
           fontSize: 12,
