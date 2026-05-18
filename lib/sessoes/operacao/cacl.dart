@@ -2703,7 +2703,7 @@ class _CalcPageState extends State<CalcPage> {
 
       for (final t in temperaturasTeste) {
         linha = await supabase
-            .from('csv_table_1')
+            .from('tcd_gasolina_diesel')
             .select('*')
             .eq('temperatura_obs', t)
             .maybeSingle();

@@ -361,7 +361,7 @@ class _CalculadoraArqueacaoDialogState
 
       Map<String, dynamic>? linha;
       for (final t in temperaturasTeste) {
-        linha = await supabase.from('csv_table_1').select('*').eq('temperatura_obs', t).maybeSingle();
+        linha = await supabase.from('tcd_gasolina_diesel').select('*').eq('temperatura_obs', t).maybeSingle();
         if (linha != null) break;
       }
       if (linha == null) return '-';
