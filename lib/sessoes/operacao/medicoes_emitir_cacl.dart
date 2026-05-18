@@ -218,7 +218,13 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
     }
   }
 
-  String _aplicarMascaraHorario(String texto) {
+  String _aplicarMascaraHorario(String texto, {String valorAntigo = ''}) {
+    if (valorAntigo.isNotEmpty && texto.length < valorAntigo.length) {
+      String limpo = texto.replaceAll(' h', '');
+      if (limpo.isEmpty) return '';
+      return '$limpo h';
+    }
+
     String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
 
     if (apenasNumeros.length > 4) {
@@ -240,7 +246,8 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
     return resultado;
   }
 
-  String _aplicarMascaraTemperatura(String texto) {
+  String _aplicarMascaraTemperatura(String texto, {String valorAntigo = ''}) {
+    if (valorAntigo.isNotEmpty && texto.length < valorAntigo.length) return texto;
     String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
 
     if (apenasNumeros.length > 3) {
@@ -258,7 +265,8 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
     return resultado;
   }
 
-  String _aplicarMascaraDensidade(String texto) {
+  String _aplicarMascaraDensidade(String texto, {String valorAntigo = ''}) {
+    if (valorAntigo.isNotEmpty && texto.length < valorAntigo.length) return texto;
     String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
 
     if (apenasNumeros.length > 5) {
@@ -1210,6 +1218,7 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
     FocusNode? focusNode,
     FocusNode? nextFocus,
   }) {
+    String valorAntigo = ctrl.text;
     return Column(
       children: [
         Text(
@@ -1235,18 +1244,19 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
             keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 12),
             onChanged: (value) {
-              final cursorPosition = ctrl.selection.baseOffset;
-              final maskedValue = _aplicarMascaraHorario(value);
+              final maskedValue = _aplicarMascaraHorario(value, valorAntigo: valorAntigo);
 
               if (maskedValue != value) {
                 ctrl.value = TextEditingValue(
                   text: maskedValue,
                   selection: TextSelection.collapsed(
-                    offset:
-                        cursorPosition + (maskedValue.length - value.length),
+                    offset: maskedValue.endsWith(' h') && maskedValue.length > 2 
+                        ? maskedValue.length - 2 
+                        : maskedValue.length,
                   ),
                 );
               }
+              valorAntigo = ctrl.text;
             },
             decoration: InputDecoration(
               hintText: hint,
@@ -1341,6 +1351,7 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
     FocusNode? focusNode,
     FocusNode? nextFocus,
   }) {
+    String valorAntigo = ctrl.text;
     return Column(
       children: [
         Text(
@@ -1366,18 +1377,17 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
             keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 12),
             onChanged: (value) {
-              final cursorPosition = ctrl.selection.baseOffset;
-              final maskedValue = _aplicarMascaraTemperatura(value);
+              final maskedValue = _aplicarMascaraTemperatura(value, valorAntigo: valorAntigo);
 
               if (maskedValue != value) {
                 ctrl.value = TextEditingValue(
                   text: maskedValue,
                   selection: TextSelection.collapsed(
-                    offset:
-                        cursorPosition + (maskedValue.length - value.length),
+                    offset: maskedValue.length,
                   ),
                 );
               }
+              valorAntigo = ctrl.text;
             },
             decoration: InputDecoration(
               hintText: hint,
@@ -1412,6 +1422,7 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
     FocusNode? focusNode,
     FocusNode? nextFocus,
   }) {
+    String valorAntigo = ctrl.text;
     return Column(
       children: [
         Text(
@@ -1437,18 +1448,17 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
             keyboardType: TextInputType.number,
             style: const TextStyle(fontSize: 12),
             onChanged: (value) {
-              final cursorPosition = ctrl.selection.baseOffset;
-              final maskedValue = _aplicarMascaraDensidade(value);
+              final maskedValue = _aplicarMascaraDensidade(value, valorAntigo: valorAntigo);
 
               if (maskedValue != value) {
                 ctrl.value = TextEditingValue(
                   text: maskedValue,
                   selection: TextSelection.collapsed(
-                    offset:
-                        cursorPosition + (maskedValue.length - value.length),
+                    offset: maskedValue.length,
                   ),
                 );
               }
+              valorAntigo = ctrl.text;
             },
             decoration: InputDecoration(
               hintText: hint,

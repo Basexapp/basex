@@ -1212,6 +1212,9 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                               produtoNome: _tanqueSelecionadoParaAcoes != null 
                                   ? _tanqueSelecionadoParaAcoes!['produto'] 
                                   : null,
+                              tanqueReferencia: _tanqueSelecionadoParaAcoes != null
+                                  ? _tanqueSelecionadoParaAcoes!['referencia']
+                                  : null,
                             )
                           : (_mostrandoCardsAcoes ? _buildCardsAcoesDoTanque() : _buildListaTanques())),
                 ),
@@ -1576,7 +1579,9 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                         const SizedBox(height: 24),
                         Row(
                           children: [
-                            Expanded(
+                            SizedBox(
+                              width: 140,
+                              height: 44,
                               child: OutlinedButton(
                                 onPressed: _cancelarEdicao,
                                 style: OutlinedButton.styleFrom(
@@ -1588,7 +1593,9 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Expanded(
+                            SizedBox(
+                              width: 140,
+                              height: 44,
                               child: ElevatedButton(
                                 onPressed: _houveAlteracao() ? _salvarTanque : null,
                                 style: ElevatedButton.styleFrom(
@@ -1665,79 +1672,78 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildCardAcao(
-                      icon: Icons.inventory_2,
-                      titulo: 'Movimentação do tanque',
-                      descricao: 'Consultar movimentação',
-                      onTap: _abrirEstoqueTanque,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildCardAcao(
-                      icon: Icons.list_alt,
-                      titulo: 'Medições',
-                      descricao: 'Consultar medições realizadas',
-                      onTap: () => setState(() => _mostrandoMedicoes = true),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Builder(
-                      builder: (context) {
-                        final tanqueAtual = tanques.firstWhere(
-                          (t) => t['id'] == _tanqueSelecionadoParaAcoes!['id'],
-                          orElse: () => _tanqueSelecionadoParaAcoes!,
-                        );
-                        final tipo = tanqueAtual['tipo_abastecimento']?.toString() ?? '';
-                        final disponivelParaTipo = tipo == 'all' || tipo == 'exa';
-                        
-                        return _buildCardAcao(
-                          icon: Icons.analytics,
-                          titulo: 'CACL Movimentação',
-                          descricao: 'Emitir CACL Movimentação',
-                          onTap: _abrirCACL,
-                          enabled: disponivelParaTipo,
-                          tooltip: !disponivelParaTipo 
-                              ? 'Disponível apenas para tanques com tipo EXA.' 
-                              : null,
-                        );
-                      }
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildCardAcao(
-                      icon: Icons.check_circle,
-                      titulo: 'CACL verificação',
-                      descricao: 'Emitir CACL Verificação',
-                      onTap: _abrirCACLVerificacao,
-                      enabled: _caclesTanque.isEmpty && !_carregandoCacls,
-                      tooltip: 'Já existe CACL para a data atual.',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildCardAcao(
-                      icon: Icons.add_chart,
-                      titulo: 'Entrada/Saída manual',
-                      descricao: 'Registrar entrada ou saída manual',
-                      onTap: _showDialogMovimentacaoAvulsa,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildCardAcao(
-                      icon: Icons.settings,
-                      titulo: 'Ajustes',
-                      descricao: 'Atualizar dados do tanque',
-                      onTap: _abrirEdicaoTanque,
-                    ),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  // Define o número de colunas baseado na largura disponível
+                  // 175 é a largura base desejada para cada card
+                  int crossAxisCount = (constraints.maxWidth / 175).floor();
+                  if (crossAxisCount < 1) crossAxisCount = 1;
+                  if (crossAxisCount > 6) crossAxisCount = 6; // Máximo de cards por linha
+
+                  return GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 175 / 160, // Mantém a proporção largura/altura
+                    children: [
+                      _buildCardAcao(
+                        icon: Icons.inventory_2,
+                        titulo: 'Movimentação do tanque',
+                        descricao: 'Consultar movimentação',
+                        onTap: _abrirEstoqueTanque,
+                      ),
+                      _buildCardAcao(
+                        icon: Icons.list_alt,
+                        titulo: 'Medições',
+                        descricao: 'Consultar medições realizadas',
+                        onTap: () => setState(() => _mostrandoMedicoes = true),
+                      ),
+                      Builder(
+                        builder: (context) {
+                          final tanqueAtual = tanques.firstWhere(
+                            (t) => t['id'] == _tanqueSelecionadoParaAcoes!['id'],
+                            orElse: () => _tanqueSelecionadoParaAcoes!,
+                          );
+                          final tipo = tanqueAtual['tipo_abastecimento']?.toString() ?? '';
+                          final disponivelParaTipo = tipo == 'all' || tipo == 'exa';
+                          
+                          return _buildCardAcao(
+                            icon: Icons.analytics,
+                            titulo: 'CACL Movimentação',
+                            descricao: 'Emitir CACL Movimentação',
+                            onTap: _abrirCACL,
+                            enabled: disponivelParaTipo,
+                            tooltip: !disponivelParaTipo 
+                                ? 'Disponível apenas para tanques com tipo EXA.' 
+                                : null,
+                          );
+                        }
+                      ),
+                      _buildCardAcao(
+                        icon: Icons.check_circle,
+                        titulo: 'CACL verificação',
+                        descricao: 'Emitir CACL Verificação',
+                        onTap: _abrirCACLVerificacao,
+                        enabled: _caclesTanque.isEmpty && !_carregandoCacls,
+                        tooltip: 'Já existe CACL para a data atual.',
+                      ),
+                      _buildCardAcao(
+                        icon: Icons.add_chart,
+                        titulo: 'Entrada/Saída manual',
+                        descricao: 'Registrar entrada ou saída manual',
+                        onTap: _showDialogMovimentacaoAvulsa,
+                      ),
+                      _buildCardAcao(
+                        icon: Icons.settings,
+                        titulo: 'Ajustes',
+                        descricao: 'Atualizar dados do tanque',
+                        onTap: _abrirEdicaoTanque,
+                      ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 24),
               Container(
@@ -2098,42 +2104,64 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         onTap: enabled ? onTap : null,
         hoverColor: enabled ? _accent.withOpacity(0.1) : Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           decoration: BoxDecoration(
             border: Border.all(color: enabled ? _line : Colors.grey.shade300, width: 1.2),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Stack(
             children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: innerBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: enabled ? _accent.withOpacity(0.3) : Colors.grey.shade300, width: 1.5),
+              // Ícone posicionado fixamente a partir do topo
+              Positioned(
+                top: 15,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: innerBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: enabled ? _accent.withOpacity(0.3) : Colors.grey.shade300, width: 1.5),
+                    ),
+                    child: Icon(icon, color: iconColor, size: 26),
+                  ),
                 ),
-                child: Icon(icon, color: iconColor, size: 32),
               ),
-              const SizedBox(height: 16),
-              Text(
-                titulo,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: titleColor,
+              // Textos posicionados abaixo do espaço reservado ao ícone
+              Positioned(
+                top: 82, // 15 (top) + 48 (height) + 19 (spacing)
+                left: 8,
+                right: 8,
+                bottom: 8,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      titulo,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: titleColor,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      descricao,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: descColor,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                descricao,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: descColor,
-                ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),

@@ -343,7 +343,13 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
     }
   }
   
-  String _aplicarMascaraHorario(String texto) {
+  String _aplicarMascaraHorario(String texto, {String valorAntigo = ''}) {
+    if (valorAntigo.isNotEmpty && texto.length < valorAntigo.length) {
+      String limpo = texto.replaceAll(' h', '');
+      if (limpo.isEmpty) return '';
+      return '$limpo h';
+    }
+
     String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
     
     if (apenasNumeros.length > 4) {
@@ -365,7 +371,8 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
     return resultado;
   }
   
-  String _aplicarMascaraTemperatura(String texto) {
+  String _aplicarMascaraTemperatura(String texto, {String valorAntigo = ''}) {
+    if (valorAntigo.isNotEmpty && texto.length < valorAntigo.length) return texto;
     String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
     
     if (apenasNumeros.length > 3) {
@@ -383,7 +390,8 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
     return resultado;
   }
   
-  String _aplicarMascaraDensidade(String texto) {
+  String _aplicarMascaraDensidade(String texto, {String valorAntigo = ''}) {
+    if (valorAntigo.isNotEmpty && texto.length < valorAntigo.length) return texto;
     String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
 
     if (apenasNumeros.length > 5) {
@@ -1286,18 +1294,18 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
             onChanged: (value) {
               if (readonly) return;
               
-              final cursorPosition = ctrl.selection.baseOffset;
+              final valorAntigo = ctrl.text.length > value.length ? ctrl.text : '';
               String maskedValue = value;
               
               switch (tipo) {
                 case 'horario':
-                  maskedValue = _aplicarMascaraHorario(value);
+                  maskedValue = _aplicarMascaraHorario(value, valorAntigo: valorAntigo);
                   break;
                 case 'temperatura':
-                  maskedValue = _aplicarMascaraTemperatura(value);
+                  maskedValue = _aplicarMascaraTemperatura(value, valorAntigo: valorAntigo);
                   break;
                 case 'densidade':
-                  maskedValue = _aplicarMascaraDensidade(value);
+                  maskedValue = _aplicarMascaraDensidade(value, valorAntigo: valorAntigo);
                   break;
                 case 'faturado':
                   maskedValue = _aplicarMascaraFaturado(value);
@@ -1307,11 +1315,14 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
               }
               
               if (maskedValue != value) {
+                int offset = maskedValue.length;
+                if (tipo == 'horario' && maskedValue.endsWith(' h') && maskedValue.length > 2) {
+                  offset = maskedValue.length - 2;
+                }
+                
                 ctrl.value = TextEditingValue(
                   text: maskedValue,
-                  selection: TextSelection.collapsed(
-                    offset: cursorPosition + (maskedValue.length - value.length),
-                  ),
+                  selection: TextSelection.collapsed(offset: offset),
                 );
               }
             },
