@@ -1308,7 +1308,6 @@ class _MedicoesPageState extends State<MedicoesPage> {
                   _buildHeaderCell('Temp. Tq', flex: 2),
                   _buildHeaderCell('Dens. Obs', flex: 2),
                   _buildHeaderCell('Temp. Obs', flex: 2),
-                  _buildHeaderCell('FCD', flex: 2),
                   _buildHeaderCell('FCV', flex: 2),
                   _buildHeaderCell('Massa', flex: 3),
                   _buildHeaderCell('Vol. 20°C', flex: 3),
@@ -1368,7 +1367,6 @@ class _MedicoesPageState extends State<MedicoesPage> {
                                     _buildDataCell(medicao['temperatura_tanque']?.toString().replaceAll('.', ','), flex: 2),
                                     _buildDataCell(medicao['densidade_observada']?.toString().replaceAll('.', ','), flex: 2),
                                     _buildDataCell(medicao['temperatura_amostra']?.toString().replaceAll('.', ','), flex: 2),
-                                    _buildDataCell(medicao['fcd']?.toString().replaceAll('.', ','), flex: 2),
                                     _buildDataCell(medicao['fcv']?.toString().replaceAll('.', ','), flex: 2),
                                     _buildDataCell(
                                         medicao['massa'] != null
