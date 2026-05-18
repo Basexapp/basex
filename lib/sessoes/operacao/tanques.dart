@@ -1400,7 +1400,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: _accent.withOpacity(0.6), width: 1.2),
+                              border: Border.all(color: _accent.withValues(alpha: 0.6), width: 1.2),
                             ),
                             child: Row(
                               children: [
@@ -1641,9 +1641,9 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: _accent.withOpacity(0.08),
+                        color: _accent.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: _accent.withOpacity(0.2)),
+                        border: Border.all(color: _accent.withValues(alpha: 0.2)),
                       ),
                       child: const Icon(Icons.storage, color: _accent, size: 22),
                     ),
@@ -1897,7 +1897,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                                       : Matrix4.identity(),
                                   decoration: BoxDecoration(
                                     color: _hoverCaclIndex == index
-                                        ? cardColor.withOpacity(0.85)
+                                        ? cardColor.withValues(alpha: 0.85)
                                         : cardColor,
                                     borderRadius:
                                         BorderRadius.circular(12),
@@ -1905,7 +1905,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                                         color: borderColor, width: 1.5),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(
+                                        color: Colors.black.withValues(alpha: 
                                           _hoverCaclIndex == index
                                               ? 0.15
                                               : 0.05,
@@ -2028,7 +2028,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                                                       vertical: 4),
                                               decoration: BoxDecoration(
                                                 color: statusColor
-                                                    .withOpacity(0.15),
+                                                    .withValues(alpha: 0.15),
                                                 borderRadius:
                                                     BorderRadius.circular(6),
                                               ),
@@ -2090,7 +2090,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     String? tooltip,
   }) {
     final cardBg = enabled ? Colors.white : Colors.grey.shade50;
-    final innerBg = enabled ? _accent.withOpacity(0.1) : Colors.grey.shade200;
+    final innerBg = enabled ? _accent.withValues(alpha: 0.1) : Colors.grey.shade200;
     final iconColor = enabled ? _accent : Colors.grey.shade500;
     final titleColor = enabled ? _ink : Colors.grey.shade600;
     final descColor = enabled ? _muted : Colors.grey.shade500;
@@ -2102,66 +2102,48 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
       clipBehavior: Clip.hardEdge,
       child: InkWell(
         onTap: enabled ? onTap : null,
-        hoverColor: enabled ? _accent.withOpacity(0.1) : Colors.transparent,
+        hoverColor: enabled ? _accent.withValues(alpha: 0.1) : Colors.transparent,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           decoration: BoxDecoration(
             border: Border.all(color: enabled ? _line : Colors.grey.shade300, width: 1.2),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: Stack(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Ícone posicionado fixamente a partir do topo
-              Positioned(
-                top: 15,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: innerBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: enabled ? _accent.withOpacity(0.3) : Colors.grey.shade300, width: 1.5),
-                    ),
-                    child: Icon(icon, color: iconColor, size: 26),
-                  ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: innerBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: enabled ? _accent.withValues(alpha: 0.3) : Colors.grey.shade300, width: 1.5),
                 ),
+                child: Icon(icon, color: iconColor, size: 26),
               ),
-              // Textos posicionados abaixo do espaço reservado ao ícone
-              Positioned(
-                top: 82, // 15 (top) + 48 (height) + 19 (spacing)
-                left: 8,
-                right: 8,
-                bottom: 8,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Text(
-                      titulo,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: titleColor,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      descricao,
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: descColor,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+              const SizedBox(height: 12),
+              Text(
+                titulo,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: titleColor,
                 ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                descricao,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: descColor,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -2305,7 +2287,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: borderColor.withOpacity(0.5)),
+                                borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(8),
@@ -2343,7 +2325,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: borderColor.withOpacity(0.5)),
+                            borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -2371,7 +2353,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: borderColor.withOpacity(0.5)),
+                            borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
@@ -2719,7 +2701,7 @@ class _SelecaoTipoVisualizacaoBottomSheetState extends State<_SelecaoTipoVisuali
                                   margin: const EdgeInsets.all(2),
                                   decoration: BoxDecoration(
                                     color: isSelected ? const Color(0xFF0D47A1)
-                                        : (day != null && hoveredDay == day) ? const Color(0xFF0D47A1).withOpacity(0.1)
+                                        : (day != null && hoveredDay == day) ? const Color(0xFF0D47A1).withValues(alpha: 0.1)
                                         : isToday ? const Color(0x220D47A1) : Colors.transparent,
                                     shape: BoxShape.circle,
                                   ),
@@ -3110,7 +3092,7 @@ class _SelecaoTipoVisualizacaoBottomSheetState extends State<_SelecaoTipoVisuali
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 10,
                     offset: const Offset(0, -5),
                   ),
@@ -3145,7 +3127,7 @@ class _SelecaoTipoVisualizacaoBottomSheetState extends State<_SelecaoTipoVisuali
                     ),
                     borderRadius: BorderRadius.circular(8),
                     color: _tipoDataEspecifica 
-                        ? const Color(0xFF0D47A1).withOpacity(0.05)
+                        ? const Color(0xFF0D47A1).withValues(alpha: 0.05)
                         : Colors.white,
                   ),
                   child: Row(
@@ -3198,7 +3180,7 @@ class _SelecaoTipoVisualizacaoBottomSheetState extends State<_SelecaoTipoVisuali
                     ),
                     borderRadius: BorderRadius.circular(8),
                     color: _tipoMensal 
-                        ? const Color(0xFF0D47A1).withOpacity(0.05)
+                        ? const Color(0xFF0D47A1).withValues(alpha: 0.05)
                         : Colors.white,
                   ),
                   child: Row(

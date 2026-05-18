@@ -32,11 +32,12 @@ class _MedicoesPageState extends State<MedicoesPage> {
   final TextEditingController _volCalcCtrl = TextEditingController();
   final TextEditingController _tempTanqueCtrl = TextEditingController();
   final TextEditingController _densidadeObsCtrl = TextEditingController();
+  final TextEditingController _densidade20Ctrl = TextEditingController();
   final TextEditingController _tempObsCtrl = TextEditingController();
-  final TextEditingController _fcdCtrl = TextEditingController();
   final TextEditingController _fcvCtrl = TextEditingController();
   final TextEditingController _aguaCmCtrl = TextEditingController();
   final TextEditingController _aguaMmCtrl = TextEditingController();
+  final TextEditingController _volAguaCtrl = TextEditingController();
   final TextEditingController _massaCtrl = TextEditingController();
   final TextEditingController _vol20Ctrl = TextEditingController();
   final TextEditingController _observacoesCtrl = TextEditingController();
@@ -60,6 +61,8 @@ class _MedicoesPageState extends State<MedicoesPage> {
     super.initState();
     _cmCtrl.addListener(_onAlturaChanged);
     _mmCtrl.addListener(_onAlturaChanged);
+    _aguaCmCtrl.addListener(_onAlturaAguaChanged);
+    _aguaMmCtrl.addListener(_onAlturaAguaChanged);
     
     // Adiciona listeners para perda de foco
     _tempTanqueFocus.addListener(_onFocusChanged);
@@ -90,10 +93,11 @@ class _MedicoesPageState extends State<MedicoesPage> {
     _tempTanqueCtrl.dispose();
     _densidadeObsCtrl.dispose();
     _tempObsCtrl.dispose();
-    _fcdCtrl.dispose();
+    _densidade20Ctrl.dispose();
     _fcvCtrl.dispose();
     _aguaCmCtrl.dispose();
     _aguaMmCtrl.dispose();
+    _volAguaCtrl.dispose();
     _massaCtrl.dispose();
     _vol20Ctrl.dispose();
     _observacoesCtrl.dispose();
@@ -104,6 +108,13 @@ class _MedicoesPageState extends State<MedicoesPage> {
     _debounceVolume?.cancel();
     _debounceVolume = Timer(const Duration(milliseconds: 600), () {
       _calcularVolumeAmbiente();
+    });
+  }
+
+  void _onAlturaAguaChanged() {
+    _debounceVolume?.cancel();
+    _debounceVolume = Timer(const Duration(milliseconds: 600), () {
+      _calcularVolumeAgua();
     });
   }
 
@@ -192,6 +203,36 @@ class _MedicoesPageState extends State<MedicoesPage> {
     }
   }
 
+  Future<void> _calcularVolumeAgua() async {
+    final cm = _aguaCmCtrl.text.trim();
+    if (cm.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _volAguaCtrl.text = '';
+        });
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _calculandoVolume = true);
+
+    try {
+      final mm = _aguaMmCtrl.text.trim();
+      final volume = await _buscarVolumeReal(cm, mm);
+      
+      _volAguaCtrl.text = volume > 0 ? _formatarVolume(volume).replaceAll(' L', '') : '';
+      
+      if (mounted) setState(() => _calculandoVolume = false);
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _volAguaCtrl.text = '';
+          _calculandoVolume = false;
+        });
+      }
+    }
+  }
+
   // ── Cálculo do volume a 20ºC ──────────────────────────────────────────────
 
   Future<void> _calcularVolume20() async {
@@ -225,7 +266,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
         if (mounted) {
           setState(() {
             _vol20Ctrl.text = '';
-            _fcdCtrl.text = '';
+            _densidade20Ctrl.text = '';
             _fcvCtrl.text = '';
             _calculandoVolume20 = false;
           });
@@ -283,6 +324,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
       if (mounted) {
         setState(() {
           _fcvCtrl.text = fcv;
+          _densidade20Ctrl.text = dens20;
           _vol20Ctrl.text = _formatarVolume(vol20).replaceAll(' L', '');
           _massaCtrl.text = _formatarVolume(massa).replaceAll(' L', '');
           _calculandoVolume20 = false;
@@ -687,10 +729,11 @@ class _MedicoesPageState extends State<MedicoesPage> {
     _tempTanqueCtrl.clear();
     _densidadeObsCtrl.clear();
     _tempObsCtrl.clear();
-    _fcdCtrl.clear();
+    _densidade20Ctrl.clear();
     _fcvCtrl.clear();
     _aguaCmCtrl.clear();
     _aguaMmCtrl.clear();
+    _volAguaCtrl.clear();
     _massaCtrl.clear();
     _vol20Ctrl.clear();
     _observacoesCtrl.clear();
@@ -743,9 +786,9 @@ class _MedicoesPageState extends State<MedicoesPage> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _buildField('Alt. cm', '0', controller: _cmCtrl, maxLength: 4)),
+                      Expanded(child: _buildField('Alt. cm (Produto)', '0', controller: _cmCtrl, maxLength: 4)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildField('Alt. mm', '0', controller: _mmCtrl, maxLength: 1)),
+                      Expanded(child: _buildField('Alt. mm (Produto)', '0', controller: _mmCtrl, maxLength: 1)),
                       const SizedBox(width: 8),
                       Expanded(
                         child: _buildField(
@@ -755,6 +798,23 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           maxLength: 10,
                           enabled: false,
                           isLoading: _calculandoVolume,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, maxLength: 4)),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, maxLength: 1)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildField(
+                          'Vol. Calc. de Água',
+                          '0',
+                          controller: _volAguaCtrl,
+                          enabled: false,
                         ),
                       ),
                     ],
@@ -815,22 +875,25 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           },
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildField('FCD', '0,0000', controller: _fcdCtrl, maxLength: 6)),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildField('FCV', '0,0000', controller: _fcvCtrl, maxLength: 6, enabled: false)),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _buildField('Água cm', '0', controller: _aguaCmCtrl, maxLength: 4)),
+                      Expanded(
+                        child: _buildField(
+                          'Densid. a 20ºC',
+                          '0,0000',
+                          controller: _densidade20Ctrl,
+                          enabled: false,
+                        ),
+                      ),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildField('Água mm', '0', controller: _aguaMmCtrl, maxLength: 1)),
+                      Expanded(
+                        child: _buildField(
+                          'FCV',
+                          '0,0000',
+                          controller: _fcvCtrl,
+                          maxLength: 6,
+                          enabled: false,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -904,9 +967,10 @@ class _MedicoesPageState extends State<MedicoesPage> {
     String valorAntigo = effectiveController.text;
     
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               label,
@@ -929,6 +993,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
         const SizedBox(height: 4),
         TextField(
           controller: effectiveController,
+          textAlign: TextAlign.center,
           focusNode: focusNode,
           maxLines: maxLines,
           maxLength: maxLength,
