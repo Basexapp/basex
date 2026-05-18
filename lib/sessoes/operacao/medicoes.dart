@@ -233,6 +233,30 @@ class _MedicoesPageState extends State<MedicoesPage> {
         return;
       }
 
+      // ───────────────────────────────────────────────────────────────────────
+      // Verificação para suspender cálculo se produtos.tabela_alcool for TRUE
+      // ───────────────────────────────────────────────────────────────────────
+      final supabase = Supabase.instance.client;
+      final prodRes = await supabase
+          .from('produtos')
+          .select('tabela_alcool')
+          .eq('nome', produtoNome)
+          .maybeSingle();
+
+      if (prodRes != null && prodRes['tabela_alcool'] == true) {
+        print('DEBUG FCV: Produto $produtoNome possui tabela_alcool=TRUE. Suspendendo cálculo.');
+        if (mounted) {
+          setState(() {
+            _fcvCtrl.text = '-';
+            _vol20Ctrl.text = '-';
+            _massaCtrl.text = '-';
+            _calculandoVolume20 = false;
+          });
+        }
+        return;
+      }
+      // ───────────────────────────────────────────────────────────────────────
+
       final fcv = await _buscarFCV(
         temperaturaTanque: tempTanque,
         densidade20C: dens20,
@@ -345,9 +369,15 @@ class _MedicoesPageState extends State<MedicoesPage> {
     required String densidadeObservada,
     required String produtoNome,
   }) async {
+    print('DEBUG DENS20: Iniciando busca de Densidade a 20°C');
+    print('DEBUG DENS20: Entradas -> tempAmostra: $temperaturaAmostra, densObs: $densidadeObservada, produto: $produtoNome');
+
     final supabase = Supabase.instance.client;
     try {
-      if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) return '-';
+      if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) {
+        print('DEBUG DENS20: Parâmetros vazios.');
+        return '-';
+      }
 
       final tempNum = double.tryParse(
         temperaturaAmostra
@@ -358,9 +388,14 @@ class _MedicoesPageState extends State<MedicoesPage> {
             .trim(),
       );
       final densNum = double.tryParse(densidadeObservada.replaceAll(',', '.').trim());
-      if (tempNum == null || densNum == null) return '-';
+      
+      if (tempNum == null || densNum == null) {
+        print('DEBUG DENS20: Falha ao converter valores para double.');
+        return '-';
+      }
 
       final int alvo = (densNum * 1000).round();
+      print('DEBUG DENS20: Alvo calculado (densObs * 1000): $alvo');
 
       final temperaturasTeste = <String>{
         tempNum.toStringAsFixed(0).replaceAll('.', ','),
@@ -369,13 +404,23 @@ class _MedicoesPageState extends State<MedicoesPage> {
         tempNum.toStringAsFixed(0),
         tempNum.toStringAsFixed(1),
       }.toList();
+      
+      print('DEBUG DENS20: Temperaturas para tentar no banco: $temperaturasTeste');
 
       Map<String, dynamic>? linha;
       for (final t in temperaturasTeste) {
+        print('DEBUG DENS20: Consultando tcd_gasolina_diesel para temperatura_obs = $t');
         linha = await supabase.from('tcd_gasolina_diesel').select('*').eq('temperatura_obs', t).maybeSingle();
-        if (linha != null) break;
+        if (linha != null) {
+          print('DEBUG DENS20: Linha encontrada para temp $t');
+          break;
+        }
       }
-      if (linha == null) return '-';
+      
+      if (linha == null) {
+        print('DEBUG DENS20: Nenhuma linha encontrada para as temperaturas testadas.');
+        return '-';
+      }
 
       int? melhorDelta;
       dynamic melhorValor;
@@ -391,8 +436,13 @@ class _MedicoesPageState extends State<MedicoesPage> {
           melhorValor = valor;
         }
       }
-      if (melhorValor == null) return '-';
+      
+      if (melhorValor == null) {
+        print('DEBUG DENS20: Nenhum valor de coluna d_XXX encontrado na linha.');
+        return '-';
+      }
 
+      print('DEBUG DENS20: Melhor valor encontrado: $melhorValor (delta: $melhorDelta)');
       String valorFinal = melhorValor.toString().trim().replaceAll('.', ',');
       if (!valorFinal.contains(',')) valorFinal = '$valorFinal,0';
       final partes = valorFinal.split(',');
@@ -408,15 +458,23 @@ class _MedicoesPageState extends State<MedicoesPage> {
     required String densidade20C,
     required String produtoNome,
   }) async {
+    print('DEBUG FCV: Iniciando busca de FCV');
+    print('DEBUG FCV: Entradas -> tempTanque: $temperaturaTanque, dens20C: $densidade20C, produto: $produtoNome');
+    
     final supabase = Supabase.instance.client;
     try {
       if (temperaturaTanque.isEmpty || temperaturaTanque == '-' ||
-          densidade20C.isEmpty || densidade20C == '-') return '-';
+          densidade20C.isEmpty || densidade20C == '-') {
+        print('DEBUG FCV: Parâmetros vazios ou "-" detectados.');
+        return '-';
+      }
 
       final nomeProdutoLower = produtoNome.toLowerCase().trim();
       final nomeView = (nomeProdutoLower.contains('anidro') || nomeProdutoLower.contains('hidratado'))
           ? 'tcv_anidro_hidratado_vw'
-          : 'tcv_gasolina_diesel_vw';
+          : 'tcv_gasolina_diesel';
+          
+      print('DEBUG FCV: Tabela/View utilizada: $nomeView');
 
       String temperaturaFormatada = temperaturaTanque
           .replaceAll(' ºC', '')
@@ -435,12 +493,18 @@ class _MedicoesPageState extends State<MedicoesPage> {
           .trim()
           .replaceAll('.', ',');
 
+      print('DEBUG FCV: Formatados -> temp: $temperaturaFormatada, dens: $densidadeFormatada');
+
       final densidadeNum = double.tryParse(densidadeFormatada.replaceAll(',', '.'));
       const double densidadeLimite = 0.8780;
       if (densidadeNum != null && densidadeNum > densidadeLimite) {
+        print('DEBUG FCV: Densidade $densidadeNum > $densidadeLimite, limitando para 0,8780');
         densidadeFormatada = '0,8780';
       }
-      if (!densidadeFormatada.contains(',')) return '-';
+      if (!densidadeFormatada.contains(',')) {
+        print('DEBUG FCV: Erro - Densidade formatada não possui vírgula.');
+        return '-';
+      }
 
       final partes = densidadeFormatada.split(',');
       String parteInteira = partes[0];
@@ -449,6 +513,8 @@ class _MedicoesPageState extends State<MedicoesPage> {
       final codigoBase = '$parteInteira$parteDecimal'.padLeft(5, '0');
       final colunaExata = 'v_$codigoBase';
       final prefixo = 'v_${codigoBase.substring(0, 4)}';
+
+      print('DEBUG FCV: Alvos -> colunaExata: $colunaExata, prefixo: $prefixo');
 
       int? codigoFcvAlvo() {
         final cod = colunaExata.replaceFirst('v_', '');
@@ -480,20 +546,24 @@ class _MedicoesPageState extends State<MedicoesPage> {
           }
         }
         if (melhorColuna == null || melhorValor == null) return null;
+        print('DEBUG FCV: Mais próximo -> Coluna: $melhorColuna, Delta: $melhorDelta');
         return {'coluna': melhorColuna, 'valor': melhorValor};
       }
 
       bool colunaInexistente = false;
       try {
+        print('DEBUG FCV: Tentativa 1 (Exata) -> Tqv: $nomeView, Col: $colunaExata, Temp: $temperaturaFormatada');
         final r1 = await supabase
             .from(nomeView)
             .select(colunaExata)
             .eq('temperatura_obs', temperaturaFormatada)
             .maybeSingle();
         if (r1 != null && r1[colunaExata] != null) {
+          print('DEBUG FCV: Sucesso na busca exata: ${r1[colunaExata]}');
           return _formatarResultadoFCV(r1[colunaExata].toString());
         }
       } catch (e) {
+        print('DEBUG FCV: Exceção na busca exata: $e');
         final msg = e.toString().toLowerCase();
         if (msg.contains('does not exist') || msg.contains('42703')) {
           colunaInexistente = true;
@@ -501,6 +571,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
       }
 
       if (colunaInexistente) {
+        print('DEBUG FCV: Tentativa 2 (Proximidade) em $nomeView para temp $temperaturaFormatada');
         final linha = await supabase
             .from(nomeView)
             .select('*')
@@ -509,10 +580,14 @@ class _MedicoesPageState extends State<MedicoesPage> {
             .maybeSingle();
         if (linha != null) {
           final escolha = valorMaisProximo(linha);
-          if (escolha != null) return _formatarResultadoFCV(escolha['valor'].toString());
+          if (escolha != null) {
+            print('DEBUG FCV: Sucesso na busca por proximidade: ${escolha['valor']}');
+            return _formatarResultadoFCV(escolha['valor'].toString());
+          }
         }
       }
 
+      print('DEBUG FCV: Tentativa 3 (Prefixo) -> prefixo: $prefixo');
       final linha = await supabase
           .from(nomeView)
           .select('*')
@@ -522,10 +597,12 @@ class _MedicoesPageState extends State<MedicoesPage> {
       if (linha != null) {
         final colunasEncontradas = linha.keys.where((k) => k.startsWith(prefixo)).toList();
         if (colunasEncontradas.isNotEmpty) {
+          print('DEBUG FCV: Sucesso por prefixo (${colunasEncontradas.first}): ${linha[colunasEncontradas.first]}');
           return _formatarResultadoFCV(linha[colunasEncontradas.first].toString());
         }
       }
 
+      print('DEBUG FCV: Tentativa 4 (Ajustes de Temperatura)');
       List<String> temperaturasParaTentar = [];
       if (temperaturaFormatada.contains(',')) {
         final p = temperaturaFormatada.split(',');
@@ -546,6 +623,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
       temperaturasParaTentar = <String>{...temperaturasParaTentar, ...comPonto}.toList();
 
       for (final temp in temperaturasParaTentar) {
+        print('DEBUG FCV: Tentando variação temp: $temp');
         final linhaFb = await supabase
             .from(nomeView)
             .select('*')
@@ -555,12 +633,15 @@ class _MedicoesPageState extends State<MedicoesPage> {
         if (linhaFb == null) continue;
         final cols = linhaFb.keys.where((k) => k.startsWith(prefixo)).toList();
         if (cols.isNotEmpty) {
+          print('DEBUG FCV: Sucesso em variação -> temp: $temp, col: ${cols.first}, valor: ${linhaFb[cols.first]}');
           return _formatarResultadoFCV(linhaFb[cols.first].toString());
         }
       }
 
+      print('DEBUG FCV: Nenhuma correspondência encontrada.');
       return '-';
-    } catch (_) {
+    } catch (e) {
+      print('DEBUG FCV: Erro crítico: $e');
       return '-';
     }
   }
