@@ -31,8 +31,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
   final TextEditingController _volAmbProdutoCtrl = TextEditingController();
   final TextEditingController _tempTanqueCtrl = TextEditingController();
   final TextEditingController _densidadeObsCtrl = TextEditingController();
-  final TextEditingController _densidade20Ctrl = TextEditingController();
-  final TextEditingController _tempObsCtrl = TextEditingController();
+  final TextEditingController _grauAlcoolGLCtrl = TextEditingController();
   final TextEditingController _fcvCtrl = TextEditingController();
   final TextEditingController _aguaCmCtrl = TextEditingController();
   final TextEditingController _aguaMmCtrl = TextEditingController();
@@ -44,7 +43,6 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
   // FocusNodes para disparar cálculos ao perder o foco
   final FocusNode _tempTanqueFocus = FocusNode();
   final FocusNode _densidadeObsFocus = FocusNode();
-  final FocusNode _tempObsFocus = FocusNode();
 
   // Estados de cálculo
   bool _calculandoVolume = false;
@@ -70,12 +68,11 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     // Adiciona listeners para perda de foco
     _tempTanqueFocus.addListener(_onFocusChanged);
     _densidadeObsFocus.addListener(_onFocusChanged);
-    _tempObsFocus.addListener(_onFocusChanged);
   }
 
   void _onFocusChanged() {
-    // Se nenhum dos campos de entrada de cálculo 20C tem o foco, força o cálculo
-    if (!_tempTanqueFocus.hasFocus && !_densidadeObsFocus.hasFocus && !_tempObsFocus.hasFocus) {
+    // Se nenhum dos campos de entrada tem o foco, força o cálculo
+    if (!_tempTanqueFocus.hasFocus && !_densidadeObsFocus.hasFocus) {
       _calcularVolume20();
     }
   }
@@ -86,7 +83,6 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     _debounceVolume20?.cancel();
     _tempTanqueFocus.dispose();
     _densidadeObsFocus.dispose();
-    _tempObsFocus.dispose();
     _tanqueCtrl.dispose();
     _dataCtrl.dispose();
     _horarioCtrl.dispose();
@@ -96,8 +92,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     _volAmbProdutoCtrl.dispose();
     _tempTanqueCtrl.dispose();
     _densidadeObsCtrl.dispose();
-    _tempObsCtrl.dispose();
-    _densidade20Ctrl.dispose();
+    _grauAlcoolGLCtrl.dispose();
     _fcvCtrl.dispose();
     _aguaCmCtrl.dispose();
     _aguaMmCtrl.dispose();
@@ -272,9 +267,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     final supabase = Supabase.instance.client;
 
     // Validações básicas antes de salvar
-    if (_horarioCtrl.text.isEmpty || _cmCtrl.text.isEmpty || _tempTanqueCtrl.text.isEmpty) {
+    if (_horarioCtrl.text.isEmpty || _cmCtrl.text.isEmpty || _tempTanqueCtrl.text.isEmpty || _densidadeObsCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha os campos obrigatórios.'), backgroundColor: Colors.red),
+        const SnackBar(content: Text('Por favor, preencha os campos obrigatórios: Horário, Altura, Temp. Tanque e Densid. Obs.'), backgroundColor: Colors.red),
       );
       return;
     }
@@ -319,8 +314,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         'vol_agua': _parseNumero(_volAguaCtrl.text),
         'temperatura_tanque': _parseNumero(_tempTanqueCtrl.text),
         'densidade_observada': _parseNumero(_densidadeObsCtrl.text),
-        'temperatura_amostra': _parseNumero(_tempObsCtrl.text),
-        'densidade_20': _parseNumero(_densidade20Ctrl.text),
+        'grau_alcolico_gl': _parseNumero(_grauAlcoolGLCtrl.text),
         'fcv': _parseNumero(_fcvCtrl.text),
         'massa': _parseNumero(_massaCtrl.text),
         'volume_20': _parseNumero(_vol20Ctrl.text),
@@ -344,82 +338,48 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     }
   }
 
-  // ── Cálculo do volume a 20ºC ──────────────────────────────────────────────
+  // ── Cálculo para Álcool usando tabela tcv_alcool ──────────────────────────
 
   Future<void> _calcularVolume20() async {
     final tempTanque = _tempTanqueCtrl.text.trim();
     final densObs = _densidadeObsCtrl.text.trim();
-    final tempAmostra = _tempObsCtrl.text.trim();
 
-    if (tempTanque.isEmpty || densObs.isEmpty || tempAmostra.isEmpty) {
-      if (mounted) setState(() => _vol20Ctrl.text = '');
+    if (tempTanque.isEmpty || densObs.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _vol20Ctrl.text = '';
+          _grauAlcoolGLCtrl.text = '';
+          _fcvCtrl.text = '';
+        });
+      }
       return;
     }
 
     final volAmb = _volumeTotalRaw - _volumeAguaRaw;
     if (volAmb <= 0) {
-      if (mounted) setState(() => _vol20Ctrl.text = '');
+      if (mounted) {
+        setState(() {
+          _vol20Ctrl.text = '';
+          _massaCtrl.text = '';
+        });
+      }
       return;
     }
-
-    final produtoNome = widget.produtoNome ?? '';
 
     if (mounted) setState(() => _calculandoVolume20 = true);
 
     try {
-      final dens20Data = await _buscarDensidade20C(
-        temperaturaAmostra: tempAmostra,
+      // Busca na tabela tcv_alcool
+      final resultado = await _buscarTabelaAlcool(
+        temperatura: tempTanque,
         densidadeObservada: densObs,
-        produtoNome: produtoNome,
       );
 
-      final dens20 = dens20Data['valor'] ?? '-';
-
-      if (dens20 == '-') {
+      if (resultado == null) {
         if (mounted) {
           setState(() {
             _vol20Ctrl.text = '';
-            _densidade20Ctrl.text = '';
-            _calculandoVolume20 = false;
-          });
-        }
-        return;
-      }
-
-      // ───────────────────────────────────────────────────────────────────────
-      // Verificação para suspender cálculo se produtos.tabela_alcool for TRUE
-      // ───────────────────────────────────────────────────────────────────────
-      final supabase = Supabase.instance.client;
-      final prodRes = await supabase
-          .from('produtos')
-          .select('tabela_alcool')
-          .eq('nome', produtoNome)
-          .maybeSingle();
-
-      if (prodRes != null && prodRes['tabela_alcool'] == true) {
-        print('DEBUG FCV: Produto $produtoNome possui tabela_alcool=TRUE. Suspendendo cálculo.');
-        if (mounted) {
-          setState(() {
-            _fcvCtrl.text = '-';
-            _vol20Ctrl.text = '-';
-            _massaCtrl.text = '-';
-            _calculandoVolume20 = false;
-          });
-        }
-        return;
-      }
-      // ───────────────────────────────────────────────────────────────────────
-
-      final fcv = await _buscarFCV(
-        temperaturaTanque: tempTanque,
-        densidade20C: dens20,
-        produtoNome: produtoNome,
-      );
-
-      if (fcv == '-') {
-        if (mounted) {
-          setState(() {
-            _vol20Ctrl.text = '';
+            _grauAlcoolGLCtrl.text = '';
             _fcvCtrl.text = '';
             _calculandoVolume20 = false;
           });
@@ -427,28 +387,94 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         return;
       }
 
-      final fcvNum = double.tryParse(fcv.replaceAll(',', '.')) ?? 1.0;
+      final fcvNum = resultado['fcv'];
       final vol20 = volAmb * fcvNum;
-
-      final dens20Num = double.tryParse(dens20.replaceAll(',', '.')) ?? 0;
-      final massa = vol20 * dens20Num;
+      
+      // Densidade a 20°C (kg/m³) -> converte para kg/L dividindo por 1000
+      final densidade20 = resultado['densidade20'] / 1000;
+      final massa = vol20 * densidade20;
 
       if (mounted) {
         setState(() {
-          _fcvCtrl.text = fcv;
-          _densidade20Ctrl.text = dens20;
+          _grauAlcoolGLCtrl.text = resultado['grauGl'].toStringAsFixed(2).replaceAll('.', ',');
+          _fcvCtrl.text = resultado['fcv'].toStringAsFixed(4).replaceAll('.', ',');
           _vol20Ctrl.text = _formatarVolume(vol20).replaceAll(' L', '');
           _massaCtrl.text = _formatarVolume(massa).replaceAll(' L', '');
           _calculandoVolume20 = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      print('Erro no cálculo do álcool: $e');
       if (mounted) {
         setState(() {
           _vol20Ctrl.text = '';
+          _grauAlcoolGLCtrl.text = '';
+          _fcvCtrl.text = '';
           _calculandoVolume20 = false;
         });
       }
+    }
+  }
+
+  Future<Map<String, dynamic>?> _buscarTabelaAlcool({
+    required String temperatura,
+    required String densidadeObservada,
+  }) async {
+    final supabase = Supabase.instance.client;
+    
+    try {
+      // Converte os valores de entrada (vírgula para ponto)
+      final tempNum = double.tryParse(temperatura.replaceAll(',', '.')) ?? 0;
+      double densNum = double.tryParse(densidadeObservada.replaceAll(',', '.')) ?? 0;
+      
+      // 🔥 CORREÇÃO: Converte de kg/L para kg/m³ (multiplica por 1000)
+      // Se o valor for menor que 10, assume que está em kg/L e converte
+      if (densNum < 10) {
+        densNum = densNum * 1000;
+      }
+      
+      // Busca todos os registros com a mesma temperatura (com tolerância de 0.1°C)
+      final registros = await supabase
+          .from('tcv_alcool')
+          .select('*')
+          .gte('temp_obs', tempNum - 0.1)
+          .lte('temp_obs', tempNum + 0.1)
+          .order('densid_obs');
+      
+      if (registros.isEmpty) {
+        debugPrint('Tabela Alcoométrica: Nenhum registro para temperatura $tempNum');
+        return null;
+      }
+      
+      // Encontra o registro com densidade observada mais próxima
+      Map<String, dynamic>? melhorRegistro;
+      double menorDiferenca = double.infinity;
+      
+      for (var reg in registros) {
+        final densReg = (reg['densid_obs'] as num).toDouble();
+        final diferenca = (densReg - densNum).abs();
+        
+        if (diferenca < menorDiferenca) {
+          menorDiferenca = diferenca;
+          melhorRegistro = reg;
+        }
+      }
+      
+      if (melhorRegistro == null) return null;
+
+      // Extrai os valores numéricos
+      final fcv = (melhorRegistro['fcv'] as num).toDouble();
+      final densidade20 = (melhorRegistro['densid_vinte'] as num).toDouble();
+      final grauGl = (melhorRegistro['grau_alcol_gl'] as num).toDouble();
+      
+      return {
+        'fcv': fcv,
+        'densidade20': densidade20,
+        'grauGl': grauGl,
+      };
+    } catch (e) {
+      debugPrint('Erro na busca da tabela alcoométrica: $e');
+      return null;
     }
   }
 
@@ -518,309 +544,6 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     }
   }
 
-  Future<Map<String, String>> _buscarDensidade20C({
-    required String temperaturaAmostra,
-    required String densidadeObservada,
-    required String produtoNome,
-  }) async {
-    print('DEBUG DENS20: Iniciando busca de Densidade a 20°C');
-    print('DEBUG DENS20: Entradas -> tempAmostra: $temperaturaAmostra, densObs: $densidadeObservada, produto: $produtoNome');
-
-    final supabase = Supabase.instance.client;
-    try {
-      if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) {
-        print('DEBUG DENS20: Parâmetros vazios.');
-        return {'valor': '-', 'fcd': '-'};
-      }
-
-      final tempNum = double.tryParse(
-        temperaturaAmostra
-            .replaceAll(' ºC', '')
-            .replaceAll('°C', '')
-            .replaceAll('ºC', '')
-            .replaceAll(',', '.')
-            .trim(),
-      );
-      final densNum = double.tryParse(densidadeObservada.replaceAll(',', '.').trim());
-
-      if (tempNum == null || densNum == null) {
-        print('DEBUG DENS20: Falha ao converter valores para double.');
-        return {'valor': '-', 'fcd': '-'};
-      }
-
-      final int alvo = (densNum * 1000).round();
-      print('DEBUG DENS20: Alvo calculado (densObs * 1000): $alvo');
-
-      final temperaturasTeste = <String>{
-        tempNum.toStringAsFixed(0).replaceAll('.', ','),
-        tempNum.toStringAsFixed(1).replaceAll('.', ','),
-        tempNum.toStringAsFixed(2).replaceAll('.', ','),
-        tempNum.toStringAsFixed(0),
-        tempNum.toStringAsFixed(1),
-      }.toList();
-
-      print('DEBUG DENS20: Temperaturas para tentar no banco: $temperaturasTeste');
-
-      Map<String, dynamic>? linha;
-      for (final t in temperaturasTeste) {
-        print('DEBUG DENS20: Consultando tcd_gasolina_diesel para temperatura_obs = $t');
-        linha = await supabase.from('tcd_gasolina_diesel').select('*').eq('temperatura_obs', t).maybeSingle();
-        if (linha != null) {
-          print('DEBUG DENS20: Linha encontrada para temp $t');
-          break;
-        }
-      }
-
-      if (linha == null) {
-        print('DEBUG DENS20: Nenhuma linha encontrada para as temperaturas testadas.');
-        return {'valor': '-', 'fcd': '-'};
-      }
-
-      int? melhorDelta;
-      dynamic melhorValor;
-      String? melhorColuna;
-      for (final entry in linha.entries) {
-        if (!entry.key.startsWith('d_')) continue;
-        final cod = int.tryParse(entry.key.replaceFirst('d_', ''));
-        if (cod == null) continue;
-        final valor = entry.value;
-        if (valor == null || valor.toString().trim().isEmpty) continue;
-        final delta = (cod - alvo).abs();
-        if (melhorDelta == null || delta < melhorDelta) {
-          melhorDelta = delta;
-          melhorColuna = entry.key;
-          melhorValor = valor;
-        }
-      }
-
-      if (melhorValor == null) {
-        print('DEBUG DENS20: Nenhum valor de coluna d_XXX encontrado na linha.');
-        return {'valor': '-', 'fcd': '-'};
-      }
-
-      print('DEBUG DENS20: Melhor valor encontrado: $melhorValor (delta: $melhorDelta)');
-      String valorFinal = melhorValor.toString().trim().replaceAll('.', ',');
-      if (!valorFinal.contains(',')) valorFinal = '$valorFinal,0';
-      final partes = valorFinal.split(',');
-      String parteDecimal = (partes.length > 1 ? partes[1] : '0').padRight(4, '0').substring(0, 4);
-
-      String fcdValue = '-';
-      if (melhorColuna != null) {
-        final fcdNumStr = melhorColuna.replaceFirst('d_', '');
-        fcdValue = '0,$fcdNumStr';
-      }
-
-      return {'valor': '${partes[0]},$parteDecimal', 'fcd': fcdValue};
-    } catch (_) {
-      return {'valor': '-', 'fcd': '-'};
-    }
-  }
-
-  Future<String> _buscarFCV({
-    required String temperaturaTanque,
-    required String densidade20C,
-    required String produtoNome,
-  }) async {
-    print('DEBUG FCV: Iniciando busca de FCV');
-    print('DEBUG FCV: Entradas -> tempTanque: $temperaturaTanque, dens20C: $densidade20C, produto: $produtoNome');
-
-    final supabase = Supabase.instance.client;
-    try {
-      if (temperaturaTanque.isEmpty || temperaturaTanque == '-' ||
-          densidade20C.isEmpty || densidade20C == '-') {
-        print('DEBUG FCV: Parâmetros vazios ou "-" detectados.');
-        return '-';
-      }
-
-      final nomeProdutoLower = produtoNome.toLowerCase().trim();
-      final nomeView = (nomeProdutoLower.contains('anidro') || nomeProdutoLower.contains('hidratado'))
-          ? 'tcv_anidro_hidratado_vw'
-          : 'tcv_gasolina_diesel';
-
-      print('DEBUG FCV: Tabela/View utilizada: $nomeView');
-
-      String temperaturaFormatada = temperaturaTanque
-          .replaceAll(' ºC', '')
-          .replaceAll('°C', '')
-          .replaceAll('ºC', '')
-          .replaceAll('°', '')
-          .replaceAll('C', '')
-          .trim()
-          .replaceAll('.', ',');
-
-      String densidadeFormatada = densidade20C
-          .replaceAll(' ', '')
-          .replaceAll('°C', '')
-          .replaceAll('ºC', '')
-          .replaceAll('°', '')
-          .trim()
-          .replaceAll('.', ',');
-
-      print('DEBUG FCV: Formatados -> temp: $temperaturaFormatada, dens: $densidadeFormatada');
-
-      final densidadeNum = double.tryParse(densidadeFormatada.replaceAll(',', '.'));
-      const double densidadeLimite = 0.8780;
-      if (densidadeNum != null && densidadeNum > densidadeLimite) {
-        print('DEBUG FCV: Densidade $densidadeNum > $densidadeLimite, limitando para 0,8780');
-        densidadeFormatada = '0,8780';
-      }
-      if (!densidadeFormatada.contains(',')) {
-        print('DEBUG FCV: Erro - Densidade formatada não possui vírgula.');
-        return '-';
-      }
-
-      final partes = densidadeFormatada.split(',');
-      String parteInteira = partes[0];
-      String parteDecimal = partes[1].padRight(4, '0');
-      parteDecimal = '${parteDecimal.substring(0, 3)}0';
-      final codigoBase = '$parteInteira$parteDecimal'.padLeft(5, '0');
-      final colunaExata = 'v_$codigoBase';
-      final prefixo = 'v_${codigoBase.substring(0, 4)}';
-
-      print('DEBUG FCV: Alvos -> colunaExata: $colunaExata, prefixo: $prefixo');
-
-      int? codigoFcvAlvo() {
-        final cod = colunaExata.replaceFirst('v_', '');
-        return int.tryParse(cod);
-      }
-
-      Map<String, dynamic>? valorMaisProximo(Map<String, dynamic> linha) {
-        final alvo = codigoFcvAlvo();
-        if (alvo == null) return null;
-        int? melhorDelta;
-        String? melhorColuna;
-        dynamic melhorValor;
-        for (final entry in linha.entries) {
-          final key = entry.key;
-          if (!key.startsWith('v_')) continue;
-          final cod = int.tryParse(key.substring(2));
-          if (cod == null) continue;
-          final valor = entry.value;
-          if (valor == null) continue;
-          if (valor is String) {
-            final limpo = valor.trim();
-            if (limpo.isEmpty || limpo == '-' || limpo.toLowerCase() == 'null') continue;
-          }
-          final delta = (cod - alvo).abs();
-          if (melhorDelta == null || delta < melhorDelta) {
-            melhorDelta = delta;
-            melhorColuna = key;
-            melhorValor = valor;
-          }
-        }
-        if (melhorColuna == null || melhorValor == null) return null;
-        print('DEBUG FCV: Mais próximo -> Coluna: $melhorColuna, Delta: $melhorDelta');
-        return {'coluna': melhorColuna, 'valor': melhorValor};
-      }
-
-      bool colunaInexistente = false;
-      try {
-        print('DEBUG FCV: Tentativa 1 (Exata) -> Tqv: $nomeView, Col: $colunaExata, Temp: $temperaturaFormatada');
-        final r1 = await supabase
-            .from(nomeView)
-            .select(colunaExata)
-            .eq('temperatura_obs', temperaturaFormatada)
-            .maybeSingle();
-        if (r1 != null && r1[colunaExata] != null) {
-          print('DEBUG FCV: Sucesso na busca exata: ${r1[colunaExata]}');
-          return _formatarResultadoFCV(r1[colunaExata].toString());
-        }
-      } catch (e) {
-        print('DEBUG FCV: Exceção na busca exata: $e');
-        final msg = e.toString().toLowerCase();
-        if (msg.contains('does not exist') || msg.contains('42703')) {
-          colunaInexistente = true;
-        }
-      }
-
-      if (colunaInexistente) {
-        print('DEBUG FCV: Tentativa 2 (Proximidade) em $nomeView para temp $temperaturaFormatada');
-        final linha = await supabase
-            .from(nomeView)
-            .select('*')
-            .eq('temperatura_obs', temperaturaFormatada)
-            .limit(1)
-            .maybeSingle();
-        if (linha != null) {
-          final escolha = valorMaisProximo(linha);
-          if (escolha != null) {
-            print('DEBUG FCV: Sucesso na busca por proximidade: ${escolha['valor']}');
-            return _formatarResultadoFCV(escolha['valor'].toString());
-          }
-        }
-      }
-
-      print('DEBUG FCV: Tentativa 3 (Prefixo) -> prefixo: $prefixo');
-      final linha = await supabase
-          .from(nomeView)
-          .select('*')
-          .eq('temperatura_obs', temperaturaFormatada)
-          .limit(1)
-          .maybeSingle();
-      if (linha != null) {
-        final colunasEncontradas = linha.keys.where((k) => k.startsWith(prefixo)).toList();
-        if (colunasEncontradas.isNotEmpty) {
-          print('DEBUG FCV: Sucesso por prefixo (${colunasEncontradas.first}): ${linha[colunasEncontradas.first]}');
-          return _formatarResultadoFCV(linha[colunasEncontradas.first].toString());
-        }
-      }
-
-      print('DEBUG FCV: Tentativa 4 (Ajustes de Temperatura)');
-      List<String> temperaturasParaTentar = [];
-      if (temperaturaFormatada.contains(',')) {
-        final p = temperaturaFormatada.split(',');
-        temperaturasParaTentar.addAll([
-          '${p[0]},${p[1]}',
-          '${p[0]},${p[1]}0',
-          '${p[0]},0${p[1]}',
-          '${p[0]}',
-        ]);
-      } else {
-        temperaturasParaTentar.addAll([
-          '$temperaturaFormatada,0',
-          '$temperaturaFormatada,00',
-          temperaturaFormatada,
-        ]);
-      }
-      final comPonto = temperaturasParaTentar.map((t) => t.replaceAll(',', '.')).toList();
-      temperaturasParaTentar = <String>{...temperaturasParaTentar, ...comPonto}.toList();
-
-      for (final temp in temperaturasParaTentar) {
-        print('DEBUG FCV: Tentando variação temp: $temp');
-        final linhaFb = await supabase
-            .from(nomeView)
-            .select('*')
-            .eq('temperatura_obs', temp)
-            .limit(1)
-            .maybeSingle();
-        if (linhaFb == null) continue;
-        final cols = linhaFb.keys.where((k) => k.startsWith(prefixo)).toList();
-        if (cols.isNotEmpty) {
-          print('DEBUG FCV: Sucesso em variação -> temp: $temp, col: ${cols.first}, valor: ${linhaFb[cols.first]}');
-          return _formatarResultadoFCV(linhaFb[cols.first].toString());
-        }
-      }
-
-      print('DEBUG FCV: Nenhuma correspondência encontrada.');
-      return '-';
-    } catch (e) {
-      print('DEBUG FCV: Erro crítico: $e');
-      return '-';
-    }
-  }
-
-  String _formatarResultadoFCV(String valorBruto) {
-    String valorLimpo = valorBruto.trim().replaceAll('.', ',');
-    if (!valorLimpo.contains(',')) valorLimpo = '$valorLimpo,0';
-    final partes = valorLimpo.split(',');
-    if (partes.length == 2) {
-      String parteDecimal = partes[1].padRight(4, '0');
-      if (parteDecimal.length > 4) parteDecimal = parteDecimal.substring(0, 4);
-      return '${partes[0]},$parteDecimal';
-    }
-    return valorLimpo;
-  }
-
   String _formatarVolume(double volume) {
     final inteiro = volume.round();
     String str = inteiro.toString();
@@ -861,7 +584,6 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
       'Alt. mm',
       'Temp. Tanque',
       'Densid. Obs.',
-      'Temp. Obs.'
     ].contains(label);
 
     // Validação básica: se for obrigatório e estiver vazio, exibe alerta
@@ -914,7 +636,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                   label.contains('Dens') ||
                   label.contains('Alt') ||
                   label.contains('Vol') ||
-                  label.contains('FCD') ||
+                  label.contains('Grau') ||
                   label.contains('FCV') ||
                   label.contains('Massa') ||
                   label.contains('Água')
@@ -974,10 +696,11 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
       ),
       content: SingleChildScrollView(
         child: SizedBox(
-          width: 500,
+          width: 600,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Primeira linha: Tanque, Data, Horário
               Row(
                 children: [
                   Expanded(child: _buildField('Tanque', 'Ex: TQ-01', controller: _tanqueCtrl, enabled: false)),
@@ -1003,6 +726,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
+              
+              // Segunda linha: Alturas e Volume total
               Row(
                 children: [
                   Expanded(child: _buildField('Alt. cm', '0', controller: _cmCtrl, maxLength: 4)),
@@ -1022,6 +747,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
+              
+              // Terceira linha: Água
               Row(
                 children: [
                   Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, maxLength: 4)),
@@ -1039,6 +766,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
+              
+              // Quarta linha: Temperatura, Densidade, Grau Alcóolico e FCV (conforme solicitado)
               Row(
                 children: [
                   Expanded(
@@ -1079,27 +808,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildField(
-                      'Temp. Obs.',
-                      '00,0',
-                      controller: _tempObsCtrl,
-                      focusNode: _tempObsFocus,
-                      onChanged: (v, controller, antigo) {
-                        final masked = _aplicarMascaraTemperatura(v, antigo);
-                        if (masked != v) {
-                          controller.value = TextEditingValue(
-                            text: masked,
-                            selection: TextSelection.collapsed(offset: masked.length),
-                          );
-                        }
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildField(
-                      'Densid. a 20ºC',
-                      '0,0000',
-                      controller: _densidade20Ctrl,
+                      'Grau Alcoo. GL',
+                      '0,00',
+                      controller: _grauAlcoolGLCtrl,
                       enabled: false,
                     ),
                   ),
@@ -1115,6 +826,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
+              
+              // Quinta linha: Massa, Volume Ambiente, Volume 20°C
               Row(
                 children: [
                   Expanded(
@@ -1149,6 +862,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
+              
+              // Sexta linha: Observações
               _buildField('Observações', '', controller: _observacoesCtrl, maxLines: 2),
             ],
           ),

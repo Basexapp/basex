@@ -403,14 +403,14 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                           child: OutlinedButton(
                             onPressed: () => Navigator.pop(context),
                             style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Colors.grey),
+                              side: const BorderSide(color: Color(0xFF0D47A1)),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
                             child: Text(
                               widget.readOnly ? "Voltar" : "Cancelar",
-                              style: const TextStyle(color: Colors.grey),
+                              style: const TextStyle(color: Color(0xFF0D47A1)),
                             ),
                           ),
                         ),
