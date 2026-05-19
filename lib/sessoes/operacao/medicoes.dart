@@ -25,14 +25,35 @@ class _MedicoesPageState extends State<MedicoesPage> {
   int? _hoverIndex;
   List<Map<String, dynamic>> _medicoesReais = [];
   bool _carregandoLista = false;
+  bool _ehAlcool = false;
 
   @override
   void initState() {
     super.initState();
+    _verificarTipoProduto();
     _carregarMedicoes();
   }
 
   // ── Persistência e busca de dados ─────────────────────────────────────────
+
+  Future<void> _verificarTipoProduto() async {
+    if (widget.produtoNome == null) return;
+    final supabase = Supabase.instance.client;
+    try {
+      final prodRes = await supabase
+          .from('produtos')
+          .select('tabela_alcool')
+          .eq('nome', widget.produtoNome!)
+          .maybeSingle();
+      if (prodRes != null && mounted) {
+        setState(() {
+          _ehAlcool = prodRes['tabela_alcool'] == true;
+        });
+      }
+    } catch (e) {
+      print('Erro ao verificar tipo de produto: $e');
+    }
+  }
 
   Future<void> _carregarMedicoes() async {
     if (mounted) setState(() => _carregandoLista = true);
@@ -201,7 +222,9 @@ class _MedicoesPageState extends State<MedicoesPage> {
                   _buildHeaderCell('Vol. Amb', flex: 3),
                   _buildHeaderCell('Temp. Tq', flex: 2),
                   _buildHeaderCell('Dens. Obs', flex: 2),
-                  _buildHeaderCell('Temp. Obs', flex: 2),
+                  if (!_ehAlcool) _buildHeaderCell('Temp. Obs', flex: 2),
+                  if (!_ehAlcool) _buildHeaderCell('Dens. 20°C', flex: 2),
+                  if (_ehAlcool) _buildHeaderCell('Grau GL', flex: 2),
                   _buildHeaderCell('FCV', flex: 2),
                   _buildHeaderCell('Massa', flex: 3),
                   _buildHeaderCell('Vol. 20°C', flex: 3),
@@ -258,9 +281,38 @@ class _MedicoesPageState extends State<MedicoesPage> {
                                             ? _formatarVolume(medicao['volume_ambiente'].toDouble()).replaceAll(' L', '')
                                             : '-',
                                         flex: 3),
-                                    _buildDataCell(medicao['temperatura_tanque']?.toString().replaceAll('.', ','), flex: 2),
-                                    _buildDataCell(medicao['densidade_observada']?.toString().replaceAll('.', ','), flex: 2),
-                                    _buildDataCell(medicao['temperatura_amostra']?.toString().replaceAll('.', ','), flex: 2),
+                                    _buildDataCell(
+                                        medicao['temperatura_tanque'] != null
+                                            ? '${medicao['temperatura_tanque'].toString().replaceAll('.', ',')} °C'
+                                            : '-',
+                                        flex: 2),
+                                    _buildDataCell(
+                                        medicao['densidade_observada'] != null
+                                            ? double.parse(medicao['densidade_observada'].toString())
+                                                .toStringAsFixed(4)
+                                                .replaceAll('.', ',')
+                                            : '-',
+                                        flex: 2),
+                                    if (!_ehAlcool)
+                                      _buildDataCell(
+                                          medicao['temperatura_amostra'] != null
+                                              ? '${medicao['temperatura_amostra'].toString().replaceAll('.', ',')} °C'
+                                              : '-',
+                                          flex: 2),
+                                    if (!_ehAlcool)
+                                      _buildDataCell(
+                                          medicao['densidade_20'] != null
+                                              ? double.parse(medicao['densidade_20'].toString())
+                                                  .toStringAsFixed(4)
+                                                  .replaceAll('.', ',')
+                                              : '-',
+                                          flex: 2),
+                                    if (_ehAlcool)
+                                      _buildDataCell(
+                                          medicao['grau_alcolico_gl'] != null
+                                              ? '${medicao['grau_alcolico_gl'].toString().replaceAll('.', ',')} °GL'
+                                              : '-',
+                                          flex: 2),
                                     _buildDataCell(medicao['fcv']?.toString().replaceAll('.', ','), flex: 2),
                                     _buildDataCell(
                                         medicao['massa'] != null
