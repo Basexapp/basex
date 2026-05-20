@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../login_page.dart';
+import 'dialog_medicoes_gasol.dart';
+import 'dialog_medicoes_alcool.dart';
 
 class ThousandSeparatorInputFormatter extends TextInputFormatter {
   @override
@@ -46,6 +49,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   String? empresaId;
   String? empresaNome;
 
+  List<Map<String, dynamic>> _tanques = [];
+  Map<String, dynamic>? _selectedTanque;
+  String _produtoNome = '';
+  final TextEditingController _produtoCtrl = TextEditingController();
+
   final List<String> _distribuidorasFixas = [
     'Zema', 'Raízen', 'Sim Distr.', 'Larco Distr.'
   ];
@@ -69,12 +77,75 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
     selecionadas = {for (var d in _distribuidorasFixas) d: false};
     controllers = {for (var d in _distribuidorasFixas) d: TextEditingController()};
+    _fetchTanques();
+  }
+
+  Future<void> _fetchTanques() async {
+    if (terminalId == null) return;
+    try {
+      final List<dynamic> data = await Supabase.instance.client
+          .from('tanques')
+          .select('id, referencia, id_produto, produtos(nome)')
+          .eq('terminal_id', terminalId as Object);
+      
+      if (mounted) {
+        setState(() {
+          _tanques = List<Map<String, dynamic>>.from(data);
+        });
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar tanques: $e');
+    }
+  }
+
+  void _abrirDialogOInserirMedicao() async {
+    final supabase = Supabase.instance.client;
+    bool usarTabelaAlcool = false;
+    final produtoNome = _produtoCtrl.text;
+    final tanqueRef = _selectedTanque?['referencia'];
+
+    if (produtoNome.isNotEmpty) {
+      try {
+        final prodRes = await supabase
+            .from('produtos')
+            .select('tabela_alcool')
+            .eq('nome', produtoNome)
+            .maybeSingle();
+        if (prodRes != null && prodRes['tabela_alcool'] == true) {
+          usarTabelaAlcool = true;
+        }
+      } catch (e) {
+        debugPrint('Erro ao verificar tabela_alcool: $e');
+      }
+    }
+
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => usarTabelaAlcool
+          ? DialogMedicoesAlcool(
+              produtoNome: produtoNome,
+              tanqueReferencia: tanqueRef,
+              data: dataCtrl.text,
+              horario: horarioCtrl.text,
+              onSaved: () {},
+            )
+          : DialogMedicoesGasol(
+              produtoNome: produtoNome,
+              tanqueReferencia: tanqueRef,
+              data: dataCtrl.text,
+              horario: horarioCtrl.text,
+              onSaved: () {},
+            ),
+    );
   }
 
   @override
   void dispose() {
     dataCtrl.dispose();
     horarioCtrl.dispose();
+    _produtoCtrl.dispose();
     for (var c in controllers.values) c.dispose();
     super.dispose();
   }
@@ -158,7 +229,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               Row(
                 children: [
                   SizedBox(
-                    width: 150,
+                    width: 125,
                     child: TextField(
                       controller: dataCtrl,
                       keyboardType: TextInputType.number,
@@ -203,7 +274,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
-                    width: 142,
+                    width: 110,
                     child: TextField(
                       controller: horarioCtrl,
                       keyboardType: TextInputType.number,
@@ -226,6 +297,49 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         floatingLabelBehavior: FloatingLabelBehavior.always,
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: DropdownButtonFormField<Map<String, dynamic>>(
+                      value: _selectedTanque,
+                      decoration: const InputDecoration(
+                        labelText: 'Tanque',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        floatingLabelBehavior: FloatingLabelBehavior.always,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      items: _tanques.map((t) {
+                        return DropdownMenuItem<Map<String, dynamic>>(
+                          value: t,
+                          child: Text(t['referencia'] ?? '', style: const TextStyle(fontSize: 13)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedTanque = val;
+                          _produtoNome = val?['produtos']?['nome'] ?? 'Sem produto';
+                          _produtoCtrl.text = _produtoNome;
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: _produtoCtrl,
+                      readOnly: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Produto',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                        floatingLabelBehavior: FloatingLabelBehavior.always,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
                     ),
                   ),
                 ],
@@ -373,7 +487,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 const Divider(height: 1, color: Color(0xFFE0E0E0)),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: _abrirDialogOInserirMedicao,
                   icon: const Icon(Icons.straighten, size: 18),
                   label: const Text('Inserir medição inicial'),
                   style: ElevatedButton.styleFrom(

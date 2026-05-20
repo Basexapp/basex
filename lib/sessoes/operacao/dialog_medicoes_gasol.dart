@@ -7,12 +7,16 @@ import '../../login_page.dart';
 class DialogMedicoesGasol extends StatefulWidget {
   final String? produtoNome;
   final String? tanqueReferencia;
+  final String? data;
+  final String? horario;
   final VoidCallback onSaved;
 
   const DialogMedicoesGasol({
     super.key,
     this.produtoNome,
     this.tanqueReferencia,
+    this.data,
+    this.horario,
     required this.onSaved,
   });
 
@@ -60,7 +64,10 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
   void initState() {
     super.initState();
     _tanqueCtrl.text = widget.tanqueReferencia ?? '';
-    _dataCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
+    _dataCtrl.text = widget.data ?? DateFormat('dd/MM/yyyy').format(DateTime.now());
+    if (widget.horario != null) {
+      _horarioCtrl.text = widget.horario!.contains('h') ? widget.horario! : '${widget.horario!} h';
+    }
 
     _cmCtrl.addListener(_onAlturaChanged);
     _mmCtrl.addListener(_onAlturaChanged);
