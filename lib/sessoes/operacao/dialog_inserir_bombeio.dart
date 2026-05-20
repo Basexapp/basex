@@ -65,7 +65,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   String valorAntigoHorario = '';
   String valorAntigoData = '';
   bool dataInvalida = false;
+  bool salvando = false;
   Map<String, dynamic>? _medicaoInicialSalva;
+  Map<String, dynamic>? _medicaoFinalSalva;
 
   @override
   void initState() {
@@ -88,10 +90,27 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
           .from('tanques')
           .select('id, referencia, id_produto, produtos(nome)')
           .eq('terminal_id', terminalId as Object);
-      
+
       if (mounted) {
+        final List<Map<String, dynamic>> tanquesList =
+            List<Map<String, dynamic>>.from(data);
+
+        // Ordenação customizada pelo número do tanque (ex: TQ-01-JN)
+        tanquesList.sort((a, b) {
+          int getNum(String ref) {
+            final parts = ref.split('-');
+            if (parts.length >= 2) {
+              return int.tryParse(parts[1]) ?? 0;
+            }
+            return 0;
+          }
+
+          return getNum(a['referencia'] ?? '')
+              .compareTo(getNum(b['referencia'] ?? ''));
+        });
+
         setState(() {
-          _tanques = List<Map<String, dynamic>>.from(data);
+          _tanques = tanquesList;
         });
       }
     } catch (e) {
@@ -99,7 +118,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
   }
 
-  void _abrirDialogOInserirMedicao() async {
+  void _abrirDialogOInserirMedicao({bool isFinal = false}) async {
     final supabase = Supabase.instance.client;
     bool usarTabelaAlcool = false;
     final produtoNome = _produtoCtrl.text;
@@ -132,7 +151,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               horario: horarioCtrl.text,
               onSaved: (map) {
                 setState(() {
-                  _medicaoInicialSalva = map;
+                  if (isFinal) {
+                    _medicaoFinalSalva = map;
+                  } else {
+                    _medicaoInicialSalva = map;
+                  }
                 });
               },
             )
@@ -143,7 +166,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               horario: horarioCtrl.text,
               onSaved: (map) {
                 setState(() {
-                  _medicaoInicialSalva = map;
+                  if (isFinal) {
+                    _medicaoFinalSalva = map;
+                  } else {
+                    _medicaoInicialSalva = map;
+                  }
                 });
               },
             ),
@@ -157,6 +184,75 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     _produtoCtrl.dispose();
     for (var c in controllers.values) c.dispose();
     super.dispose();
+  }
+
+  Future<void> _salvarBombeio() async {
+    if (_selectedTanque == null || dataCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Preencha os campos obrigatórios (Data e Tanque)')),
+      );
+      return;
+    }
+
+    setState(() => salvando = true);
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Formatar data (dd/MM/yyyy -> yyyy-MM-dd)
+      String dataIso = '';
+      if (dataCtrl.text.length == 10) {
+        final d = dataCtrl.text.split('/');
+        dataIso = '${d[2]}-${d[1]}-${d[0]}';
+      }
+
+      // Formatar horário (HH:mm h -> HH:mm)
+      String horarioIso = horarioCtrl.text.replaceAll(' h', '');
+
+      // Coletar volumes solicitados
+      final Map<String, double> volumes = {};
+      double total = 0;
+      for (var d in _distribuidorasFixas) {
+        if (selecionadas[d]!) {
+          final val = double.tryParse(controllers[d]!.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+          volumes[d] = val;
+          total += val;
+        }
+      }
+
+      final payload = {
+        'terminal_id': terminalId,
+        'empresa_id': empresaId,
+        'tanque_id': _selectedTanque!['id'],
+        'num_controle': null,
+        'data': dataIso.isNotEmpty ? dataIso : null,
+        'horario': horarioIso.isNotEmpty ? horarioIso : null,
+        'medicao_inicial_id': _medicaoInicialSalva?['id'],
+        'medicao_final_id': _medicaoFinalSalva?['id'],
+        'volumes_solicitados': volumes,
+        'total_bombeio': total,
+      };
+
+      await supabase.from('bombeios').insert(payload);
+
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bombeio salvo com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar bombeio: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => salvando = false);
+    }
   }
 
   void _validarData(String v) {
@@ -244,6 +340,48 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildMedicaoDisplay(Map<String, dynamic> medicao, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.straighten, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildInfoColumn('Nº Controle', medicao['num_controle'] ?? '-'),
+              _buildInfoColumn('Data', _formatarDataIso(medicao['data'])),
+              _buildInfoColumn('Horário', _formatarHorario(medicao['horario'])),
+              _buildInfoColumn('Vol. Amb.', '${_fmt.format((medicao['volume_ambiente'] as num?)?.toInt() ?? 0)} L'),
+              _buildInfoColumn('Vol. 20ºC', '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L'),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -537,40 +675,53 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 const SizedBox(height: 8),
                 const Divider(height: 1, color: Color(0xFFE0E0E0)),
                 const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: _abrirDialogOInserirMedicao,
-                  icon: const Icon(Icons.straighten, size: 18),
-                  label: const Text('Inserir medição inicial'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[200],
-                    foregroundColor: const Color(0xFF0D47A1),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: const BorderSide(color: Color(0xFF0D47A1)),
+                if (_medicaoInicialSalva == null)
+                  ElevatedButton.icon(
+                    onPressed: () => _abrirDialogOInserirMedicao(isFinal: false),
+                    icon: const Icon(Icons.straighten, size: 18),
+                    label: const Text('Inserir medição inicial'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      foregroundColor: const Color(0xFF0D47A1),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: const BorderSide(color: Color(0xFF0D47A1)),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
-                ),
                 if (_medicaoInicialSalva != null) ...[
+                  _buildMedicaoDisplay(
+                    _medicaoInicialSalva!,
+                    'MEDIÇÃO INICIAL',
+                    const Color(0xFF0D47A1),
+                  ),
+                  if (_medicaoFinalSalva == null) ...[
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () => _abrirDialogOInserirMedicao(isFinal: true),
+                      icon: const Icon(Icons.straighten, size: 18),
+                      label: const Text('Inserir medição final'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange[50],
+                        foregroundColor: Colors.orange[900],
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: Colors.orange[900]!),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                    ),
+                  ],
+                ],
+                if (_medicaoFinalSalva != null) ...[
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF0D47A1), width: 0.5),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildInfoColumn('Nº Controle', _medicaoInicialSalva!['num_controle'] ?? '-'),
-                        _buildInfoColumn('Data', _formatarDataIso(_medicaoInicialSalva!['data'])),
-                        _buildInfoColumn('Horário', _formatarHorario(_medicaoInicialSalva!['horario'])),
-                        _buildInfoColumn('Vol. Amb.', '${_fmt.format((_medicaoInicialSalva!['volume_ambiente'] as num?)?.toInt() ?? 0)} L'),
-                        _buildInfoColumn('Vol. 20ºC', '${_fmt.format((_medicaoInicialSalva!['volume_20'] as num?)?.toInt() ?? 0)} L'),
-                      ],
-                    ),
+                  _buildMedicaoDisplay(
+                    _medicaoFinalSalva!,
+                    'MEDIÇÃO FINAL',
+                    Colors.orange[900]!,
                   ),
                 ],
               ],
@@ -580,18 +731,20 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: salvando ? null : () => Navigator.pop(context),
           child: const Text('VOLTAR', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
         ),
         ElevatedButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: salvando ? null : _salvarBombeio,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF0D47A1),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
-          child: const Text('SALVAR', style: TextStyle(fontWeight: FontWeight.bold)),
+          child: salvando
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+              : const Text('SALVAR', style: TextStyle(fontWeight: FontWeight.bold)),
         ),
       ],
     );

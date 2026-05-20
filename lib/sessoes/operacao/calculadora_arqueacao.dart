@@ -134,6 +134,20 @@ class _CalculadoraArqueacaoDialogState
         });
       }
 
+      // Ordenação numérica pela referência (ex: TQ-01-JN)
+      lista.sort((a, b) {
+        int getNum(String ref) {
+          final parts = ref.split('-');
+          if (parts.length >= 2) {
+            return int.tryParse(parts[1]) ?? 0;
+          }
+          return 0;
+        }
+
+        return getNum(a['referencia'] ?? '')
+            .compareTo(getNum(b['referencia'] ?? ''));
+      });
+
       if (mounted) {
         setState(() {
           _tanques = lista;
