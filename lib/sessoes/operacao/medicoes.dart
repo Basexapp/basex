@@ -217,6 +217,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                   _buildHeaderCell('Tanque', flex: 2),
                   _buildHeaderCell('Data', flex: 2),
                   _buildHeaderCell('Horário', flex: 2),
+                  _buildHeaderCell('Nº controle', flex: 2),
                   _buildHeaderCell('Alt. cm', flex: 2),
                   _buildHeaderCell('Alt. mm', flex: 2),
                   _buildHeaderCell('Vol. Amb', flex: 3),
@@ -274,6 +275,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                                     _buildDataCell(
                                         medicao['horario'] != null ? '${medicao['horario'].toString().substring(0, 5)} h' : '-',
                                         flex: 2),
+                                    _buildDataCell(medicao['num_controle']?.toString(), flex: 2),
                                     _buildDataCell(medicao['altura_total_cm']?.toString(), flex: 2),
                                     _buildDataCell(medicao['altura_total_mm']?.toString(), flex: 2),
                                     _buildDataCell(

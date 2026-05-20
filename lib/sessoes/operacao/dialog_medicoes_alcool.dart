@@ -47,6 +47,10 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
   // FocusNodes para disparar cálculos ao perder o foco
   final FocusNode _tempTanqueFocus = FocusNode();
   final FocusNode _densidadeObsFocus = FocusNode();
+  final FocusNode _cmFocus = FocusNode();
+  final FocusNode _mmFocus = FocusNode();
+  final FocusNode _aguaCmFocus = FocusNode();
+  final FocusNode _aguaMmFocus = FocusNode();
 
   // Estados de cálculo
   bool _calculandoVolume = false;
@@ -55,7 +59,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
   double _volumeAguaRaw = 0;
 
   // Debouncers
-  Timer? _debounceVolume;
+  Timer? _debounceVolumeAmbiente;
+  Timer? _debounceVolumeAgua;
   Timer? _debounceVolume20;
 
   @override
@@ -75,6 +80,10 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     // Adiciona listeners para perda de foco
     _tempTanqueFocus.addListener(_onFocusChanged);
     _densidadeObsFocus.addListener(_onFocusChanged);
+    _cmFocus.addListener(_onHeightFocusChanged);
+    _mmFocus.addListener(_onHeightFocusChanged);
+    _aguaCmFocus.addListener(_onAguaHeightFocusChanged);
+    _aguaMmFocus.addListener(_onAguaHeightFocusChanged);
   }
 
   void _onFocusChanged() {
@@ -84,12 +93,33 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     }
   }
 
+  void _onHeightFocusChanged() {
+    // Se perdeu o foco do bloco de alturas, força o cálculo imediato
+    if (!_cmFocus.hasFocus && !_mmFocus.hasFocus) {
+      _debounceVolumeAmbiente?.cancel();
+      _calcularVolumeAmbiente();
+    }
+  }
+
+  void _onAguaHeightFocusChanged() {
+    // Se perdeu o foco do bloco de alturas de água, força o cálculo imediato
+    if (!_aguaCmFocus.hasFocus && !_aguaMmFocus.hasFocus) {
+      _debounceVolumeAgua?.cancel();
+      _calcularVolumeAgua();
+    }
+  }
+
   @override
   void dispose() {
-    _debounceVolume?.cancel();
+    _debounceVolumeAmbiente?.cancel();
+    _debounceVolumeAgua?.cancel();
     _debounceVolume20?.cancel();
     _tempTanqueFocus.dispose();
     _densidadeObsFocus.dispose();
+    _cmFocus.dispose();
+    _mmFocus.dispose();
+    _aguaCmFocus.dispose();
+    _aguaMmFocus.dispose();
     _tanqueCtrl.dispose();
     _dataCtrl.dispose();
     _horarioCtrl.dispose();
@@ -111,17 +141,25 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
   }
 
   void _onAlturaChanged() {
-    _debounceVolume?.cancel();
-    _debounceVolume = Timer(const Duration(milliseconds: 600), () {
+    _debounceVolumeAmbiente?.cancel();
+    _debounceVolumeAmbiente = Timer(const Duration(milliseconds: 600), () {
       _calcularVolumeAmbiente();
     });
+    // Se ambos os campos têm valor, tenta calcular imediatamente em background
+    if (_cmCtrl.text.isNotEmpty && _mmCtrl.text.isNotEmpty) {
+      _calcularVolumeAmbiente();
+    }
   }
 
   void _onAlturaAguaChanged() {
-    _debounceVolume?.cancel();
-    _debounceVolume = Timer(const Duration(milliseconds: 600), () {
+    _debounceVolumeAgua?.cancel();
+    _debounceVolumeAgua = Timer(const Duration(milliseconds: 600), () {
       _calcularVolumeAgua();
     });
+    // Se ambos os campos têm valor, tenta calcular imediatamente em background
+    if (_aguaCmCtrl.text.isNotEmpty && _aguaMmCtrl.text.isNotEmpty) {
+      _calcularVolumeAgua();
+    }
   }
 
   String _aplicarMascaraHorario(String texto, String valorAntigo) {
@@ -737,9 +775,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
               // Segunda linha: Alturas e Volume total
               Row(
                 children: [
-                  Expanded(child: _buildField('Alt. cm', '0', controller: _cmCtrl, maxLength: 4)),
+                  Expanded(child: _buildField('Alt. cm', '0', controller: _cmCtrl, focusNode: _cmFocus, maxLength: 4)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildField('Alt. mm', '0', controller: _mmCtrl, maxLength: 1)),
+                  Expanded(child: _buildField('Alt. mm', '0', controller: _mmCtrl, focusNode: _mmFocus, maxLength: 1)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildField(
@@ -758,9 +796,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
               // Terceira linha: Água
               Row(
                 children: [
-                  Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, maxLength: 4)),
+                  Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, focusNode: _aguaCmFocus, maxLength: 4)),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, maxLength: 1)),
+                  Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, focusNode: _aguaMmFocus, maxLength: 1)),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildField(
