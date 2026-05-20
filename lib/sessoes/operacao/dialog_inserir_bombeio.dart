@@ -65,6 +65,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   String valorAntigoHorario = '';
   String valorAntigoData = '';
   bool dataInvalida = false;
+  Map<String, dynamic>? _medicaoInicialSalva;
 
   @override
   void initState() {
@@ -129,14 +130,22 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               tanqueReferencia: tanqueRef,
               data: dataCtrl.text,
               horario: horarioCtrl.text,
-              onSaved: () {},
+              onSaved: (map) {
+                setState(() {
+                  _medicaoInicialSalva = map;
+                });
+              },
             )
           : DialogMedicoesGasol(
               produtoNome: produtoNome,
               tanqueReferencia: tanqueRef,
               data: dataCtrl.text,
               horario: horarioCtrl.text,
-              onSaved: () {},
+              onSaved: (map) {
+                setState(() {
+                  _medicaoInicialSalva = map;
+                });
+              },
             ),
     );
   }
@@ -194,6 +203,48 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       resultado += apenasNumeros[i];
     }
     return resultado;
+  }
+
+  String _formatarDataIso(String? dataIso) {
+    if (dataIso == null) return '-';
+    try {
+      DateTime dt = DateTime.parse(dataIso);
+      return DateFormat('dd/MM/yyyy').format(dt);
+    } catch (e) {
+      return dataIso;
+    }
+  }
+
+  String _formatarHorario(dynamic horario) {
+    if (horario == null) return '-';
+    String s = horario.toString();
+    if (s.length >= 5) return s.substring(0, 5);
+    return s;
+  }
+
+  Widget _buildInfoColumn(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.grey,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            color: Color(0xFF0D47A1),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -501,6 +552,27 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   ),
                 ),
+                if (_medicaoInicialSalva != null) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFF0D47A1), width: 0.5),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildInfoColumn('Nº Controle', _medicaoInicialSalva!['num_controle'] ?? '-'),
+                        _buildInfoColumn('Data', _formatarDataIso(_medicaoInicialSalva!['data'])),
+                        _buildInfoColumn('Horário', _formatarHorario(_medicaoInicialSalva!['horario'])),
+                        _buildInfoColumn('Vol. Amb.', '${_fmt.format((_medicaoInicialSalva!['volume_ambiente'] as num?)?.toInt() ?? 0)} L'),
+                        _buildInfoColumn('Vol. 20ºC', '${_fmt.format((_medicaoInicialSalva!['volume_20'] as num?)?.toInt() ?? 0)} L'),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ],
           ),

@@ -9,7 +9,7 @@ class DialogMedicoesAlcool extends StatefulWidget {
   final String? tanqueReferencia;
   final String? data;
   final String? horario;
-  final VoidCallback onSaved;
+  final Function(Map<String, dynamic>)? onSaved;
 
   const DialogMedicoesAlcool({
     super.key,
@@ -17,7 +17,7 @@ class DialogMedicoesAlcool extends StatefulWidget {
     this.tanqueReferencia,
     this.data,
     this.horario,
-    required this.onSaved,
+    this.onSaved,
   });
 
   @override
@@ -367,14 +367,14 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         'observacoes': _observacoesCtrl.text.trim(),
       };
 
-      await supabase.from('medicoes').insert(payload);
+      final savedMedicao = await supabase.from('medicoes').insert(payload).select().single();
 
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Medição salva com sucesso!'), backgroundColor: Colors.green),
         );
-        widget.onSaved();
+        if (widget.onSaved != null) widget.onSaved!(savedMedicao);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

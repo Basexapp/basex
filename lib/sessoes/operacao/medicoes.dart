@@ -146,12 +146,12 @@ class _MedicoesPageState extends State<MedicoesPage> {
           ? DialogMedicoesAlcool(
               produtoNome: widget.produtoNome,
               tanqueReferencia: widget.tanqueReferencia,
-              onSaved: _carregarMedicoes,
+              onSaved: (_) => _carregarMedicoes(),
             )
           : DialogMedicoesGasol(
               produtoNome: widget.produtoNome,
               tanqueReferencia: widget.tanqueReferencia,
-              onSaved: _carregarMedicoes,
+              onSaved: (_) => _carregarMedicoes(),
             ),
     );
   }
