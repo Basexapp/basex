@@ -48,9 +48,11 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
   String? terminalSelecionadoId;
   String? produtoSelecionado;
   String? produtoSelecionadoId;
+  String? tanqueSelecionadoId;
 
   // RECOLOCANDO AS VARIÁVEIS QUE FORAM REMOVIDAS ACIDENTALMENTE
   List<Map<String, dynamic>> produtosDisponiveis = [];
+  List<Map<String, dynamic>> tanquesDisponiveis = [];
   List<Map<String, dynamic>> terminais = [];
 
   bool carregando = true;
@@ -61,18 +63,14 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
 
   UsuarioAtual? get user => UsuarioAtual.instance;
 
-  List<Map<String, dynamic>> _todosRegistrosFicticios = [];
+  List<Map<String, dynamic>> _todosRegistros = [];
   List<Map<String, dynamic>> registrosExibidos = [];
-
-  final List<String> _distribuidorasFixas = [
-    'Zema', 'Raízen', 'Sim Distr.', 'Larco Distr.'
-  ];
 
   @override
   void initState() {
     super.initState();
-    dataFinal = DateTime(2026, 4, 10);
-    dataInicial = DateTime(2026, 3, 1);
+    dataFinal = DateTime.now();
+    dataInicial = DateTime.now().subtract(const Duration(days: 30));
     
     // Inicializa variáveis globais do usuário
     if (user != null) {
@@ -81,8 +79,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
       empresaNome = user!.empresaNome;
     }
 
-    _carregarDadosViaUsuario();
-    _gerarDadosFicticios();
+    _carregarDadosIniciais();
     pesquisaController.addListener(_aplicarFiltrosLocal);
   }
 
@@ -92,7 +89,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     super.dispose();
   }
 
-  void _carregarDadosViaUsuario() async {
+  void _carregarDadosIniciais() async {
     setState(() => carregando = true);
     try {
       if (user == null) return;
@@ -105,8 +102,10 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
 
         final Map<String, Map<String, dynamic>> terminaisUnicos = {};
         for (var relacao in relacoes) {
-          if (relacao['terminais'] != null) {
-            final t = relacao['terminais'];
+          final terminaisArr = relacao['terminais'];
+          final t = terminaisArr is List ? (terminaisArr.isNotEmpty ? terminaisArr[0] : null) : terminaisArr;
+          
+          if (t != null) {
             terminaisUnicos[t['id']] = {
               'id': t['id'],
               'nome': t['nome_dois'] ?? 'Sem nome',
@@ -122,10 +121,11 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
             terminalSelecionadoId = terminais[0]['id'];
           }
           if (terminalSelecionadoId != null) {
-            _carregarProdutosPorTerminal(terminalSelecionadoId!);
+            _carregarTanquesPorTerminal(terminalSelecionadoId!);
           }
         });
       }
+      await _carregarBombeios();
     } catch (e) {
       debugPrint('Erro: $e');
     } finally {
@@ -133,102 +133,168 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     }
   }
 
-  Future<void> _carregarProdutosPorTerminal(String terminalId) async {
+  Future<void> _carregarBombeios() async {
     try {
-      final response = await _supabase
-          .from('tanques')
-          .select('id_produto, produtos(id, nome_dois)')
-          .eq('terminal_id', terminalId)
-          .not('id_produto', 'is', null);
+      var query = _supabase.from('bombeios').select('''
+        id,
+        num_controle,
+        data,
+        horario,
+        medicao_inicial_id,
+        medicao_final_id,
+        volumes_solicitados,
+        total_bombeio,
+        tanque_id,
+        tanques!bombeios_tanque_id_fkey (
+          referencia,
+          id_produto,
+          produtos (
+            nome_dois
+          )
+        )
+      ''');
 
-      final Map<String, Map<String, dynamic>> produtosUnicos = {};
-      for (var tanque in response) {
-        if (tanque['produtos'] != null) {
-          final p = tanque['produtos'];
-          produtosUnicos[p['id']] = {
-            'id': p['id'].toString(),
-            'nome': p['nome_dois'] ?? 'Sem nome',
-          };
-        }
+      if (terminalSelecionadoId != null) {
+        query = query.eq('terminal_id', terminalSelecionadoId!);
+      } else if (terminalId != null) {
+        query = query.eq('terminal_id', terminalId!);
       }
-      setState(() {
-        produtosDisponiveis = produtosUnicos.values.toList()..sort((a, b) => (a['nome'] ?? '').compareTo(b['nome'] ?? ''));
-      });
-    } catch (e) {
-      debugPrint('Erro: $e');
-    }
-  }
-
-  void _gerarDadosFicticios() {
-    final Random random = Random();
-    final List<String> produtos = ['Gasolina A', 'S500-A', 'S10-A'];
-    final List<String> tanques = ['TQ-01', 'TQ-05', 'TQ-10', 'TQ-12', 'TQ-20'];
-    
-    _todosRegistrosFicticios.clear();
-    for (int i = 0; i < 30; i++) {
-      final int diasDeDiferenca = random.nextInt(41);
-      final DateTime dataBase = DateTime(2026, 3, 1).add(Duration(days: diasDeDiferenca));
-      final int horaInicial = 6 + random.nextInt(12);
-      final int minutoInicial = random.nextInt(60);
-      final int duracaoMinutos = 220 + random.nextInt(40);
-      final DateTime dtInicio = DateTime(2026, 3, 1, horaInicial, minutoInicial).add(Duration(days: diasDeDiferenca));
-      final DateTime dtFim = dtInicio.add(Duration(minutes: duracaoMinutos));
-
-      String status;
-      bool ehHoje = dataBase.day == 10 && dataBase.month == 4 && dataBase.year == 2026;
-      if (ehHoje) {
-        status = 'Em andamento';
-      } else {
-        int r = random.nextInt(100);
-        if (r < 95) {
-          status = 'Concluído';
-        } else {
-          status = 'Cancelado';
-        }
+      
+      if (empresaId != null) {
+        query = query.eq('empresa_id', empresaId!);
       }
 
-      List<Map<String, dynamic>> participantes = [];
-      double totalPedido = 0;
-      double porcentagemRecebida = 0.8 + (random.nextDouble() * 0.2);
+      if (tanqueSelecionadoId != null) {
+        query = query.eq('tanque_id', tanqueSelecionadoId!);
+      }
 
-      for (String nomeDistribuidora in _distribuidorasFixas) {
-        // Garantindo que o volume solicitado seja múltiplo de 10.000
-        double solicitado = ((1 + random.nextInt(3)) * 10000).toDouble();
-        totalPedido += solicitado;
-        participantes.add({
-          'nome': nomeDistribuidora,
-          'solicitado': solicitado,
+      if (dataInicial != null) {
+        query = query.gte('data', dataInicial!.toIso8601String().split('T')[0]);
+      }
+      if (dataFinal != null) {
+        query = query.lte('data', dataFinal!.toIso8601String().split('T')[0]);
+      }
+
+      final response = await query.order('data', ascending: false).limit(100);
+
+      final List<Map<String, dynamic>> dadosTransformados = [];
+      for (var item in response) {
+        // Tenta buscar pela chave com o hint ou pela chave simples 'tanques'
+        final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
+        
+        // No Supabase, se for relationship many-to-one, pode vir como Map ou List
+        final tanques = tanquesArr is List ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null) : tanquesArr;
+        
+        final produto = tanques?['produtos']?['nome_dois'] ?? 'S/ Produto';
+        final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
+
+        String status = 'Concluído';
+        if (item['medicao_final_id'] == null) {
+          status = 'Em andamento';
+        }
+
+        double totalSolicitado = 0;
+        List<Map<String, dynamic>> participantes = [];
+        final rawVols = item['volumes_solicitados'];
+        
+        if (rawVols != null) {
+          List vols = [];
+          if (rawVols is List) {
+            vols = rawVols;
+          } else if (rawVols is Map) {
+            // Se por algum motivo for um objeto único, trata como lista de um item
+            vols = [rawVols];
+          }
+
+          for (var v in vols) {
+            if (v is Map) {
+              double sol = double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
+              totalSolicitado += sol;
+              participantes.add({
+                'nome': v['nome'] ?? 'S/ Distribuidora',
+                'solicitado': sol,
+              });
+            }
+          }
+        }
+
+        dadosTransformados.add({
+          'id': item['id'],
+          'tanque_id': item['tanque_id'],
+          'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
+          'produto': produto,
+          'tanque': tanqueNome,
+          'horario_inicial': item['horario']?.toString().substring(0, 5) ?? '--:--',
+          'horario_final': '--:--', 
+          'numero_controle': item['num_controle'] ?? 'S/N',
+          'status': status,
+          'volume_total': double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
+          'volume_solicitado': totalSolicitado,
+          'participantes': participantes,
         });
       }
 
-      double volumeTotalRecebido = totalPedido * porcentagemRecebida;
-
-      _todosRegistrosFicticios.add({
-        'id': i,
-        'data': dataBase,
-        'produto': produtos[random.nextInt(produtos.length)],
-        'tanque': tanques[random.nextInt(tanques.length)],
-        'horario_inicial': '${dtInicio.hour.toString().padLeft(2, "0")}:${dtInicio.minute.toString().padLeft(2, "0")}',
-        'horario_final': '${dtFim.hour.toString().padLeft(2, "0")}:${dtFim.minute.toString().padLeft(2, "0")}',
-        'numero_controle': 'BOMB-${1250 + i}',
-        'status': status,
-        'volume_total': volumeTotalRecebido,
-        'volume_solicitado': totalPedido,
-        'participantes': participantes,
+      setState(() {
+        _todosRegistros = dadosTransformados;
+        _aplicarFiltrosLocal();
       });
+    } catch (e) {
+      debugPrint('Erro ao carregar bombeios: $e');
     }
-    _todosRegistrosFicticios.sort((a, b) => (b['data'] as DateTime).compareTo(a['data'] as DateTime));
-    _aplicarFiltrosLocal();
+  }
+
+  Future<void> _carregarTanquesPorTerminal(String terminalId) async {
+    try {
+      final List<dynamic> data = await _supabase
+          .from('tanques')
+          .select('id, referencia, id_produto, produtos(id, nome_dois)')
+          .eq('terminal_id', terminalId);
+
+      final List<Map<String, dynamic>> tanquesList = List<Map<String, dynamic>>.from(data);
+
+      tanquesList.sort((a, b) {
+        int getNum(String ref) {
+          final parts = ref.split('-');
+          if (parts.length >= 2) {
+            return int.tryParse(parts[1]) ?? 0;
+          }
+          return 0;
+        }
+        return getNum(a['referencia'] ?? '').compareTo(getNum(b['referencia'] ?? ''));
+      });
+
+      final Map<String, Map<String, dynamic>> produtosSet = {};
+      for (var t in tanquesList) {
+        final prodArr = t['produtos'];
+        final prod = prodArr is List ? (prodArr.isNotEmpty ? prodArr[0] : null) : prodArr;
+        
+        if (prod != null) {
+          produtosSet[prod['id'].toString()] = {
+            'id': prod['id'].toString(),
+            'nome': prod['nome_dois'] ?? 'Sem nome',
+          };
+        }
+      }
+
+      setState(() {
+        tanquesDisponiveis = tanquesList;
+        produtosDisponiveis = produtosSet.values.toList()
+          ..sort((a, b) => (a['nome'] ?? '').compareTo(b['nome'] ?? ''));
+      });
+    } catch (e) {
+      debugPrint('Erro ao buscar tanques/produtos: $e');
+    }
   }
 
   void _aplicarFiltrosLocal() {
     setState(() {
-      registrosExibidos = _todosRegistrosFicticios.where((item) {
+      registrosExibidos = _todosRegistros.where((item) {
         final DateTime dt = item['data'] as DateTime;
         final String pesquisa = pesquisaController.text.toLowerCase();
         if (dataInicial != null && dt.isBefore(dataInicial!)) return false;
         if (dataFinal != null && dt.isAfter(dataFinal!.add(const Duration(days: 1)))) return false;
         if (produtoSelecionado != null && item['produto'] != produtoSelecionado) return false;
+        if (tanqueSelecionadoId != null && item['tanque_id'] != tanqueSelecionadoId) return false;
         if (pesquisa.isNotEmpty) {
           if (!(item['produto'] as String).toLowerCase().contains(pesquisa) && 
               !(item['numero_controle'] as String).toLowerCase().contains(pesquisa)) return false;
@@ -520,6 +586,25 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
             Row(
               children: [
                 SizedBox(
+                  width: 150,
+                  child: DropdownButtonFormField<String>(
+                    value: tanqueSelecionadoId,
+                    decoration: const InputDecoration(labelText: 'Tanque', border: OutlineInputBorder(), prefixIcon: Icon(Icons.storage, size: 18), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), isDense: true),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Todos tanques', style: TextStyle(fontSize: 13))),
+                      ...tanquesDisponiveis.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['referencia'] ?? '', style: const TextStyle(fontSize: 13)))),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        tanqueSelecionadoId = val;
+                      });
+                      _carregarBombeios();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
                   width: 250,
                   child: DropdownButtonFormField<String>(
                     value: produtoSelecionadoId,
@@ -563,16 +648,19 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                               terminalSelecionadoId = val;
                               produtoSelecionadoId = null;
                               produtoSelecionado = null;
-                              if (val != null) _carregarProdutosPorTerminal(val);
+                              tanqueSelecionadoId = null;
+                              if (val != null) {
+                                _carregarTanquesPorTerminal(val);
+                              }
                             });
-                            _aplicarFiltrosLocal();
+                            _carregarBombeios();
                           },
                   ),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(width: 140, child: _buildDatePicker('Data inicial', dataInicial, (d) { setState(() => dataInicial = d); _aplicarFiltrosLocal(); })),
+                SizedBox(width: 140, child: _buildDatePicker('Data inicial', dataInicial, (d) { setState(() => dataInicial = d); _carregarBombeios(); })),
                 const SizedBox(width: 8),
-                SizedBox(width: 140, child: _buildDatePicker('Data final', dataFinal, (d) { setState(() => dataFinal = d); _aplicarFiltrosLocal(); })),
+                SizedBox(width: 140, child: _buildDatePicker('Data final', dataFinal, (d) { setState(() => dataFinal = d); _carregarBombeios(); })),
                 const SizedBox(width: 8),
                 SizedBox(width: 300, child: TextField(controller: pesquisaController, decoration: const InputDecoration(labelText: 'Pesquisa geral', prefixIcon: Icon(Icons.search, size: 18), border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), isDense: true), style: const TextStyle(fontSize: 13))),
                 const SizedBox(width: 8),
@@ -752,7 +840,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                 IconButton(icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)), onPressed: widget.onVoltar),
                 const Text('Gestão de Bombeios', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1))),
                 const Spacer(),
-                if (!carregando) IconButton(icon: const Icon(Icons.refresh, color: Color(0xFF0D47A1)), onPressed: _gerarDadosFicticios),
+                if (!carregando) IconButton(icon: const Icon(Icons.refresh, color: Color(0xFF0D47A1)), onPressed: _carregarBombeios),
               ],
             ),
           ),
