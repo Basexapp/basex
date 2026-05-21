@@ -25,8 +25,9 @@ class DadosTanque {
     return detalhes.first.litros.clamp(0, capacidadeTotal);
   }
 
-  double get percentualPreenchimento =>
-      (estoqueAtual / capacidadeTotal * 100).clamp(0, 100);
+  double get percentualPreenchimento => capacidadeTotal > 0
+      ? (estoqueAtual / capacidadeTotal * 100).clamp(0, 100)
+      : 0;
 }
 
 class DetalheTanque {
@@ -700,8 +701,10 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                                         height: dynamicBaseHeight,
                                         child: TankIllustration(
                                           percentual: percentual / 100,
-                                          lastroPercentual: tanque.lastro /
-                                              tanque.capacidadeTotal,
+                                          lastroPercentual: tanque.capacidadeTotal > 0
+                                              ? (tanque.lastro /
+                                                  tanque.capacidadeTotal)
+                                              : 0,
                                           estoqueAtual: tanque.estoqueAtual,
                                           capacidade: tanque.capacidadeTotal,
                                           produtoDisponivel:

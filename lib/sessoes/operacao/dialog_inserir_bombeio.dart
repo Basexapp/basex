@@ -89,7 +89,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       final List<dynamic> data = await Supabase.instance.client
           .from('tanques')
           .select('id, referencia, id_produto, produtos(nome)')
-          .eq('terminal_id', terminalId as Object);
+          .eq('terminal_id', terminalId as Object)
+          .eq('tipo_abastecimento', 'exa');
 
       if (mounted) {
         final List<Map<String, dynamic>> tanquesList =
