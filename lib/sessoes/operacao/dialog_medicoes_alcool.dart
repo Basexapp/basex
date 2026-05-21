@@ -10,6 +10,7 @@ class DialogMedicoesAlcool extends StatefulWidget {
   final String? data;
   final String? horario;
   final Function(Map<String, dynamic>)? onSaved;
+  final bool exibirCamposAgua;
 
   const DialogMedicoesAlcool({
     super.key,
@@ -18,6 +19,7 @@ class DialogMedicoesAlcool extends StatefulWidget {
     this.data,
     this.horario,
     this.onSaved,
+    this.exibirCamposAgua = true,
   });
 
   @override
@@ -791,25 +793,25 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              
-              // Terceira linha: Água
-              Row(
-                children: [
-                  Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, focusNode: _aguaCmFocus, maxLength: 4)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, focusNode: _aguaMmFocus, maxLength: 1)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _buildField(
-                      'Vol. Calc. de Água',
-                      '0',
-                      controller: _volAguaCtrl,
-                      enabled: false,
+              if (widget.exibirCamposAgua) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, focusNode: _aguaCmFocus, maxLength: 4)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, focusNode: _aguaMmFocus, maxLength: 1)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildField(
+                        'Vol. Calc. de Água',
+                        '0',
+                        controller: _volAguaCtrl,
+                        enabled: false,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 12),
               
               // Quarta linha: Temperatura, Densidade, Grau Alcóolico e FCV (conforme solicitado)

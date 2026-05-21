@@ -319,7 +319,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                             child: Text('DISTRIBUIDORA',
                                 textAlign: TextAlign.left,
                                 style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.grey[700]))),
                         Expanded(
@@ -327,7 +327,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                             child: Text('%',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.grey[700]))),
                         Expanded(
@@ -335,7 +335,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                             child: Text('SOLICITADO',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.grey[700]))),
                         Expanded(
@@ -343,7 +343,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                             child: Text('RECEB. (AMB)',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.grey[700]))),
                         Expanded(
@@ -351,7 +351,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                             child: Text('RECEB. (20ºC)',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.grey[700]))),
                       ],
@@ -401,7 +401,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                                           Text(
                                             p['nome'].toString().toUpperCase(),
                                             style: const TextStyle(
-                                              fontSize: 11,
+                                              fontSize: 13,
                                               fontWeight: FontWeight.bold,
                                               color: Color(0xFF263238),
                                             ),
@@ -431,7 +431,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                                   '${(percent * 100).toStringAsFixed(1)}%',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF455A64),
                                   ),
@@ -443,7 +443,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                                   '${_fmt.format(p['solicitado'].toInt())} L',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     color: Color(0xFF455A64),
                                   ),
@@ -455,7 +455,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                                   '${_fmt.format(recAmbPart.toInt())} L',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 11,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w700,
                                     color: colors[index % colors.length],
                                   ),
@@ -467,7 +467,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                                   '${_fmt.format(rec20Part.toInt())} L',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w900,
                                     color: colors[index % colors.length],
                                   ),

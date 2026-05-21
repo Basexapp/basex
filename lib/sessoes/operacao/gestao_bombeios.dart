@@ -142,6 +142,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         volumes_solicitados,
         total_bombeio,
         tanque_id,
+        qtd_faturada,
         tanques!bombeios_tanque_id_fkey (
           referencia,
           id_produto,
@@ -201,9 +202,16 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
         final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
 
-        String status = 'Concluído';
-        if (item['medicao_final_id'] == null) {
+        // Lógica de status baseada na presença de medições e faturamento
+        String status = '';
+        if (item['medicao_inicial_id'] == null && item['medicao_final_id'] == null) {
+          status = 'Definindo quantidades';
+        } else if (item['medicao_final_id'] == null) {
           status = 'Em andamento';
+        } else if (item['qtd_faturada'] == null) {
+          status = 'Aguardando informações';
+        } else {
+          status = 'Concluído';
         }
 
         double totalSolicitado = 0;
@@ -264,6 +272,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
           'participantes': participantes,
           'recebido_amb': recebidoAmb,
           'recebido_20': recebido20,
+          'qtd_faturada': item['qtd_faturada'],
           'medicao_inicial': medIni,
           'medicao_final': medFinal,
         });
@@ -331,8 +340,17 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         if (produtoSelecionado != null && item['produto'] != produtoSelecionado) return false;
         if (tanqueSelecionadoId != null && item['tanque_id'] != tanqueSelecionadoId) return false;
         if (pesquisa.isNotEmpty) {
-          if (!(item['produto'] as String).toLowerCase().contains(pesquisa) && 
-              !(item['numero_controle'] as String).toLowerCase().contains(pesquisa)) return false;
+          final String dataStr = _formatarData(dt).toLowerCase();
+          final String status = (item['status'] as String).toLowerCase();
+          final String tanque = (item['tanque'] as String).toLowerCase();
+          final String numControle = (item['numero_controle'] as String).toLowerCase();
+          final String produto = (item['produto'] as String).toLowerCase();
+          
+          if (!produto.contains(pesquisa) && 
+              !numControle.contains(pesquisa) &&
+              !dataStr.contains(pesquisa) &&
+              !status.contains(pesquisa) &&
+              !tanque.contains(pesquisa)) return false;
         }
         return true;
       }).toList();
@@ -344,7 +362,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
   Color _getStatusColor(String? status) {
     if (status == 'Concluído') return Colors.green;
     if (status == 'Em andamento') return Colors.orange;
-    return Colors.red;
+    if (status == 'Aguardando informações') return Colors.purple;
+    if (status == 'Definindo quantidades') return Colors.blue;
+    return Colors.grey;
   }
 
   Widget _buildListaBombeios() {
@@ -377,7 +397,10 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
               final item = registrosExibidos[index];
               final fmt = NumberFormat.decimalPattern('pt_BR');
               return InkWell(
-                onTap: () => setState(() { _bombeioSelecionado = item; _mostrarRateio = true; }),
+                onTap: () async {
+                  await DialogInserirBombeio.show(context, bombeio: item);
+                  _carregarBombeios();
+                },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 2, offset: const Offset(0, 1))]),
@@ -501,18 +524,6 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                 SizedBox(width: 140, child: _buildDatePicker('Data final', dataFinal, (d) { setState(() => dataFinal = d); _carregarBombeios(); })),
                 const SizedBox(width: 8),
                 SizedBox(width: 300, child: TextField(controller: pesquisaController, decoration: const InputDecoration(labelText: 'Pesquisa geral', prefixIcon: Icon(Icons.search, size: 18), border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), isDense: true), style: const TextStyle(fontSize: 13))),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.bar_chart, size: 18),
-                  label: const Text('Gráfico'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0D47A1),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                  ),
-                ),
               ],
             ),
           ],

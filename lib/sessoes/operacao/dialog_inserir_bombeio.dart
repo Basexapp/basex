@@ -26,12 +26,13 @@ class ThousandSeparatorInputFormatter extends TextInputFormatter {
 }
 
 class DialogInserirBombeio extends StatefulWidget {
-  const DialogInserirBombeio({super.key});
+  final Map<String, dynamic>? bombeio;
+  const DialogInserirBombeio({super.key, this.bombeio});
 
-  static void show(BuildContext context) {
-    showDialog(
+  static Future<void> show(BuildContext context, {Map<String, dynamic>? bombeio}) {
+    return showDialog(
       context: context,
-      builder: (context) => const DialogInserirBombeio(),
+      builder: (context) => DialogInserirBombeio(bombeio: bombeio),
     );
   }
 
@@ -62,12 +63,19 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   late final Map<String, TextEditingController> controllers;
   final TextEditingController dataCtrl = TextEditingController();
   final TextEditingController horarioCtrl = TextEditingController();
+  final TextEditingController _qtdFaturadaCtrl = TextEditingController();
+  final TextEditingController _recebidaAmbCtrl = TextEditingController();
+  final TextEditingController _recebida20Ctrl = TextEditingController();
+  final TextEditingController _difFaturadoCtrl = TextEditingController();
   String valorAntigoHorario = '';
   String valorAntigoData = '';
   bool dataInvalida = false;
   bool salvando = false;
   Map<String, dynamic>? _medicaoInicialSalva;
   Map<String, dynamic>? _medicaoFinalSalva;
+  Color _difColor = const Color(0xFF0D47A1);
+
+  bool get _temMedicoes => _medicaoInicialSalva != null || _medicaoFinalSalva != null;
 
   @override
   void initState() {
@@ -80,7 +88,91 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
     selecionadas = {for (var d in _distribuidorasFixas) d: false};
     controllers = {for (var d in _distribuidorasFixas) d: TextEditingController()};
+
+    if (widget.bombeio != null) {
+      final b = widget.bombeio!;
+      if (b['data'] != null) {
+        if (b['data'] is DateTime) {
+          dataCtrl.text = DateFormat('dd/MM/yyyy').format(b['data']);
+        } else {
+          dataCtrl.text = _formatarDataIso(b['data'].toString());
+        }
+      }
+      if (b['horario_inicial'] != null) {
+        horarioCtrl.text = '${b['horario_inicial']} h';
+      } else if (b['horario'] != null) {
+        horarioCtrl.text = '${b['horario'].toString().substring(0, 5)} h';
+      }
+
+      _medicaoInicialSalva = b['medicao_inicial'];
+      _medicaoFinalSalva = b['medicao_final'];
+      _atualizarCalculos();
+
+      final vsol = b['volumes_solicitados'];
+      if (vsol != null && vsol is Map) {
+        vsol.forEach((key, value) {
+          if (_distribuidorasFixas.contains(key)) {
+            selecionadas[key] = true;
+            controllers[key]!.text = _fmt.format((value as num).toDouble());
+          }
+        });
+      }
+
+      if (b['participantes'] != null && b['participantes'] is List) {
+        for (var p in b['participantes']) {
+          final nome = p['nome'];
+          final sol = p['solicitado'];
+          if (_distribuidorasFixas.contains(nome)) {
+            selecionadas[nome] = true;
+            controllers[nome]!.text = _fmt.format(sol.toInt());
+          }
+        }
+      }
+
+      if (b['qtd_faturada'] != null) {
+        _qtdFaturadaCtrl.text = _fmt.format((b['qtd_faturada'] as num).toInt());
+      }
+      _atualizarCalculos();
+    }
+
     _fetchTanques();
+    _qtdFaturadaCtrl.addListener(_atualizarCalculos);
+  }
+
+  void _atualizarCalculos() {
+    if (_medicaoInicialSalva != null && _medicaoFinalSalva != null) {
+      final double ambIni =
+          (_medicaoInicialSalva!['volume_ambiente'] as num?)?.toDouble() ?? 0;
+      final double ambFin =
+          (_medicaoFinalSalva!['volume_ambiente'] as num?)?.toDouble() ?? 0;
+      final double v20Ini =
+          (_medicaoInicialSalva!['volume_20'] as num?)?.toDouble() ?? 0;
+      final double v20Fin =
+          (_medicaoFinalSalva!['volume_20'] as num?)?.toDouble() ?? 0;
+
+      final double recebidoAmb = ambFin - ambIni;
+      final double recebido20 = v20Fin - v20Ini;
+
+      _recebidaAmbCtrl.text = _fmt.format(recebidoAmb.toInt());
+      _recebida20Ctrl.text = _fmt.format(recebido20.toInt());
+
+      // Cálculo da diferença faturado/recebido
+      final double faturado = double.tryParse(
+              _qtdFaturadaCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ??
+          0;
+
+      if (faturado > 0 && _qtdFaturadaCtrl.text.isNotEmpty) {
+        final double dif = recebido20 - faturado;
+        final double percentual = (dif / faturado) * 100;
+
+        _difFaturadoCtrl.text =
+            '${_fmt.format(dif.toInt())} L | ${percentual.toStringAsFixed(2).replaceAll('.', ',')}%';
+        _difColor = dif < 0 ? Colors.red : const Color(0xFF0D47A1);
+      } else {
+        _difFaturadoCtrl.text = '';
+        _difColor = const Color(0xFF0D47A1);
+      }
+    }
   }
 
   Future<void> _fetchTanques() async {
@@ -112,6 +204,15 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
         setState(() {
           _tanques = tanquesList;
+          if (widget.bombeio != null && widget.bombeio!['tanque_id'] != null) {
+            try {
+              _selectedTanque = _tanques.firstWhere(
+                (t) => t['id'] == widget.bombeio!['tanque_id'],
+              );
+              _produtoNome = _selectedTanque?['produtos']?['nome'] ?? '';
+              _produtoCtrl.text = _produtoNome;
+            } catch (_) {}
+          }
         });
       }
     } catch (e) {
@@ -150,6 +251,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               tanqueReferencia: tanqueRef,
               data: dataCtrl.text,
               horario: horarioCtrl.text,
+              exibirCamposAgua: false,
               onSaved: (map) {
                 setState(() {
                   if (isFinal) {
@@ -157,6 +259,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   } else {
                     _medicaoInicialSalva = map;
                   }
+                  _atualizarCalculos();
                 });
               },
             )
@@ -165,6 +268,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               tanqueReferencia: tanqueRef,
               data: dataCtrl.text,
               horario: horarioCtrl.text,
+              exibirCamposAgua: false,
               onSaved: (map) {
                 setState(() {
                   if (isFinal) {
@@ -172,6 +276,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   } else {
                     _medicaoInicialSalva = map;
                   }
+                  _atualizarCalculos();
                 });
               },
             ),
@@ -182,7 +287,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   void dispose() {
     dataCtrl.dispose();
     horarioCtrl.dispose();
+    _recebidaAmbCtrl.dispose();
+    _recebida20Ctrl.dispose();
+    _difFaturadoCtrl.dispose();
     _produtoCtrl.dispose();
+    _qtdFaturadaCtrl.dispose();
     for (var c in controllers.values) c.dispose();
     super.dispose();
   }
@@ -225,16 +334,21 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         'terminal_id': terminalId,
         'empresa_id': empresaId,
         'tanque_id': _selectedTanque!['id'],
-        'num_controle': null,
+        'num_controle': widget.bombeio?['num_controle'],
         'data': dataIso.isNotEmpty ? dataIso : null,
         'horario': horarioIso.isNotEmpty ? horarioIso : null,
         'medicao_inicial_id': _medicaoInicialSalva?['id'],
         'medicao_final_id': _medicaoFinalSalva?['id'],
         'volumes_solicitados': volumes,
         'total_bombeio': total,
+        'qtd_faturada': double.tryParse(_qtdFaturadaCtrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0,
       };
 
-      await supabase.from('bombeios').insert(payload);
+      if (widget.bombeio != null) {
+        await supabase.from('bombeios').update(payload).eq('id', widget.bombeio!['id']);
+      } else {
+        await supabase.from('bombeios').insert(payload);
+      }
 
       if (mounted) {
         Navigator.pop(context);
@@ -423,14 +537,17 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     child: TextField(
                       controller: dataCtrl,
                       keyboardType: TextInputType.number,
+                      readOnly: _temMedicoes,
                       style: TextStyle(color: dataInvalida ? Colors.red : Colors.black87),
-                      onTap: () {
-                        dataCtrl.clear();
-                        setState(() {
-                          valorAntigoData = '';
-                          dataInvalida = false;
-                        });
-                      },
+                      onTap: _temMedicoes
+                          ? null
+                          : () {
+                              dataCtrl.clear();
+                              setState(() {
+                                valorAntigoData = '';
+                                dataInvalida = false;
+                              });
+                            },
                       onChanged: (v) {
                         String formatado = _aplicarMascaraData(v, valorAntigoData);
                         valorAntigoData = formatado;
@@ -467,8 +584,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     width: 110,
                     child: TextField(
                       controller: horarioCtrl,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) {
+                      keyboardType: TextInputType.number,                      readOnly: _temMedicoes,                      onChanged: (v) {
                         String formatado = _aplicarMascaraHorario(v, valorAntigoHorario);
                         if (v != formatado) {
                           int offset = formatado.indexOf(' h');
@@ -507,13 +623,15 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                           child: Text(t['referencia'] ?? '', style: const TextStyle(fontSize: 13)),
                         );
                       }).toList(),
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedTanque = val;
-                          _produtoNome = val?['produtos']?['nome'] ?? 'Sem produto';
-                          _produtoCtrl.text = _produtoNome;
-                        });
-                      },
+                      onChanged: _temMedicoes
+                          ? null
+                          : (val) {
+                              setState(() {
+                                _selectedTanque = val;
+                                _produtoNome = val?['produtos']?['nome'] ?? 'Sem produto';
+                                _produtoCtrl.text = _produtoNome;
+                              });
+                            },
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -547,9 +665,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     selected: isSelected,
                     selectedColor: const Color(0xFF0D47A1),
                     checkmarkColor: Colors.white,
-                    onSelected: (val) {
-                      setState(() => selecionadas[d] = val);
-                    },
+                    onSelected: _temMedicoes
+                        ? null
+                        : (val) {
+                            setState(() => selecionadas[d] = val);
+                          },
                   );
                 }).toList(),
               ),
@@ -573,6 +693,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                 child: TextField(
                                   controller: controllers[d],
                                   keyboardType: TextInputType.number,
+                                  readOnly: _temMedicoes,
                                   onChanged: (_) => setState(() {}),
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
@@ -723,6 +844,88 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     _medicaoFinalSalva!,
                     'MEDIÇÃO FINAL',
                     Colors.orange[900]!,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text('Análise de Recebimento e Faturamento:',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.grey)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _recebidaAmbCtrl,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Rcb. (amb)',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                          ),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0D47A1),
+                              fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _recebida20Ctrl,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Rcb. (20ºC)',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                          ),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0D47A1),
+                              fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _qtdFaturadaCtrl,
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() => _atualizarCalculos()),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(7),
+                            ThousandSeparatorInputFormatter(),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: 'Faturado (L)',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                          ),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: TextField(
+                          controller: _difFaturadoCtrl,
+                          readOnly: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Dif. fat/rcb (20º)',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                          ),
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: _difColor,
+                              fontSize: 12),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
