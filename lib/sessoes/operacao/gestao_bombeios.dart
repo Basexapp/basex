@@ -150,10 +150,17 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
           )
         ),
         medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
           volume_ambiente,
           volume_20
         ),
         medicao_final:medicoes!bombeios_medicao_final_id_fkey (
+          id,
+          num_controle,
+          data,
           horario,
           volume_ambiente,
           volume_20
@@ -257,6 +264,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
           'participantes': participantes,
           'recebido_amb': recebidoAmb,
           'recebido_20': recebido20,
+          'medicao_inicial': medIni,
+          'medicao_final': medFinal,
         });
       }
 
