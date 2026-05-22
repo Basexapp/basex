@@ -326,7 +326,112 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
   }
 
-  void _abrirDialogOInserirMedicao({bool isFinal = false}) async {
+  Future<void> _excluirMedicao(Map<String, dynamic> medicao, bool isFinal) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+        ),
+        titlePadding: const EdgeInsets.all(0),
+        title: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+              SizedBox(width: 10),
+              Text(
+                'Confirmar Exclusão',
+                style: TextStyle(
+                  color: Color(0xFF0D47A1),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text(
+            'Deseja realmente excluir esta medição ${isFinal ? "final" : "inicial"}?\nEsta ação não poderá ser desfeita.',
+            style: const TextStyle(color: Colors.black87, fontSize: 15),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: Text(
+              'CANCELAR',
+              style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red[600],
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('EXCLUIR'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    final supabase = Supabase.instance.client;
+    final medId = medicao['id'];
+    if (medId == null) return;
+
+    try {
+      // 1. Remove o vínculo no bombeio
+      final field = isFinal ? 'medicao_final_id' : 'medicao_inicial_id';
+      await supabase
+          .from('bombeios')
+          .update({field: null})
+          .eq('id', _bombeioLocal!['id']);
+
+      // 2. Deleta a medição
+      await supabase.from('medicoes').delete().eq('id', medId);
+
+      setState(() {
+        if (isFinal) {
+          _medicaoFinalSalva = null;
+        } else {
+          _medicaoInicialSalva = null;
+        }
+        _atualizarCalculos();
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Medição excluída com sucesso!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao excluir medição: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _abrirDialogOInserirMedicao({
+    bool isFinal = false,
+  }) async {
     if (_bombeioLocal == null) return;
 
     final supabase = Supabase.instance.client;
@@ -597,77 +702,95 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     return s;
   }
 
-  Widget _buildInfoColumn(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10,
-            color: Colors.grey,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Color(0xFF0D47A1),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildMedicaoDisplay(
     Map<String, dynamic> medicao,
-    String label,
-    Color color,
-  ) {
+    Color color, {
+    bool isFinal = false,
+  }) {
+    final bool podeEditar = _bombeioLocal?['qtd_faturada'] == null;
+
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color, width: 0.5),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Icon(Icons.straighten, size: 14, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                  letterSpacing: 0.5,
+          if (podeEditar)
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, size: 22, color: color),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onSelected: (val) {
+                if (val == 'delete') {
+                  _excluirMedicao(medicao, isFinal);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, size: 16, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Excluir medição', style: TextStyle(fontSize: 13, color: Colors.red)),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            )
+          else
+            const SizedBox(width: 32),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildColumnInfo('Cód.', medicao['num_controle'] ?? '-'),
+                _buildColumnInfo('Data', _formatarDataIso(medicao['data'])),
+                _buildColumnInfo('Hora', _formatarHorario(medicao['horario'])),
+                _buildColumnInfo(
+                  'Vol. Amb.',
+                  '${_fmt.format((medicao['volume_ambiente'] as num?)?.toInt() ?? 0)} L',
+                ),
+                _buildColumnInfo(
+                  'Vol. 20ºC',
+                  '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L',
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildInfoColumn('Nº Controle', medicao['num_controle'] ?? '-'),
-              _buildInfoColumn('Data', _formatarDataIso(medicao['data'])),
-              _buildInfoColumn('Horário', _formatarHorario(medicao['horario'])),
-              _buildInfoColumn(
-                'Vol. Amb.',
-                '${_fmt.format((medicao['volume_ambiente'] as num?)?.toInt() ?? 0)} L',
-              ),
-              _buildInfoColumn(
-                'Vol. 20ºC',
-                '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L',
-              ),
-            ],
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColumnInfo(String label, String value) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF0D47A1),
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -1136,10 +1259,20 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     ),
                   ),
                 if (_medicaoInicialSalva != null) ...[
+                  const Text(
+                    'MEDIÇÃO INICIAL',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0D47A1),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   _buildMedicaoDisplay(
                     _medicaoInicialSalva!,
-                    'MEDIÇÃO INICIAL',
                     const Color(0xFF0D47A1),
+                    isFinal: false,
                   ),
                   if (_medicaoFinalSalva == null) ...[
                     const SizedBox(height: 16),
@@ -1166,10 +1299,20 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 ],
                 if (_medicaoFinalSalva != null) ...[
                   const SizedBox(height: 12),
+                  const Text(
+                    'MEDIÇÃO FINAL',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE65100),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   _buildMedicaoDisplay(
                     _medicaoFinalSalva!,
-                    'MEDIÇÃO FINAL',
                     Colors.orange[900]!,
+                    isFinal: true,
                   ),
                   const SizedBox(height: 24),
                   const Text(

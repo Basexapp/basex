@@ -932,6 +932,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          ),
           child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
         ),
         SizedBox(
@@ -940,7 +943,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF0D47A1),
               foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
             child: const Text(
               'Salvar dados',
