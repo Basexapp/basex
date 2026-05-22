@@ -1211,7 +1211,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         ? () => _salvarBombeio(fecharDialog: false)
                         : null,
                     icon: const Icon(Icons.save, size: 18),
-                    label: const Text('SALVAR QUANTIDADES'),
+                    label: const Text('Salvar quantidades'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue[50],
                       foregroundColor: const Color(0xFF0D47A1),
