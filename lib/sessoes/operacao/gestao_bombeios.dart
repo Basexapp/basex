@@ -63,11 +63,15 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
   List<Map<String, dynamic>> _todosRegistros = [];
   List<Map<String, dynamic>> registrosExibidos = [];
 
+  int paginaAtual = 0;
+  final int itensPorPagina = 20;
+  bool temMaisRegistros = true;
+
   @override
   void initState() {
     super.initState();
-    dataFinal = DateTime.now();
-    dataInicial = DateTime.now().subtract(const Duration(days: 30));
+    dataFinal = null;
+    dataInicial = null;
     
     // Inicializa variáveis globais do usuário
     if (user != null) {
@@ -122,7 +126,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
           }
         });
       }
-      await _carregarBombeios();
+      await _carregarBombeios(resetPagina: true);
     } catch (e) {
       debugPrint('Erro: $e');
     } finally {
@@ -130,7 +134,14 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     }
   }
 
-  Future<void> _carregarBombeios() async {
+  Future<void> _carregarBombeios({bool resetPagina = true, int? novaPagina}) async {
+    if (resetPagina) {
+      paginaAtual = 0;
+    } else if (novaPagina != null) {
+      paginaAtual = novaPagina;
+    }
+
+    setState(() => carregando = true);
     try {
       var query = _supabase.from('bombeios').select('''
         id,
@@ -189,7 +200,14 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         query = query.lte('data', dataFinal!.toIso8601String().split('T')[0]);
       }
 
-      final response = await query.order('data', ascending: false).limit(100);
+      final int from = paginaAtual * itensPorPagina;
+      final int to = from + itensPorPagina - 1;
+
+      final response = await query
+          .order('data', ascending: false)
+          .range(from, to);
+
+      temMaisRegistros = response.length == itensPorPagina;
 
       final List<Map<String, dynamic>> dadosTransformados = [];
       for (var item in response) {
@@ -281,9 +299,11 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
       setState(() {
         _todosRegistros = dadosTransformados;
         _aplicarFiltrosLocal();
+        carregando = false;
       });
     } catch (e) {
       debugPrint('Erro ao carregar bombeios: $e');
+      setState(() => carregando = false);
     }
   }
 
@@ -398,8 +418,15 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
               final fmt = NumberFormat.decimalPattern('pt_BR');
               return InkWell(
                 onTap: () async {
-                  await DialogInserirBombeio.show(context, bombeio: item);
-                  _carregarBombeios();
+                  if (item['status'] == 'Concluído') {
+                    setState(() {
+                      _bombeioSelecionado = item;
+                      _mostrarRateio = true;
+                    });
+                  } else {
+                    await DialogInserirBombeio.show(context, bombeio: item);
+                    _carregarBombeios(resetPagina: true);
+                  }
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -428,6 +455,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
             },
           ),
         ),
+        _buildPaginacao(),
       ],
     );
   }
@@ -460,7 +488,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                       setState(() {
                         tanqueSelecionadoId = val;
                       });
-                      _carregarBombeios();
+                      _carregarBombeios(resetPagina: true);
                     },
                   ),
                 ),
@@ -480,7 +508,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                         produtoSelecionadoId = val;
                         produtoSelecionado = val != null ? produtosDisponiveis.firstWhere((p) => p['id'] == val)['nome'] : null;
                       });
-                      _aplicarFiltrosLocal();
+                      _carregarBombeios(resetPagina: true);
                     },
                   ),
                 ),
@@ -514,20 +542,46 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                                 _carregarTanquesPorTerminal(val);
                               }
                             });
-                            _carregarBombeios();
+                            _carregarBombeios(resetPagina: true);
                           },
                   ),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(width: 140, child: _buildDatePicker('Data inicial', dataInicial, (d) { setState(() => dataInicial = d); _carregarBombeios(); })),
+                SizedBox(width: 140, child: _buildDatePicker('Data inicial', dataInicial, (d) { setState(() => dataInicial = d); _carregarBombeios(resetPagina: true); })),
                 const SizedBox(width: 8),
-                SizedBox(width: 140, child: _buildDatePicker('Data final', dataFinal, (d) { setState(() => dataFinal = d); _carregarBombeios(); })),
+                SizedBox(width: 140, child: _buildDatePicker('Data final', dataFinal, (d) { setState(() => dataFinal = d); _carregarBombeios(resetPagina: true); })),
                 const SizedBox(width: 8),
                 SizedBox(width: 300, child: TextField(controller: pesquisaController, decoration: const InputDecoration(labelText: 'Pesquisa geral', prefixIcon: Icon(Icons.search, size: 18), border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), isDense: true), style: const TextStyle(fontSize: 13))),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPaginacao() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      color: Colors.white,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: paginaAtual > 0 ? () => _carregarBombeios(resetPagina: false, novaPagina: paginaAtual - 1) : null,
+          ),
+          const SizedBox(width: 16),
+          Text(
+            'Página ${paginaAtual + 1}',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+          const SizedBox(width: 16),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: temMaisRegistros ? () => _carregarBombeios(resetPagina: false, novaPagina: paginaAtual + 1) : null,
+          ),
+        ],
       ),
     );
   }
@@ -607,7 +661,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                                   onEnter: (_) => day != null ? setDayState(() => hoveredDay = day) : null,
                                   onExit: (_) => day != null ? setDayState(() => hoveredDay = null) : null,
                                   child: GestureDetector(
-                                    onTap: day != null ? () => setStateDialog(() => tempDate = DateTime(tempDate.year, tempDate.month, day)) : null,
+                                    onTap: day != null ? () {
+                                      Navigator.of(context).pop(DateTime(tempDate.year, tempDate.month, day));
+                                    } : null,
                                     child: Container(
                                       margin: const EdgeInsets.all(2),
                                       decoration: BoxDecoration(
@@ -632,14 +688,14 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                         ),
                         const SizedBox(height: 20),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('CANCELAR', style: TextStyle(color: Colors.black87))),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => Navigator.of(context).pop(tempDate),
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: const Text('SELECIONAR', style: TextStyle(fontWeight: FontWeight.bold)),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              ),
+                              child: const Text('CANCELAR', style: TextStyle(color: Colors.black87, fontSize: 13)),
                             ),
                           ],
                         ),
@@ -702,7 +758,10 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => DialogInserirBombeio.show(context),
+        onPressed: () async {
+          await DialogInserirBombeio.show(context);
+          _carregarBombeios();
+        },
         backgroundColor: const Color(0xFF0D47A1),
         tooltip: 'Novo Bombeio',
         child: const Icon(Icons.add, color: Colors.white),

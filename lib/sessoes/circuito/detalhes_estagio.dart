@@ -477,7 +477,9 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
                                   onEnter: (_) { if (day != null) { setDayState(() => hoveredDay = day); } },
                                   onExit: (_) { if (day != null) { setDayState(() => hoveredDay = null); } },
                                   child: GestureDetector(
-                                    onTap: day != null ? () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month, day); }); } : null,
+                                    onTap: day != null ? () {
+                                      Navigator.of(context).pop(DateTime(tempDate.year, tempDate.month, day));
+                                    } : null,
                                     child: Container(
                                       margin: const EdgeInsets.all(2),
                                       decoration: BoxDecoration(
@@ -502,14 +504,15 @@ class _DetalhesEstagioPageState extends State<DetalhesEstagioPage> {
                         ),
                         const SizedBox(height: 20),
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            TextButton(onPressed: () => Navigator.of(context).pop(), style: TextButton.styleFrom(foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(horizontal: 16)), child: const Text('CANCELAR')),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () => Navigator.of(context).pop(tempDate),
-                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              child: const Text('SELECIONAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(), 
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.black87, 
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
+                              ), 
+                              child: const Text('CANCELAR', style: TextStyle(fontSize: 13))
                             ),
                           ],
                         ),

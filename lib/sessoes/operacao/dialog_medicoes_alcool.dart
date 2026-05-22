@@ -11,6 +11,8 @@ class DialogMedicoesAlcool extends StatefulWidget {
   final String? horario;
   final Function(Map<String, dynamic>)? onSaved;
   final bool exibirCamposAgua;
+  final String? bombeioId;
+  final String? bombeioField;
 
   const DialogMedicoesAlcool({
     super.key,
@@ -20,6 +22,8 @@ class DialogMedicoesAlcool extends StatefulWidget {
     this.horario,
     this.onSaved,
     this.exibirCamposAgua = true,
+    this.bombeioId,
+    this.bombeioField,
   });
 
   @override
@@ -371,6 +375,14 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
 
       final savedMedicao = await supabase.from('medicoes').insert(payload).select().single();
 
+      // Se foi aberto a partir de um bombeio, vincula a medição ao bombeio
+      if (widget.bombeioId != null && widget.bombeioField != null) {
+        await supabase
+            .from('bombeios')
+            .update({widget.bombeioField!: savedMedicao['id']})
+            .eq('id', widget.bombeioId!);
+      }
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -569,7 +581,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
 
       final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm]);
       return double.parse((volumeCm + volumeMm).toStringAsFixed(3));
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Erro ao buscar volume real: $e');
       return 0;
     }
   }
