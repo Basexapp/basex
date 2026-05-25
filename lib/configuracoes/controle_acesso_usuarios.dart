@@ -355,15 +355,15 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
                               ? Colors.orange 
                               : Colors.blue,
                         ),
-                        title: Text(u['nome'],
+                        title: Text(u['nome']?.toString() ?? 'Sem nome',
                             style:
                                 const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(u['email'] ?? 'Sem e-mail'),
+                            Text(u['email']?.toString() ?? 'Sem e-mail'),
                             Text(
-                              'Nível ${u['nivel']} - ${_getNivelDescricao(u['nivel'])}',
+                              'Nível ${u['nivel'] ?? ''} - ${_getNivelDescricao(u['nivel'])}',
                               style: TextStyle(
                                 color: Colors.grey[600],
                                 fontSize: 12,
@@ -374,7 +374,7 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
                         trailing:
                             const Icon(Icons.arrow_forward_ios, size: 16),
                         onTap: () =>
-                            _carregarCards(u['id'], u['nome']),
+                            _carregarCards(u['id']?.toString() ?? '', u['nome']?.toString() ?? 'Sem nome'),
                       );
                     },
                   ),
@@ -384,7 +384,9 @@ class _ControleAcessoUsuariosState extends State<ControleAcessoUsuarios> {
     );
   }
 
-  String _getNivelDescricao(int nivel) {
+  String _getNivelDescricao(dynamic nivel) {
+    if (nivel == null) return 'Desconhecido';
+    
     switch (nivel) {
       case 1:
         return 'Operador';

@@ -32,7 +32,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   String _tipoOpSelecionada = 'Todos';
   final TextEditingController _searchCtrl = TextEditingController();
 
-  static const List<String> _empresas = ['Todas', 'Larco', 'Zema', 'Ale Comb.'];
+  List<String> _empresas = ['Todas'];
   static const List<String> _tiposOp = ['Todos', 'Carga', 'Descarga'];
 
   // ── Estágios (apenas para UI, não armazena estado) ───────────────────────
@@ -84,9 +84,26 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
 
       _usuarioTerminalId = usuario.terminalId;
 
-      final empresaId = usuario.empresaId;
-      if (empresaId == null || empresaId.isEmpty) {
-        throw Exception('Empresa não identificada');
+      if (_usuarioTerminalId == null || _usuarioTerminalId!.isEmpty) {
+        setState(() {
+          _veiculos = [];
+          _carregando = false;
+        });
+        return;
+      }
+
+      // Carregar empresas vinculadas ao terminal
+      final relacoesResponse = await _supabase
+          .from('relacoes_terminais')
+          .select('empresas!inner(nome_dois)')
+          .eq('terminal_id', _usuarioTerminalId!);
+
+      final List<String> empresasVinculadas = ['Todas'];
+      for (var item in (relacoesResponse as List)) {
+        final nome = item['empresas']?['nome_dois']?.toString();
+        if (nome != null && !empresasVinculadas.contains(nome)) {
+          empresasVinculadas.add(nome);
+        }
       }
 
       final response = await _supabase
@@ -106,9 +123,10 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             transportadoras!transportadora_id(nome),
             produtos!produto_id(nome_dois),
             empresas!empresa_id(nome_dois),
-            ordens!ordem_id(id, terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest, posicao_fila)
+            ordens!ordem_id!inner(id, terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest, posicao_fila)
           ''')
-          .eq('empresa_id', empresaId)
+          .or('terminal_id_orig.eq.$_usuarioTerminalId,terminal_id_dest.eq.$_usuarioTerminalId',
+              referencedTable: 'ordens')
           .order('ordens(posicao_fila)', ascending: true, nullsFirst: false)
           .order('data_mov', ascending: false);
 
@@ -225,6 +243,11 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       }).toList();
 
       setState(() {
+        _empresas = empresasVinculadas;
+        // Reset da empresa selecionada caso ela não esteja mais na lista
+        if (!_empresas.contains(_empresaSelecionada)) {
+          _empresaSelecionada = 'Todas';
+        }
         _veiculos = novosVeiculos;
         _carregando = false;
       });
