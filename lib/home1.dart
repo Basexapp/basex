@@ -263,6 +263,8 @@ class _HomePageState extends State<HomePage>
               .eq('id', terminalId)
               .maybeSingle();
 
+          if (!mounted) return;
+
           setState(() {
             _usuarioTerminalNome =
                 terminalData?['nome']?.toString() ?? 'Sem terminal';
@@ -270,6 +272,7 @@ class _HomePageState extends State<HomePage>
           });
         } catch (e) {
           debugPrint('Erro ao carregar nome do terminal do usuário: $e');
+          if (!mounted) return;
           setState(() {
             _usuarioTerminalNome = 'Sem terminal';
             _usuarioFilialNome = null;
@@ -303,12 +306,15 @@ class _HomePageState extends State<HomePage>
           .eq('id', filialId)
           .maybeSingle();
 
+      if (!mounted) return;
+
       setState(() {
         _usuarioFilialNome = filialData?['nome']?.toString();
         _usuarioTerminalNome = null;
       });
     } catch (e) {
       debugPrint('Erro ao carregar nome da filial/terminal do usuário: $e');
+      if (!mounted) return;
       setState(() {
         _usuarioFilialNome = null;
         _usuarioTerminalNome = null;
@@ -352,6 +358,9 @@ class _HomePageState extends State<HomePage>
             .eq('usuario_id', usuario.id)
             .eq('card_id', cardId);
       }
+
+      if (!mounted) return;
+
       setState(() {
         for (final sessao in _filhosPorSessao.values) {
           for (final card in sessao) {
@@ -462,6 +471,8 @@ class _HomePageState extends State<HomePage>
           .select('card_id')
           .eq('usuario_id', usuario.id)
           .eq('acesso', true);
+
+      if (!mounted) return;
 
       final favoritosIds = <String>{
         for (final f in favoritosDb) f['card_id'].toString()
@@ -949,6 +960,8 @@ class _HomePageState extends State<HomePage>
           .select('id, nome, nome_dois, terminal_id_1')
           .order('nome');
 
+      if (!mounted) return;
+
       if (filiaisData.isEmpty) {
         setState(() {
           _filiaisProgramacao = [];
@@ -1028,6 +1041,9 @@ class _HomePageState extends State<HomePage>
               .select('id, nome, nome_abrev, cnpj')
               .eq('id', empresaId)
               .limit(1);
+
+          if (!mounted) return;
+
           dados = List<Map<String, dynamic>>.from(result);
         }
       } else if (nivelUsuario == 4) {
@@ -1040,7 +1056,10 @@ class _HomePageState extends State<HomePage>
               .select('empresa_id')
               .eq('terminal_id', terminalId);
 
-          debugPrint('🔍 [Nível 4] relacoes_terminais retornou ${relacoes.length} registros');
+          if (!mounted) return;
+
+          debugPrint(
+              '🔍 [Nível 4] relacoes_terminais retornou ${relacoes.length} registros');
 
           final empresasIds = relacoes
               .map((r) => r['empresa_id']?.toString())
@@ -1057,6 +1076,9 @@ class _HomePageState extends State<HomePage>
                 .select('id, nome, nome_abrev, cnpj')
                 .inFilter('id', empresasIds)
                 .order('nome');
+
+            if (!mounted) return;
+
             dados = List<Map<String, dynamic>>.from(result);
           }
         }
@@ -1066,6 +1088,9 @@ class _HomePageState extends State<HomePage>
             .from('empresas')
             .select('id, nome, nome_abrev, cnpj')
             .order('nome');
+
+        if (!mounted) return;
+
         dados = List<Map<String, dynamic>>.from(result);
       }
 
@@ -1135,6 +1160,8 @@ class _HomePageState extends State<HomePage>
             .eq('empresa_id', empresaId)
             .order('nome');
       }
+
+      if (!mounted) return;
 
       List<Map<String, dynamic>> dados = [];
 
@@ -1518,26 +1545,35 @@ class _HomePageState extends State<HomePage>
                               },
                             );
 
-                            if (response.data != null && response.data['autorizado'] == true) {
+                            if (!context.mounted) return;
+
+                            if (response.data != null &&
+                                response.data['autorizado'] == true) {
                               Navigator.pop(context);
-                              setState(() {
-                                _mostrarAcessoDesenvolvedor = true;
-                              });
+                              if (mounted) {
+                                setState(() {
+                                  _mostrarAcessoDesenvolvedor = true;
+                                });
+                              }
                             } else {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Credenciais inválidas'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          } catch (e) {
+                            if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Credenciais inválidas'),
+                                SnackBar(
+                                  content: Text('Erro ao validar: $e'),
                                   backgroundColor: Colors.red,
                                 ),
                               );
                             }
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Erro ao validar: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
                           } finally {
                             if (mounted) {
                               setDialogState(() => carregando = false);
@@ -2096,69 +2132,9 @@ class _HomePageState extends State<HomePage>
       ),
       mostrarVoltar: false,
     );
-  }
-
-  Widget _buildSuportePage() {
-    return HomeCards(
-      menuSelecionado: 'Suporte',
-      onCardSelecionado: (context, tipoCard) {
-        switch (tipoCard) {
-          case 'suporte':
-            setState(() {
-              _mostrarSuporte = true;
-            });
-            break;
-
-          case 'desenvolvedor':
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const DesenvolvedorPage(),
-              ),
-            );
-            break;
-
-          case 'fila_solicitacoes':
-            setState(() {
-              _mostrarFilaSolicitacoes = true;
-            });
-            break;
-
-          case 'acesso_desenvolvedor':
-            _showLoginDevDialog();
-            break;
-
-          case 'minhas_solicitacoes':
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Acompanhe suas solicitações.'),
-                backgroundColor: Colors.blue,
-                duration: Duration(seconds: 2),
-              ),
-            );
-            break;
-
-          default:
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Em breve! Em processo de adequação à sua organização.'),
-                backgroundColor: Colors.orange,
-                duration: Duration(seconds: 2),
-              ),
-            );
-        }
-      },
-      onVoltar: () {
-        setState(() {
-          _mostrarSuporte = false;
-          selectedIndex = -1;
-        });
-      },
-    );
-  }  
+  }    
 
   Widget _buildConteudoSessoes() {
-    final usuario = UsuarioAtual.instance;
     
     // PRIMEIRO: Obter a sessão atual do menu lateral
     final sessaoAtual = selectedIndex >= 0 && selectedIndex < menuItems.length
@@ -2443,7 +2419,9 @@ class _HomePageState extends State<HomePage>
                   .select('nome')
                   .eq('id', idTerminal)
                   .maybeSingle();
-                  
+
+              if (!mounted) return;
+
               if (filialData != null) {
                 setState(() {
                   _filialSelecionadaId = idTerminal;
@@ -2469,7 +2447,9 @@ class _HomePageState extends State<HomePage>
                   .select('nome')
                   .eq('id', idTerminal)
                   .maybeSingle();
-                  
+
+              if (!mounted) return;
+
               if (terminalData != null) {
                 setState(() {
                   _terminalSelecionadoId = idTerminal;
@@ -2508,11 +2488,15 @@ class _HomePageState extends State<HomePage>
                 _filialSelecionadaId = idTerminal;
                 _filialSelecionadaNome = 'Terminal';
                 _mostrarEscolherTerminal = false;
-                
+
                 if (_contextoEscolhaTerminal == 'cacl') {
                   _mostrarListarCacls = true;
+                } else if (_contextoEscolhaTerminal == 'tanques') {
+                  _mostrarTanques = true;
+                } else if (_contextoEscolhaTerminal == 'estoque_por_tanque') {
+                  _mostrarEstoquePorTanque = true;
                 }
-                
+
                 _contextoEscolhaTerminal = '';
               });
             }
@@ -3036,8 +3020,6 @@ class _HomePageState extends State<HomePage>
       return _buildSemPermissaoPage();
     }
 
-    final cardsPermitidos = _filhosSessaoAtual;
-
     // Se houver um card filho selecionado, exibe seu conteúdo
     if (_filhoSelecionadoTipo != null) {
       switch (_filhoSelecionadoTipo) {
@@ -3207,116 +3189,7 @@ class _HomePageState extends State<HomePage>
         });
       },
     );
-  }
-
-  // NOVO: Card padronizado com solução para overflow
-  Widget _buildCardFilho(Map<String, dynamic> card) {
-    final usuario = UsuarioAtual.instance;
-    final cardId = card['id']?.toString();
-
-    final naoPermitido = usuario != null &&
-        cardId != null &&
-        !usuario.podeAcessarCard(cardId);
-
-    final corSessao = _getCorSessaoAtual();
-    final isFavorito = card['favorito'] == true;
-    final uuidRegex = RegExp(
-      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-      caseSensitive: false,
-    );
-    final isUuid = cardId != null && uuidRegex.hasMatch(cardId);
-    final podeFavoritar = card.containsKey('favorito') && isUuid;
-
-    return _HoverScale(
-      child: Stack(
-        children: [
-          Material(
-            elevation: 2,
-            color: naoPermitido ? Colors.grey.shade100 : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.hardEdge,
-            child: InkWell(
-              onTap: naoPermitido
-                  ? () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Não permitido. Contate seu supervisor.'),
-                          backgroundColor: Colors.red,
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  : () => _navegarParaCardFilho(card),
-              hoverColor: corSessao.withOpacity(0.1),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        Transform.scale(
-                          scaleY: card['icon_inverted'] == true ? -1 : 1,
-                          child: Icon(card['icon'],
-                              color: naoPermitido
-                                  ? Colors.grey.shade400
-                                  : corSessao,
-                              size: 55),
-                        ),
-                        if (naoPermitido)
-                          const Icon(Icons.lock, size: 18, color: Colors.grey),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 48, maxHeight: 48),
-                      child: Center(
-                        child: Text(
-                          (card['label']?.toString() ?? '') == 'Estoque Contábil x Físico'
-                              ? 'Estoque\nContábil x Físico'
-                              : (card['label'] ?? ''),
-                          style: TextStyle(
-                            fontSize: (card['label']?.toString() ?? '').length > 25 ? 11 : 13,
-                            color: naoPermitido ? Colors.grey.shade500 : const Color(0xFF0D47A1),
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (podeFavoritar)
-            Positioned(
-              top: 4,
-              right: 4,
-              child: GestureDetector(
-                onTap: () => _toggleFavorito(cardId, !isFavorito),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsets.all(3),
-                  child: Icon(
-                    isFavorito ? Icons.star : Icons.star_border,
-                    size: 15,
-                    color: isFavorito ? Colors.amber : Colors.grey[400],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
+  }  
 
   Widget _buildCardFavoritoInicio(Map<String, dynamic> card) {
     final sessaoPai = card['sessao_pai']?.toString() ?? '';
@@ -3413,6 +3286,8 @@ class _HomePageState extends State<HomePage>
             });
 
             await _carregarFiliaisDaEmpresa(_empresaSelecionadaId!);
+
+            if (!mounted) return;
 
             setState(() {
               _mostrarEstoquePorEmpresa = false;
@@ -4108,113 +3983,7 @@ class _HomePageState extends State<HomePage>
         });
         break;
     }
-  }
-
-  Widget _buildConfiguracoesPage(UsuarioAtual? usuario) {
-    if (showUsuarios) {
-      return UsuariosPage(
-        key: const ValueKey('usuarios'),
-        onVoltar: () => setState(() => showUsuarios = false),
-      );
-    }
-
-    if (showControleAcesso) {
-      return ControleAcessoUsuarios(
-        key: const ValueKey('controle_acesso'),
-        onVoltar: () => setState(() => showControleAcesso = false),
-      );
-    }
-
-    final List<Map<String, dynamic>> configCards = [];
-
-    // Cartões apenas para administradores (nível >= 2)
-    if (usuario != null && usuario.nivel >= 2) {
-      configCards.add({
-        'icon': Icons.admin_panel_settings,
-        'label': 'Controle de acesso',
-        'tipo': 'controle_acesso',
-      });
-    }
-
-    // Cartão Usuários apenas para nível 3
-    if (usuario != null && usuario.nivel >= 3) {
-      configCards.add({
-        'icon': Icons.people_alt,
-        'label': 'Usuários',
-        'tipo': 'usuarios',
-      });
-    }
-
-    return _buildPaginaPadronizada(
-      titulo: "Configurações do sistema",
-      conteudo: GridView.count(
-        crossAxisCount: 7,
-        crossAxisSpacing: 15,
-        mainAxisSpacing: 15,
-        childAspectRatio: 1.1,
-        padding: const EdgeInsets.only(bottom: 20),
-        children: configCards.map((c) {
-          return _HoverScale(
-            child: Material(
-              color: Colors.white,
-              elevation: 1,
-              borderRadius: BorderRadius.circular(10),
-              clipBehavior: Clip.hardEdge,
-              child: InkWell(
-                onTap: () {
-                  switch (c['tipo']) {
-                    case 'atualizar_app':
-                      if (atualizarApp != null) {
-                        atualizarApp!.callAsFunction();
-                      } else {
-                        debugPrint('❌ atualizarApp não está disponível no JS');
-                      }
-                      break;
-                    case 'controle_acesso':
-                      setState(() => showControleAcesso = true);
-                      break;
-                    case 'usuarios':
-                      setState(() => showUsuarios = true);
-                      break;
-                  }
-                },
-                hoverColor: _getCorPorSessao('Configurações').withOpacity(0.1),
-                child: Container(
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        c['icon'],
-                        color: _getCorPorSessao('Configurações'),
-                        size: 55,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        c['label'],
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF0D47A1),
-                          fontWeight: FontWeight.w600,
-                        ),
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-      mostrarVoltar: false,
-    );
-  }
+  }  
 
   IconData _getMenuIcon(String item) {
     switch (item) {
