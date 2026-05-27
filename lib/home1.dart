@@ -1628,7 +1628,7 @@ class _HomePageState extends State<HomePage>
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: Image.asset(
-                          'assets/logo_top_home3.png',
+                          'assets/basex_top_home.png',
                           fit: BoxFit.contain,
                         ),
                       ),
