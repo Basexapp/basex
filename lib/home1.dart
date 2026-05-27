@@ -330,69 +330,7 @@ class _HomePageState extends State<HomePage>
   // NOVO: Método para obter cor da sessão por nome
   Color _getCorPorSessao(String sessao) {
     return _coresSessoes[sessao] ?? const Color(0xFF2E7D32);
-  }
-
-  Future<void> _toggleFavorito(String cardId, bool novoValor) async {
-    final supabase = Supabase.instance.client;
-    final usuario = UsuarioAtual.instance;
-    if (usuario == null) return;
-
-    // Cards de fallback (IDs não-UUID) não podem ser favoritados no banco
-    final uuidRegex = RegExp(
-      r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
-      caseSensitive: false,
-    );
-    if (!uuidRegex.hasMatch(cardId)) return;
-
-    try {
-      if (novoValor) {
-        await supabase.from('relacoes_cards_favoritos').insert({
-          'usuario_id': usuario.id,
-          'card_id': cardId,
-          'acesso': true,
-        });
-      } else {
-        await supabase
-            .from('relacoes_cards_favoritos')
-            .delete()
-            .eq('usuario_id', usuario.id)
-            .eq('card_id', cardId);
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        for (final sessao in _filhosPorSessao.values) {
-          for (final card in sessao) {
-            if (card['id'] == cardId) {
-              card['favorito'] = novoValor;
-            }
-          }
-        }
-        // Atualizar cards dinâmicos não presentes em _filhosPorSessao
-        for (final card in _filhosSessaoAtual) {
-          if (card['id'] == cardId) {
-            card['favorito'] = novoValor;
-          }
-        }
-        for (final card in _filiaisProgramacao) {
-          if (card['id'] == cardId) {
-            card['favorito'] = novoValor;
-          }
-        }
-      });
-    } catch (e) {
-      debugPrint('❌ Erro ao atualizar favorito: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erro ao atualizar favorito.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
+  }  
 
   void _navegarParaFavorito(Map<String, dynamic> card) {
     final usuario = UsuarioAtual.instance;
@@ -1628,7 +1566,7 @@ class _HomePageState extends State<HomePage>
                       child: MouseRegion(
                         cursor: SystemMouseCursors.click,
                         child: Image.asset(
-                          'assets/basex_top_home.png',
+                          'assets/basex-top-home.png',
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -3194,79 +3132,60 @@ class _HomePageState extends State<HomePage>
   Widget _buildCardFavoritoInicio(Map<String, dynamic> card) {
     final sessaoPai = card['sessao_pai']?.toString() ?? '';
     final corSessao = _getCorPorSessao(sessaoPai);
-    final cardId = card['id']?.toString();
 
-    return Stack(
-      children: [
-        _HoverScale(
-          child: Material(
-            elevation: 2,
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.hardEdge,
-            child: InkWell(
-              onTap: () => _navegarParaFavorito(card),
-              hoverColor: corSessao.withOpacity(0.1),
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(card['icon'], color: corSessao, size: 50),
-                    const SizedBox(height: 6),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(minHeight: 45, maxHeight: 45),
-                      child: Center(
-                        child: Text(
-                          card['label'] ?? '',
-                          style: TextStyle(
-                            fontSize: (card['label']?.toString() ?? '').length > 25 ? 10 : 12,
-                            color: const Color(0xFF0D47A1),
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.center,
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      sessaoPai,
+    return _HoverScale(
+      child: Material(
+        elevation: 2,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.hardEdge,
+        child: InkWell(
+          onTap: () => _navegarParaFavorito(card),
+          hoverColor: corSessao.withOpacity(0.1),
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(card['icon'], color: corSessao, size: 50),
+                const SizedBox(height: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 45, maxHeight: 45),
+                  child: Center(
+                    child: Text(
+                      card['label'] ?? '',
                       style: TextStyle(
-                        fontSize: 9,
-                        color: corSessao.withOpacity(0.8),
-                        fontWeight: FontWeight.w500,
+                        fontSize: (card['label']?.toString() ?? '').length > 25 ? 10 : 12,
+                        color: const Color(0xFF0D47A1),
+                        fontWeight: FontWeight.w600,
                       ),
                       textAlign: TextAlign.center,
-                      maxLines: 1,
+                      maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  sessaoPai,
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: corSessao.withOpacity(0.8),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
           ),
         ),
-        Positioned(
-          top: 4,
-          right: 4,
-          child: GestureDetector(
-            onTap: () {
-              if (cardId != null) _toggleFavorito(cardId, false);
-            },
-            behavior: HitTestBehavior.opaque,
-            child: Padding(
-              padding: const EdgeInsets.all(3),
-              child: Icon(Icons.star, size: 15, color: Colors.amber),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -4054,14 +3973,24 @@ class _HomePageState extends State<HomePage>
     }
 
     return Container(
+      width: double.infinity,
+      height: double.infinity,
       padding: const EdgeInsets.fromLTRB(30, 20, 30, 30),
-      color: Colors.white,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        image: DecorationImage(
+          image: AssetImage('assets/home-fundo.png'),
+          alignment: Alignment.center,
+          scale: 1.0, // Mantém o tamanho original
+          opacity: 0.1, // Transparência para a imagem de fundo
+        ),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             usuario != null
-                ? 'Olá, ${usuario.nome}! Bem-vindo ao PowerTank!'
+                ? 'Olá, ${usuario.nome}!'
                 : 'Bem-vindo ao PowerTank!',
             style: const TextStyle(
               fontSize: 24,
@@ -4072,55 +4001,22 @@ class _HomePageState extends State<HomePage>
           const SizedBox(height: 10),
           const Divider(color: Colors.grey),
           const SizedBox(height: 20),
-          if (favoritos.isEmpty)
+          if (favoritos.isNotEmpty)
             Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.star_border, size: 70, color: Colors.grey[300]),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Nenhum card favorito ainda.',
-                      style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.grey[500],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Clique na pequena estrela no canto superior direito de qualquer card para adicioná-lo aqui.',
-                      style: TextStyle(fontSize: 13, color: Colors.grey[400]),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+              child: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 15,
+                  runSpacing: 15,
+                  children: favoritos.map((card) {
+                    return SizedBox(
+                      width: 140,
+                      height: 170,
+                      child: _buildCardFavoritoInicio(card),
+                    );
+                  }).toList(),
                 ),
               ),
-            )
-          else ...[
-            Text(
-              'Favoritos',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.5,
-              ),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 15,
-              runSpacing: 15,
-              children: favoritos.map((card) {
-                return SizedBox(
-                  width: 140,
-                  height: 170,
-                  child: _buildCardFavoritoInicio(card),
-                );
-              }).toList(),
-            ),
-          ],
         ],
       ),
     );
