@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'dart:html' as html;
 import 'login_page.dart';
-import 'home.dart';
+import 'home_router.dart';
 import 'configuracoes/escolher_senha.dart';
 import 'configuracoes/redefinir_senha.dart';
 
@@ -246,9 +246,12 @@ class _SplashScreenState extends State<SplashScreen> {
       // 🔐 Verifica se o usuário ainda tem senha provisória
       final usuario = await supabase
           .from('usuarios')
-          .select('senha_temporaria')
+          .select('senha_temporaria, layout')
           .eq('email', session.user.email ?? '')
           .maybeSingle();
+
+      // Armazena o layout para o HomeRouter usar antes de UsuarioAtual.instance ser populado
+      UsuarioAtual.pendingLayout = int.tryParse(usuario?['layout']?.toString() ?? '1') ?? 1;
 
       if (usuario != null && usuario['senha_temporaria'] == true) {
         if (!mounted) return;
@@ -260,7 +263,7 @@ class _SplashScreenState extends State<SplashScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
+          MaterialPageRoute(builder: (_) => const HomeRouter()),
         );
       }
     } catch (e) {
