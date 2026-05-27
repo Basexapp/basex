@@ -1924,22 +1924,14 @@ class _HomePageState extends State<HomePage>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'PowerTank Terminais 2026, All rights reserved.',
+                    'Base X® 2026, All rights reserved.',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey[600],
                       letterSpacing: 0.3,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Licenciado e comercializado por Metabots Business Intelligence - Rua Leais Paulistanos, 416 - Ipiranga - São Paulo, SP | Uma iniciativa © Norton Technology',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.grey[500],
-                      letterSpacing: 0.2,
-                    ),
-                  ),
+                  const SizedBox(height: 2),                  
                 ],
               ),
             ),
