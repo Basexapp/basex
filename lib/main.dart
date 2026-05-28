@@ -24,6 +24,7 @@ Future<void> main() async {
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
       autoRefreshToken: true,
+      localStorage: EmptyLocalStorage(),
     ),
   );
 

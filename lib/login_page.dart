@@ -348,7 +348,7 @@ class _LoginPageState extends State<LoginPage> {
                           style: TextStyle(
                             fontSize: 15,
                             color: Colors.black,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 35),
@@ -359,11 +359,11 @@ class _LoginPageState extends State<LoginPage> {
                             AutofillHints.email
                           ],
                           keyboardType: TextInputType.emailAddress,
-                          style: const TextStyle(color: Colors.black),
+                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                           decoration: InputDecoration(
                             labelText: 'E-mail',
-                            labelStyle: const TextStyle(color: Colors.black),
-                            hintStyle: const TextStyle(color: Colors.black54),
+                            labelStyle: const TextStyle(color: Color.fromARGB(255, 0, 0, 0), fontWeight: FontWeight.bold),
+                            hintStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold),
                             prefixIcon: const Icon(Icons.email_outlined,
                                 color: Colors.black),
                             enabledBorder: OutlineInputBorder(
@@ -383,11 +383,11 @@ class _LoginPageState extends State<LoginPage> {
                           obscureText: _obscureText,
                           autofillHints: const [AutofillHints.password],
                           onSubmitted: (_) => _isLoading ? null : loginUser(),
-                          style: const TextStyle(color: Colors.black),
+                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                           decoration: InputDecoration(
                             labelText: 'Senha',
-                            labelStyle: const TextStyle(color: Colors.black),
-                            hintStyle: const TextStyle(color: Colors.black54),
+                            labelStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                            hintStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold),
                             prefixIcon: const Icon(Icons.lock_outline,
                                 color: Colors.black),
                             suffixIcon: IconButton(
@@ -447,9 +447,12 @@ class _LoginPageState extends State<LoginPage> {
                                   builder: (_) => const EsqueciSenhaPage()),
                             );
                           },
+                          style: TextButton.styleFrom(
+                            overlayColor: Colors.white.withOpacity(0.15),
+                          ),
                           child: const Text(
                             "Esqueci minha senha",
-                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
                           ),
                         ),
                         TextButton(
@@ -461,10 +464,13 @@ class _LoginPageState extends State<LoginPage> {
                                       const CadastroNovoUsuarioPage()),
                             );
                           },
+                          style: TextButton.styleFrom(
+                            overlayColor: Colors.white.withOpacity(0.15),
+                          ),
                           child: const Text(
                             "Me cadastrar",
                             style: TextStyle(
-                              color: Color(0xFF0A4B78),
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

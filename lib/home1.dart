@@ -1793,10 +1793,6 @@ class _HomePageState extends State<HomePage>
                                   preferBelow: false,
                                   child: InkWell(
                                   onTap: () {
-                                    if (nomeItem == 'Início') {
-                                      setState(() => _menuExpanded = !_menuExpanded);
-                                    }
-
                                     _resetarTodasFlags();
 
                                     setState(() {
@@ -1841,15 +1837,25 @@ class _HomePageState extends State<HomePage>
                                         child: Row(
                                           crossAxisAlignment: CrossAxisAlignment.center,
                                           children: [
-                                            Icon(
-                                              (!_menuExpanded && nomeItem == 'Início')
-                                                  ? Icons.menu
-                                                  : _getMenuIcon(nomeItem),
-                                              color: isSelected
-                                                  ? _getCorPorSessao(nomeItem)
-                                                  : Colors.grey[700],
-                                              size: 20,
-                                            ),
+                                            if (!_menuExpanded && nomeItem == 'Início')
+                                              InkWell(
+                                                onTap: () => setState(() => _menuExpanded = !_menuExpanded),
+                                                child: Icon(
+                                                  Icons.menu,
+                                                  color: isSelected
+                                                      ? _getCorPorSessao(nomeItem)
+                                                      : Colors.grey[700],
+                                                  size: 20,
+                                                ),
+                                              )
+                                            else
+                                              Icon(
+                                                _getMenuIcon(nomeItem),
+                                                color: isSelected
+                                                    ? _getCorPorSessao(nomeItem)
+                                                    : Colors.grey[700],
+                                                size: 20,
+                                              ),
                                             if (_menuExpanded) ...[
                                               const SizedBox(width: 10),
                                               Expanded(
@@ -1893,12 +1899,17 @@ class _HomePageState extends State<HomePage>
                                               if (nomeItem == 'Início')
                                                 Padding(
                                                   padding: const EdgeInsets.only(bottom: 2),
-                                                  child: Icon(
-                                                    Icons.menu,
-                                                    color: isSelected
-                                                        ? _getCorPorSessao(nomeItem)
-                                                        : Colors.grey[700],
-                                                    size: 20,
+                                                  child: GestureDetector(
+                                                    onTap: () {
+                                                      setState(() => _menuExpanded = !_menuExpanded);
+                                                    },
+                                                    child: Icon(
+                                                      Icons.menu,
+                                                      color: isSelected
+                                                          ? _getCorPorSessao(nomeItem)
+                                                          : Colors.grey[700],
+                                                      size: 20,
+                                                    ),
                                                   ),
                                                 ),
                                             ],

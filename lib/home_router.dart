@@ -11,7 +11,12 @@ class HomeRouter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final layout = UsuarioAtual.instance?.layout ?? UsuarioAtual.pendingLayout;
+    // Se não houver usuário logado (ex: após um refresh de página), volta para o login
+    if (UsuarioAtual.instance == null) {
+      return const LoginPage();
+    }
+    
+    final layout = UsuarioAtual.instance!.layout;
     if (layout == 2) {
       return const HomePageLayout1();
     }
