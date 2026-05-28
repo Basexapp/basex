@@ -96,37 +96,126 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         _dataSelecionada = _getHorarioBrasilia();
       }
 
-      // Agrupar por placa (normalmente edição é de uma placa só, mas vamos manter a estrutura)
-      final placa = _PlacaVenda();
-      final placasData = todasMovimentacoes.first['placa'];
-      if (placasData is List && placasData.isNotEmpty) {
-        placa.controller.text = placasData.first.toString();
-      } else if (placasData is String) {
-        placa.controller.text = placasData;
+      // Agrupar movimentações por placa
+      final Map<String, List<Map<String, dynamic>>> movsPorPlaca = {};
+      for (var mov in todasMovimentacoes) {
+        final placaData = mov['placa'];
+        String placaStr = "";
+        if (placaData is List && placaData.isNotEmpty) {
+          placaStr = placaData.first.toString().toUpperCase().trim();
+        } else if (placaData is String) {
+          placaStr = placaData.toUpperCase().trim();
+        }
+        
+        if (placaStr.isNotEmpty) {
+          movsPorPlaca.putIfAbsent(placaStr, () => []).add(mov);
+        }
       }
 
-      for (var mov in todasMovimentacoes) {
-        final tanque = _TanqueVenda(
-          capacidade: _calcularCapacidade(mov['saida_amb']?.toString() ?? '0'),
-        );
-        
-        tanque.produtoId = mov['produto_id']?.toString();
-        tanque.clienteController.text = (mov['cliente']?.toString() ?? '').toUpperCase();
-        tanque.pagamentoController.text = (mov['forma_pagamento']?.toString() ?? '').toUpperCase();
-        tanque.movimentacaoId = mov['id']?.toString(); // Armazenamos o ID para atualizar depois
-        
-        placa.tanques.add(tanque);
+      // Se por algum motivo não conseguimos placas (improvável), usamos o comportamento antigo simplificado
+      if (movsPorPlaca.isEmpty) {
+        final placa = _PlacaVenda();
+        for (var mov in todasMovimentacoes) {
+          final tanque = _TanqueVenda(
+            capacidade: _calcularCapacidade(mov['saida_amb']?.toString() ?? '0'),
+          );
+          tanque.produtoId = mov['produto_id']?.toString();
+          tanque.clienteController.text = (mov['cliente']?.toString() ?? '').toUpperCase();
+          tanque.pagamentoController.text = (mov['forma_pagamento']?.toString() ?? '').toUpperCase();
+          tanque.movimentacaoId = mov['id']?.toString();
+          placa.tanques.add(tanque);
+        }
+        _placasVenda.add(placa);
+      } else {
+        // Para cada placa, buscar seus tanques originais e preencher com as movimentações
+        for (var entry in movsPorPlaca.entries) {
+          final placaStr = entry.key;
+          final movs = entry.value;
+          
+          final placaVenda = _PlacaVenda();
+          placaVenda.controller.text = placaStr;
+          
+          // Buscar tanques do veículo
+          final List<String> capacidadesVeiculo = await _getTanquesDaPlaca(placaStr);
+          
+          if (capacidadesVeiculo.isNotEmpty) {
+            // Criar todos os tanques do veículo
+            for (final cap in capacidadesVeiculo) {
+              placaVenda.tanques.add(_TanqueVenda(capacidade: cap));
+            }
+            
+            // Preencher os tanques com as movimentações existentes
+            // Tentamos preencher em ordem (já que não temos index de tanque fixo)
+            for (int i = 0; i < movs.length && i < placaVenda.tanques.length; i++) {
+              final mov = movs[i];
+              final tanque = placaVenda.tanques[i];
+              
+              tanque.produtoId = mov['produto_id']?.toString();
+              tanque.clienteController.text = (mov['cliente']?.toString() ?? '').toUpperCase();
+              tanque.pagamentoController.text = (mov['forma_pagamento']?.toString() ?? '').toUpperCase();
+              tanque.movimentacaoId = mov['id']?.toString();
+            }
+          } else {
+            // Fallback se não achar o veículo: usa apenas o que tem na movimentação
+            for (var mov in movs) {
+              final tanque = _TanqueVenda(
+                capacidade: _calcularCapacidade(mov['saida_amb']?.toString() ?? '0'),
+              );
+              tanque.produtoId = mov['produto_id']?.toString();
+              tanque.clienteController.text = (mov['cliente']?.toString() ?? '').toUpperCase();
+              tanque.pagamentoController.text = (mov['forma_pagamento']?.toString() ?? '').toUpperCase();
+              tanque.movimentacaoId = mov['id']?.toString();
+              placaVenda.tanques.add(tanque);
+            }
+          }
+          
+          _placasVenda.add(placaVenda);
+        }
       }
       
-      _placasVenda.add(placa);
-      
     } catch (e) {
-      print('Erro ao carregar dados para edição: $e');
+      debugPrint('Erro ao carregar dados para edição: $e');
     } finally {
       if (mounted) {
         setState(() => _carregandoProdutos = false);
       }
     }
+  }
+
+  Future<List<String>> _getTanquesDaPlaca(String placaStr) async {
+    if (placaStr.isEmpty) return [];
+    
+    try {
+      final supabase = Supabase.instance.client;
+      final termoBusca = placaStr.trim().toUpperCase();
+      
+      // Buscar em equipamentos
+      final respEq = await supabase
+          .from('equipamentos')
+          .select('tanques')
+          .eq('placa', termoBusca)
+          .maybeSingle();
+      
+      if (respEq != null && respEq['tanques'] != null) {
+        final List<dynamic> t = respEq['tanques'] is List ? respEq['tanques'] : [];
+        return t.map((e) => e.toString()).toList();
+      }
+
+      // Buscar em veiculos
+      final respVeic = await supabase
+          .from('veiculos')
+          .select('tanques')
+          .eq('placa', termoBusca)
+          .maybeSingle();
+          
+      if (respVeic != null && respVeic['tanques'] != null) {
+        final List<dynamic> t = respVeic['tanques'] is List ? respVeic['tanques'] : [];
+        return t.map((e) => e.toString()).toList();
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar tanques da placa $placaStr: $e');
+    }
+    return [];
   }
 
   String _calcularCapacidade(String quantidadeLitros) {
@@ -727,6 +816,15 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         throw Exception('Ordem ID não encontrado para esta movimentação');
       }
 
+      // Buscar empresa_id da filial para novos inserts se necessário
+      final filialResponse = await supabase
+          .from('filiais')
+          .select('empresa_id')
+          .eq('id', widget.filialId)
+          .single();
+      
+      final empresaId = filialResponse['empresa_id'];
+
       DateTime timestampParaSalvar;
       if (_dataSelecionada != null) {
         final agora = _getHorarioBrasilia();
@@ -783,17 +881,23 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
           final clientePreenchido = tanque.clienteController.text.trim().isNotEmpty;
           final pagamentoPreenchido = tanque.pagamentoController.text.trim().isNotEmpty;
           
-          if (!(produtoPreenchido && clientePreenchido && pagamentoPreenchido)) {
-            // Se o tanque foi esvaziado na edição, idealmente poderíamos deletar, 
-            // mas aqui vamos apenas ignorar ou manter se já existia.
-            // Para simplificar: se tem movimentacaoId, atualizamos com o que estiver lá.
-            if (tanque.movimentacaoId == null) continue;
+          final isCompleto = produtoPreenchido && clientePreenchido && pagamentoPreenchido;
+
+          if (!isCompleto) {
+            // Se o tanque não está completo e já tinha uma movimentação, deletamos
+            if (tanque.movimentacaoId != null) {
+              await supabase
+                  .from('movimentacoes')
+                  .delete()
+                  .eq('id', tanque.movimentacaoId!);
+            }
+            continue;
           }
 
           final capacidadeMCubicos = double.tryParse(tanque.capacidade) ?? 0.0;
           final capacidadeLitros = capacidadeMCubicos * 1000.0;
 
-          final Map<String, dynamic> dadosUpdate = {
+          final Map<String, dynamic> dadosMovimentacao = {
             'data_mov': timestampParaSalvar.toIso8601String(),
             'updated_at': _getHorarioBrasilia().toIso8601String(),
             'produto_id': tanque.produtoId,
@@ -809,11 +913,28 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             // Atualiza movimentação existente
             await supabase
                 .from('movimentacoes')
-                .update(dadosUpdate)
+                .update(dadosMovimentacao)
                 .eq('id', tanque.movimentacaoId!);
           } else {
-            // Se o usuário adicionou um tanque novo durante a edição (caso permitamos)
-            // faríamos um insert aqui vinculando ao ordemId.
+            // Insere nova movimentação para tanque que estava vazio
+            final Map<String, dynamic> novaMov = {
+              ...dadosMovimentacao,
+              'ordem_id': ordemId,
+              'filial_id': widget.filialId,
+              'filial_origem_id': widget.filialId,
+              'empresa_id': empresaId,
+              'usuario_id': user.id,
+              'tipo_op': 'venda',
+              'tipo_mov': 'saida',
+              'tipo_mov_orig': 'saida',
+              'descricao': 'venda comum',
+              'anp': false,
+              'status_circuito_orig': 1,
+              'entrada_amb': 0,
+              'entrada_vinte': 0,
+              'saida_vinte': 0,
+            };
+            await supabase.from('movimentacoes').insert(novaMov);
           }
         }
       }

@@ -64,6 +64,7 @@ class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   int selectedIndex = 0;
   int _hoveredMenuIndex = -1;
+  int _hoveredSubmenuIndex = -1;
   bool _menuExpanded = true;
   TextEditingController searchController = TextEditingController();
 
@@ -1548,205 +1549,220 @@ class _HomePageState extends State<HomePage>
               height: 60,
               decoration: const BoxDecoration(
                 color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    offset: Offset(0, 2),
-                    blurRadius: 4,
-                  ),
-                ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Stack(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: InkWell(
-                      onTap: _resetarTodasFlags,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: Image.asset(
-                          'assets/basex-top-home.png',
-                          fit: BoxFit.contain,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10, top: 15),
+                        child: InkWell(
+                          onTap: _resetarTodasFlags,
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Image.asset(
+                              'assets/basex-top-home.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisSize: MainAxisSize.min,
-                          children: (usuario?.nivel == 3)
-                              ? [
-                                  Text(
-                                    usuario?.nome ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF0D47A1),
-                                      fontWeight: FontWeight.w600,
+                      Padding(
+                        padding: const EdgeInsets.only(right: 20, top: 10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisSize: MainAxisSize.min,
+                              children: (usuario?.nivel == 3)
+                                  ? [
+                                      Text(
+                                        usuario?.nome ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xFF0D47A1),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ]
+                                  : [
+                                      Text(
+                                        usuario?.nome ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xFF0D47A1),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        (usuario?.nivel == 1 ||
+                                                usuario?.nivel == 2)
+                                            ? (_usuarioTerminalNome ??
+                                                (UsuarioAtual
+                                                            .instance
+                                                            ?.terminalId ==
+                                                        null ||
+                                                    UsuarioAtual
+                                                        .instance!
+                                                        .terminalId!
+                                                        .isEmpty
+                                                ? 'Sem terminal'
+                                                : 'Carregando...'))
+                                            : (_usuarioFilialNome ??
+                                                (UsuarioAtual
+                                                            .instance
+                                                            ?.filialId ==
+                                                        null ||
+                                                    UsuarioAtual
+                                                        .instance!
+                                                        .filialId!
+                                                        .isEmpty
+                                                ? 'Sem filial'
+                                                : 'Carregando...')),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                            ),
+                            const SizedBox(width: 10),
+                            PopupMenuButton<String>(
+                              surfaceTintColor: Colors.white,
+                              color: Colors.white,
+                              icon: const Icon(
+                                Icons.account_circle,
+                                color: Color(0xFF0D47A1),
+                                size: 30,
+                              ),
+                              onSelected: (value) async {
+                                if (value == 'Perfil') {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const PerfilPage(),
                                     ),
-                                  ),
-                                ]
-                              : [
-                                  Text(
-                                    usuario?.nome ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF0D47A1),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    (usuario?.nivel == 1 || usuario?.nivel == 2)
-                                        ? (_usuarioTerminalNome ??
-                                              (UsuarioAtual
-                                                              .instance
-                                                              ?.terminalId ==
-                                                          null ||
-                                                      UsuarioAtual
-                                                          .instance!
-                                                          .terminalId!
-                                                          .isEmpty
-                                                  ? 'Sem terminal'
-                                                  : 'Carregando...'))
-                                        : (_usuarioFilialNome ??
-                                              (UsuarioAtual.instance?.filialId ==
-                                                          null ||
-                                                      UsuarioAtual
-                                                          .instance!
-                                                          .filialId!
-                                                          .isEmpty
-                                                  ? 'Sem filial'
-                                                  : 'Carregando...')),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                        ),
-                        const SizedBox(width: 10),
-                        PopupMenuButton<String>(
-                          surfaceTintColor: Colors.white,
-                          color: Colors.white,
-                          icon: const Icon(
-                            Icons.account_circle,
-                            color: Color(0xFF0D47A1),
-                            size: 30,
-                          ),
-                          onSelected: (value) async {
-                            if (value == 'Perfil') {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const PerfilPage(),
-                                ),
-                              );
-                            }
+                                  );
+                                }
 
-                            if (value == 'Sair') {
-                              await Supabase.instance.client.auth.signOut();
-                              UsuarioAtual.instance = null;
-                              if (context.mounted) {
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginPage(),
+                                if (value == 'Sair') {
+                                  await Supabase.instance.client.auth.signOut();
+                                  UsuarioAtual.instance = null;
+                                  if (context.mounted) {
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const LoginPage(),
+                                      ),
+                                      (route) => false,
+                                    );
+                                  }
+                                }
+                              },
+                              itemBuilder: (context) {
+                                return {'Perfil', 'Sair'}.map((choice) {
+                                  return PopupMenuItem<String>(
+                                    value: choice,
+                                    child: Text(choice),
+                                  );
+                                }).toList();
+                              },
+                            ),
+                            const SizedBox(width: 15),
+                            // Lista suspensa de idiomas (agora o último objeto à direita)
+                            PopupMenuButton<String>(
+                              offset: const Offset(0, 40),
+                              tooltip: 'Selecionar Idioma',
+                              onSelected: (value) {
+                                // Funcionalidade fictícia de troca de idioma
+                              },
+                              surfaceTintColor: Colors.white,
+                              color: Colors.white,
+                              elevation: 8,
+                              itemBuilder: (BuildContext context) => [
+                                const PopupMenuItem<String>(
+                                  value: 'en',
+                                  child: Row(
+                                    children: [
+                                      Text('🇺🇸'),
+                                      SizedBox(width: 8),
+                                      Text('English (US)'),
+                                    ],
                                   ),
-                                  (route) => false,
-                                );
-                              }
-                            }
-                          },
-                          itemBuilder: (context) {
-                            return {'Perfil', 'Sair'}.map((choice) {
-                              return PopupMenuItem<String>(
-                                value: choice,
-                                child: Text(choice),
-                              );
-                            }).toList();
-                          },
-                        ),
-                        const SizedBox(width: 15),
-                        // Lista suspensa de idiomas (agora o último objeto à direita)
-                        PopupMenuButton<String>(
-                          offset: const Offset(0, 40),
-                          tooltip: 'Selecionar Idioma',
-                          onSelected: (value) {
-                            // Funcionalidade fictícia de troca de idioma
-                          },
-                          surfaceTintColor: Colors.white,
-                          color: Colors.white,
-                          elevation: 8,
-                          itemBuilder: (BuildContext context) => [
-                            const PopupMenuItem<String>(
-                              value: 'en',
+                                ),
+                                const PopupMenuItem<String>(
+                                  value: 'es',
+                                  child: Row(
+                                    children: [
+                                      Text('🇪🇸'),
+                                      SizedBox(width: 8),
+                                      Text('Español'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem<String>(
+                                  value: 'pt',
+                                  child: Row(
+                                    children: [
+                                      Text('🇧🇷'),
+                                      SizedBox(width: 8),
+                                      Text('Português (BR)'),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               child: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text('🇺🇸'),
-                                  SizedBox(width: 8),
-                                  Text('English (US)'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'es',
-                              child: Row(
-                                children: [
-                                  Text('🇪🇸'),
-                                  SizedBox(width: 8),
-                                  Text('Español'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'pt',
-                              child: Row(
-                                children: [
-                                  Text('🇧🇷'),
-                                  SizedBox(width: 8),
-                                  Text('Português (BR)'),
+                                  const Text(
+                                    '🇧🇷',
+                                    style: TextStyle(fontSize: 18),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'PT-BR',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    size: 20,
+                                    color: Colors.grey[600],
+                                  ),
                                 ],
                               ),
                             ),
                           ],
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                '🇧🇷',
-                                style: TextStyle(fontSize: 18),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text(
-                                'PT-BR',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0D47A1),
-                                ),
-                              ),
-                              Icon(
-                                Icons.arrow_drop_down,
-                                size: 20,
-                                color: Colors.grey[600],
-                              ),
-                            ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (selectedIndex == 0 || selectedIndex == -1)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: Center(
+                        child: Text(
+                          _formatarDataAtual(),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Color(0xFF0D47A1),
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
+            const Divider(height: 1, thickness: 1, color: Colors.grey),
 
             Expanded(
               child: Row(
@@ -1759,26 +1775,6 @@ class _HomePageState extends State<HomePage>
                     color: const Color(0xFFF5F5F5),
                     child: Column(
                       children: [
-                        // Toggle button
-                        Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 4, top: 4),
-                          child: Tooltip(
-                            message: _menuExpanded ? 'Recolher menu' : 'Expandir menu',
-                            child: InkWell(
-                              onTap: () => setState(() => _menuExpanded = !_menuExpanded),
-                              borderRadius: BorderRadius.circular(20),
-                              child: Padding(
-                                padding: const EdgeInsets.all(6),
-                                child: Icon(
-                                  _menuExpanded ? Icons.chevron_left : Icons.chevron_right,
-                                  color: Colors.grey[500],
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
                         Expanded(
                           child: ListView.builder(
                             itemCount: menuItems.length,
@@ -1797,6 +1793,10 @@ class _HomePageState extends State<HomePage>
                                   preferBelow: false,
                                   child: InkWell(
                                   onTap: () {
+                                    if (nomeItem == 'Início') {
+                                      setState(() => _menuExpanded = !_menuExpanded);
+                                    }
+
                                     _resetarTodasFlags();
 
                                     setState(() {
@@ -1833,57 +1833,78 @@ class _HomePageState extends State<HomePage>
                                         ),
                                       ),
                                     ),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          _getMenuIcon(nomeItem),
-                                          color: isSelected
-                                              ? _getCorPorSessao(nomeItem)
-                                              : Colors.grey[700],
-                                          size: 20,
-                                        ),
-                                        if (_menuExpanded) ...[
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: AnimatedContainer(
-                                              duration: const Duration(
-                                                milliseconds: 200,
-                                              ),
-                                              transform: Matrix4.translationValues(
-                                                _hoveredMenuIndex == index
-                                                    ? 6.0
-                                                    : 0.0,
-                                                0,
-                                                0,
-                                              ),
-                                              child: AnimatedDefaultTextStyle(
-                                                duration: const Duration(
-                                                  milliseconds: 200,
-                                                ),
-                                                style: TextStyle(
-                                                  fontWeight:
-                                                      (isSelected ||
-                                                          _hoveredMenuIndex ==
-                                                              index)
-                                                      ? FontWeight.bold
-                                                      : FontWeight.w500,
-                                                  color: isSelected
-                                                      ? _getCorPorSessao(nomeItem)
-                                                      : Colors.grey[800],
-                                                  fontSize: 13,
-                                                  height: 1.1,
-                                                ),
-                                                child: Text(
-                                                  nomeFormatado,
-                                                  maxLines: 2,
-                                                  overflow: TextOverflow.visible,
-                                                ),
-                                              ),
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      child: SizedBox(
+                                        width: _menuExpanded ? 176 : 32,
+                                        child: Row(
+                                          crossAxisAlignment: CrossAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              (!_menuExpanded && nomeItem == 'Início')
+                                                  ? Icons.menu
+                                                  : _getMenuIcon(nomeItem),
+                                              color: isSelected
+                                                  ? _getCorPorSessao(nomeItem)
+                                                  : Colors.grey[700],
+                                              size: 20,
                                             ),
-                                          ),
-                                        ],
-                                      ],
+                                            if (_menuExpanded) ...[
+                                              const SizedBox(width: 10),
+                                              Expanded(
+                                                child: AnimatedContainer(
+                                                  duration: const Duration(
+                                                    milliseconds: 200,
+                                                  ),
+                                                  transform: Matrix4.translationValues(
+                                                    _hoveredMenuIndex == index
+                                                        ? 6.0
+                                                        : 0.0,
+                                                    0,
+                                                    0,
+                                                  ),
+                                                  child: AnimatedDefaultTextStyle(
+                                                    duration: const Duration(
+                                                      milliseconds: 200,
+                                                    ),
+                                                    style: TextStyle(
+                                                      fontWeight:
+                                                          (isSelected ||
+                                                              _hoveredMenuIndex ==
+                                                                  index)
+                                                          ? FontWeight.bold
+                                                          : FontWeight.w500,
+                                                      color: isSelected
+                                                          ? _getCorPorSessao(nomeItem)
+                                                          : Colors.grey[800],
+                                                      fontSize: 13,
+                                                      height: 1.0,
+                                                    ),
+                                                    child: Text(
+                                                      nomeFormatado,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.clip,
+                                                      softWrap: false,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              if (nomeItem == 'Início')
+                                                Padding(
+                                                  padding: const EdgeInsets.only(bottom: 2),
+                                                  child: Icon(
+                                                    Icons.menu,
+                                                    color: isSelected
+                                                        ? _getCorPorSessao(nomeItem)
+                                                        : Colors.grey[700],
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -1923,12 +1944,29 @@ class _HomePageState extends State<HomePage>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'Base X® 2026, All rights reserved.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
-                      letterSpacing: 0.3,
+                  Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                        letterSpacing: 0.3,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Base X'),
+                        WidgetSpan(
+                          child: Transform.translate(
+                            offset: const Offset(0, -4),
+                            child: Text(
+                              '®',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const TextSpan(text: ' 2026, All rights reserved.'),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 2),                  
@@ -3980,19 +4018,6 @@ class _HomePageState extends State<HomePage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            usuario != null
-                ? 'Olá, ${usuario.nome}!'
-                : 'Bem-vindo ao PowerTank!',
-            style: const TextStyle(
-              fontSize: 24,
-              color: Color(0xFF0D47A1),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Divider(color: Colors.grey),
-          const SizedBox(height: 20),
           if (favoritos.isNotEmpty)
             Expanded(
               child: SingleChildScrollView(
@@ -4168,6 +4193,39 @@ class _HomePageState extends State<HomePage>
   }
 
   // Método para adicionar quebras de linha nos nomes longos
+  String _formatarDataAtual() {
+    final now = DateTime.now();
+    final diasDaSemana = [
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+      'domingo'
+    ];
+    final meses = [
+      'janeiro',
+      'fevereiro',
+      'março',
+      'abril',
+      'maio',
+      'junho',
+      'julho',
+      'agosto',
+      'setembro',
+      'outubro',
+      'novembro',
+      'dezembro'
+    ];
+
+    String diaSemana = diasDaSemana[now.weekday - 1];
+    diaSemana = diaSemana[0].toUpperCase() + diaSemana.substring(1);
+    String mes = meses[now.month - 1];
+
+    return "$diaSemana, ${now.day} de $mes de ${now.year}";
+  }
+
   String _formatarNomeMenu(String nomeOriginal) {
     // Mapeia os nomes que precisam de quebra de linha
     final Map<String, String> quebras = {
@@ -4252,7 +4310,7 @@ class _HomePageState extends State<HomePage>
             child: ListView.builder(
               padding: EdgeInsets.zero,
               itemCount: _filhosSessaoAtual.length,
-              itemBuilder: (context, index) => _buildSubmenuItem(_filhosSessaoAtual[index], corSessao),
+              itemBuilder: (context, index) => _buildSubmenuItem(_filhosSessaoAtual[index], corSessao, index),
             ),
           ),
         ],
@@ -4260,13 +4318,15 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildSubmenuItem(Map<String, dynamic> card, Color corSessao) {
+  Widget _buildSubmenuItem(Map<String, dynamic> card, Color corSessao, int index) {
     final usuario = UsuarioAtual.instance;
     final cardId = card['id']?.toString();
     final naoPermitido = usuario != null && cardId != null && !usuario.podeAcessarCard(cardId);
     final tipo = card['tipo']?.toString() ?? '';
     final isActive = _isSubmenuItemActive(tipo);
     return MouseRegion(
+      onEnter: (_) => setState(() => _hoveredSubmenuIndex = index),
+      onExit: (_) => setState(() => _hoveredSubmenuIndex = -1),
       cursor: naoPermitido ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: InkWell(
         onTap: naoPermitido ? null : () => _navegarParaCardFilho(card),
@@ -4275,34 +4335,48 @@ class _HomePageState extends State<HomePage>
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: isActive ? corSessao.withOpacity(0.08) : Colors.transparent,
+            color: isActive 
+                ? corSessao.withOpacity(0.08) 
+                : (_hoveredSubmenuIndex == index && !naoPermitido ? corSessao.withOpacity(0.04) : Colors.transparent),
             border: Border(left: BorderSide(color: isActive ? corSessao : Colors.transparent, width: 3)),
           ),
-          child: Row(
-            children: [
-              Transform.scale(
-                scaleY: card['icon_inverted'] == true ? -1 : 1,
-                child: Icon(
-                  card['icon'] as IconData,
-                  size: 17,
-                  color: naoPermitido ? Colors.grey.shade400 : (isActive ? corSessao : Colors.grey.shade600),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  card['label']?.toString() ?? '',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: naoPermitido ? Colors.grey.shade400 : (isActive ? corSessao : Colors.grey.shade800),
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            transform: Matrix4.translationValues(
+              (_hoveredSubmenuIndex == index && !naoPermitido) ? 5.0 : 0.0, 
+              0, 
+              0
+            ),
+            child: Row(
+              children: [
+                Transform.scale(
+                  scaleY: card['icon_inverted'] == true ? -1 : 1,
+                  child: Icon(
+                    card['icon'] as IconData,
+                    size: 17,
+                    color: naoPermitido 
+                        ? Colors.grey.shade400 
+                        : (isActive || _hoveredSubmenuIndex == index ? corSessao : Colors.grey.shade600),
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              if (naoPermitido) Icon(Icons.lock_outline, size: 13, color: Colors.grey.shade400),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    card['label']?.toString() ?? '',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: naoPermitido 
+                          ? Colors.grey.shade400 
+                          : (isActive || _hoveredSubmenuIndex == index ? corSessao : Colors.grey.shade800),
+                      fontWeight: (isActive || _hoveredSubmenuIndex == index) ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (naoPermitido) Icon(Icons.lock_outline, size: 13, color: Colors.grey.shade400),
+              ],
+            ),
           ),
         ),
       ),

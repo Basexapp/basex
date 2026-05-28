@@ -68,45 +68,69 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
   Widget _buildMedicaoDisplay(
       Map<String, dynamic> medicao, String label, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: color.withOpacity(0.05),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: color, width: 0.5),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(Icons.straighten, size: 14, color: color),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                  letterSpacing: 0.5,
+          // Título reduzido e ícone
+          SizedBox(
+            width: 55,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.straighten, size: 14, color: color),
+                const SizedBox(height: 2),
+                Text(
+                  label.replaceFirst('MEDIÇÃO ', ''),
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                    letterSpacing: 0.5,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildInfoColumn('Nº Controle', medicao['num_controle'] ?? '-'),
-              _buildInfoColumn('Data', _formatarDataIso(medicao['data'])),
-              _buildInfoColumn('Horário', _formatarHorario(medicao['horario'])),
-              _buildInfoColumn('Vol. Amb.',
-                  '${_fmt.format((medicao['volume_ambiente'] as num?)?.toInt() ?? 0)} L'),
-              _buildInfoColumn('Vol. 20ºC',
-                  '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L'),
-            ],
+          const SizedBox(width: 8),
+          Container(height: 24, width: 1, color: color.withOpacity(0.2)),
+          const SizedBox(width: 12),
+          // Informações na mesma linha
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _buildInfoColumn('Controle', medicao['num_controle'] ?? '-'),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildInfoColumn('Data', _formatarDataIso(medicao['data'])),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: _buildInfoColumn('Horário', _formatarHorario(medicao['horario'])),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: _buildInfoColumn('Vol. Amb.',
+                      '${_fmt.format((medicao['volume_ambiente'] as num?)?.toInt() ?? 0)} L'),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: _buildInfoColumn('Vol. 20ºC',
+                      '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L'),
+                ),
+              ],
+            ),
           ),
         ],
-      ), // informações centraliz
+      ),
     );
   }
 
@@ -163,18 +187,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
           const Divider(height: 1),
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
+            padding: const EdgeInsets.fromLTRB(20, 10, 80, 10),
             color: const Color(0xFFFBFBFB),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildHeaderMicroItem(
                     'CONTROLE', widget.bombeio['numero_controle']),
+                _buildHeaderMicroItem('PRODUTO', widget.bombeio['produto']),
                 _buildHeaderMicroItem(
                     'DATA', _formatarData(widget.bombeio['data'])),
                 _buildHeaderMicroItem('HORÁRIO',
                     '${widget.bombeio['horario_inicial']} - ${widget.bombeio['horario_final']}'),
-                _buildHeaderMicroItem('PRODUTO', widget.bombeio['produto']),
               ],
             ),
           ),
@@ -190,7 +214,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                   const Text(
                     'MEDIÇÕES DO BOMBEIO',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF0D47A1),
                       letterSpacing: 0.5,
@@ -204,282 +228,304 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                       const Color(0xFF0D47A1),
                     ),
                   if (widget.bombeio['medicao_inicial'] != null)
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 8),
                   if (widget.bombeio['medicao_final'] != null)
                     _buildMedicaoDisplay(
                       widget.bombeio['medicao_final'],
                       'MEDIÇÃO FINAL',
                       Colors.green.shade700,
                     ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 80),
 
-                  // --- RESUMO E GRÁFICO ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const Text('TOTAL SOLICITADO',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.grey)),
-                          const SizedBox(height: 2),
-                          Text('${_fmt.format(totalSolicitado.toInt())} L',
-                              style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF455A64))),
-                          const SizedBox(height: 16),
-                          const Text('TOTAL RECEBIDO (AMB)',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.grey)),
-                          const SizedBox(height: 2),
-                          Text('${_fmt.format(recebidoAmb.toInt())} L',
-                              style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0D47A1))),
-                          const SizedBox(height: 16),
-                          const Text('TOTAL RECEBIDO (20ºC)',
-                              style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.grey)),
-                          const SizedBox(height: 2),
-                          Text('${_fmt.format(recebido20.toInt())} L',
-                                style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF388E3C))),
-                        ],
+                  // --- SEÇÃO INFERIOR: DISTRIBUIÇÃO E RATEIO LADO A LADO ---
+                  const Center(
+                    child: Text(
+                      'DISTRIBUIÇÃO E RATEIO',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0D47A1),
+                        letterSpacing: 0.5,
                       ),
-                      const SizedBox(width: 30),
-                      SizedBox(
-                        width: 180,
-                        height: 180,
-                        child: PieChart(
-                          PieChartData(
-                            sectionsSpace: 2,
-                            centerSpaceRadius: 40,
-                            sections: List.generate(participantes.length, (i) {
-                              final p = participantes[i];
-                              final colors = [
-                                const Color(0xFF0D47A1), // Azul Escuro
-                                const Color(0xFFD32F2F), // Vermelho
-                                const Color(0xFF388E3C), // Verde
-                                const Color(0xFFFBC02D), // Amarelo/Dourado
-                              ];
-                              return PieChartSectionData(
-                                color: colors[i % colors.length],
-                                value: p['solicitado'],
-                                title:
-                                    '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((p['solicitado'] / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
-                                radius: 50,
-                                titleStyle: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  shadows: [
-                                    Shadow(color: Colors.black45, blurRadius: 2)
-                                  ],
-                                ),
-                                titlePositionPercentageOffset: 0.55,
-                              );
-                            }),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-                  const Text(
-                    'DISTRIBUIÇÃO E RATEIO',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0D47A1),
-                      letterSpacing: 0.5,
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Tabela de distribuição fixa
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      children: [
-                        const SizedBox(width: 8),
-                        Expanded(
-                            flex: 3,
-                            child: Text('DISTRIBUIDORA',
-                                textAlign: TextAlign.left,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700]))),
-                        Expanded(
-                            flex: 1,
-                            child: Text('%',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700]))),
-                        Expanded(
-                            flex: 2,
-                            child: Text('SOLICITADO',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700]))),
-                        Expanded(
-                            flex: 2,
-                            child: Text('RECEB. (AMB)',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700]))),
-                        Expanded(
-                            flex: 2,
-                            child: Text('RECEB. (20ºC)',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.grey[700]))),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1),
-                  ...participantes.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final p = entry.value;
-                    double peso = totalSolicitado > 0
-                        ? (p['solicitado'] / totalSolicitado)
-                        : 0;
-                    double recAmbPart = recebidoAmb * peso;
-                    double rec20Part = recebido20 * peso;
-                    double percent = peso; // O percentual do rateio é baseado no solicitado
-
-                    final colors = [
-                      const Color(0xFF0D47A1),
-                      const Color(0xFFD32F2F),
-                      const Color(0xFF388E3C),
-                      const Color(0xFFFBC02D),
-                    ];
-
-                    return Column(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Row(
+                  
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // LADO ESQUERDO: RESUMO E GRÁFICO
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Expanded(
-                                flex: 3,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 8,
-                                      height: 8,
-                                      margin: const EdgeInsets.only(right: 12),
-                                      decoration: BoxDecoration(
-                                        color: colors[index % colors.length],
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            p['nome'].toString().toUpperCase(),
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: Color(0xFF263238),
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 6),
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(2),
-                                            child: LinearProgressIndicator(
-                                              value: percent,
-                                              backgroundColor: Colors.grey[100],
-                                              valueColor: AlwaysStoppedAnimation<Color>(
-                                                colors[index % colors.length]
-                                              ),
-                                              minHeight: 3,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Text('TOTAL SOLICITADO',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text('${_fmt.format(totalSolicitado.toInt())} L',
+                                      style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF455A64))),
+                                  const SizedBox(height: 16),
+                                  const Text('TOTAL RECEBIDO (AMB)',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text('${_fmt.format(recebidoAmb.toInt())} L',
+                                      style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF0D47A1))),
+                                  const SizedBox(height: 16),
+                                  const Text('TOTAL RECEBIDO (20ºC)',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey)),
+                                  const SizedBox(height: 2),
+                                  Text('${_fmt.format(recebido20.toInt())} L',
+                                        style: const TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF388E3C))),
+                                ],
                               ),
-                              Expanded(
-                                flex: 1,
-                                child: Text(
-                                  '${(percent * 100).toStringAsFixed(1)}%',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF455A64),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  '${_fmt.format(p['solicitado'].toInt())} L',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF455A64),
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  '${_fmt.format(recAmbPart.toInt())} L',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: colors[index % colors.length],
-                                  ),
-                                ),
-                              ),
-                              Expanded(
-                                flex: 2,
-                                child: Text(
-                                  '${_fmt.format(rec20Part.toInt())} L',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                    color: colors[index % colors.length],
+                              const SizedBox(width: 30),
+                              SizedBox(
+                                width: 180,
+                                height: 180,
+                                child: PieChart(
+                                  PieChartData(
+                                    sectionsSpace: 2,
+                                    centerSpaceRadius: 40,
+                                    sections: List.generate(participantes.length, (i) {
+                                      final p = participantes[i];
+                                      final colors = [
+                                        const Color(0xFF0D47A1), // Azul Escuro
+                                        const Color(0xFFD32F2F), // Vermelho
+                                        const Color(0xFF388E3C), // Verde
+                                        const Color(0xFFFBC02D), // Amarelo/Dourado
+                                      ];
+                                      return PieChartSectionData(
+                                        color: colors[i % colors.length],
+                                        value: p['solicitado'],
+                                        title:
+                                            '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((p['solicitado'] / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
+                                        radius: 50,
+                                        titleStyle: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          shadows: [
+                                            Shadow(color: Colors.black45, blurRadius: 2)
+                                          ],
+                                        ),
+                                        titlePositionPercentageOffset: 0.55,
+                                      );
+                                    }),
                                   ),
                                 ),
                               ),
                             ],
                           ),
+                        ],
+                      ),
+
+                      const SizedBox(width: 40),
+
+                      // LADO DIREITO: TABELA DE RATEIO
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Tabela de distribuição fixa
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                      flex: 3,
+                                      child: Text('DISTRIBUIDORA',
+                                          textAlign: TextAlign.left,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey[700]))),
+                                  Expanded(
+                                      flex: 1,
+                                      child: Text('%',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey[700]))),
+                                  Expanded(
+                                      flex: 2,
+                                      child: Text('SOLICITADO',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey[700]))),
+                                  Expanded(
+                                      flex: 2,
+                                      child: Text('RECEB. (AMB)',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey[700]))),
+                                  Expanded(
+                                      flex: 2,
+                                      child: Text('RECEB. (20ºC)',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.grey[700]))),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            ...participantes.asMap().entries.map((entry) {
+                              final index = entry.key;
+                              final p = entry.value;
+                              double peso = totalSolicitado > 0
+                                  ? (p['solicitado'] / totalSolicitado)
+                                  : 0;
+                              double recAmbPart = recebidoAmb * peso;
+                              double rec20Part = recebido20 * peso;
+                              double percent = peso; // O percentual do rateio é baseado no solicitado
+
+                              final colors = [
+                                const Color(0xFF0D47A1),
+                                const Color(0xFFD32F2F),
+                                const Color(0xFF388E3C),
+                                const Color(0xFFFBC02D),
+                              ];
+
+                              return Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 3,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 8,
+                                                height: 8,
+                                                margin: const EdgeInsets.only(right: 12),
+                                                decoration: BoxDecoration(
+                                                  color: colors[index % colors.length],
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      p['nome'].toString().toUpperCase(),
+                                                      style: const TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Color(0xFF263238),
+                                                      ),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    ClipRRect(
+                                                      borderRadius: BorderRadius.circular(2),
+                                                      child: LinearProgressIndicator(
+                                                        value: percent,
+                                                        backgroundColor: Colors.grey[100],
+                                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                                          colors[index % colors.length]
+                                                        ),
+                                                        minHeight: 3,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 1,
+                                          child: Text(
+                                            '${(percent * 100).toStringAsFixed(1)}%',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF455A64),
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            '${_fmt.format(p['solicitado'].toInt())} L',
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF455A64),
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            '${_fmt.format(recAmbPart.toInt())} L',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: colors[index % colors.length],
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            '${_fmt.format(rec20Part.toInt())} L',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w900,
+                                              color: colors[index % colors.length],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const Divider(height: 1),
+                                ],
+                              );
+                            }).toList(),
+                          ],
                         ),
-                        const Divider(height: 1),
-                      ],
-                    );
-                  }).toList(),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),

@@ -312,15 +312,15 @@ class _LoginPageState extends State<LoginPage> {
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/background_login9.jpg'),
-                fit: BoxFit.cover,
+                image: AssetImage('assets/background-login.png'),
+                fit: BoxFit.fill,
               ),
             ),
           ),
           Positioned(
             top: 80,
             left: 80,
-            child: Image.asset('assets/logo_top_login20.png'),
+            child: Image.asset('assets/logo-login.png'),
           ),
           Center(
             child: Container(
@@ -443,12 +443,30 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'PowerTank Terminais 2026, All rights reserved.',
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w400,
+                  Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Base X'),
+                        WidgetSpan(
+                          child: Transform.translate(
+                            offset: const Offset(0, -5),
+                            child: Text(
+                              '®',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: Colors.grey.shade400,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const TextSpan(text: ' 2026, All rights reserved.'),
+                      ],
                     ),
                     textAlign: TextAlign.center,
                   ),

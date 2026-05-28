@@ -1497,205 +1497,217 @@ class _HomePageLayout1State extends State<HomePageLayout1>
               height: 60,
               decoration: const BoxDecoration(
                 color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    offset: Offset(0, 2),
-                    blurRadius: 4,
-                  ),
-                ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Stack(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10),
-                    child: InkWell(
-                      onTap: _resetarTodasFlags,
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: Image.asset(
-                          'assets/logo_top_home3.png',
-                          fit: BoxFit.contain,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 10),
+                        child: InkWell(
+                          onTap: _resetarTodasFlags,
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: Image.asset(
+                              'assets/logo_top_home3.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 20),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisSize: MainAxisSize.min,
-                          children: (usuario?.nivel == 3)
-                              ? [
-                                  Text(
-                                    usuario?.nome ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF0D47A1),
-                                      fontWeight: FontWeight.w600,
+                      Padding(
+                        padding: const EdgeInsets.only(right: 20),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisSize: MainAxisSize.min,
+                              children: (usuario?.nivel == 3)
+                                  ? [
+                                      Text(
+                                        usuario?.nome ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xFF0D47A1),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ]
+                                  : [
+                                      Text(
+                                        usuario?.nome ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 14,
+                                          color: Color(0xFF0D47A1),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        (usuario?.nivel == 1 ||
+                                                usuario?.nivel == 2)
+                                            ? (_usuarioTerminalNome ??
+                                                (UsuarioAtual
+                                                            .instance
+                                                            ?.terminalId ==
+                                                        null ||
+                                                    UsuarioAtual
+                                                        .instance!
+                                                        .terminalId!
+                                                        .isEmpty
+                                                ? 'Sem terminal'
+                                                : 'Carregando...'))
+                                            : (_usuarioFilialNome ??
+                                                (UsuarioAtual
+                                                            .instance
+                                                            ?.filialId ==
+                                                        null ||
+                                                    UsuarioAtual
+                                                        .instance!
+                                                        .filialId!
+                                                        .isEmpty
+                                                ? 'Sem filial'
+                                                : 'Carregando...')),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey[600],
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                            ),
+                            const SizedBox(width: 10),
+                            PopupMenuButton<String>(
+                              surfaceTintColor: Colors.white,
+                              color: Colors.white,
+                              icon: const Icon(
+                                Icons.account_circle,
+                                color: Color(0xFF0D47A1),
+                                size: 30,
+                              ),
+                              onSelected: (value) async {
+                                if (value == 'Perfil') {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const PerfilPage(),
                                     ),
-                                  ),
-                                ]
-                              : [
-                                  Text(
-                                    usuario?.nome ?? '',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFF0D47A1),
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    (usuario?.nivel == 1 || usuario?.nivel == 2)
-                                        ? (_usuarioTerminalNome ??
-                                              (UsuarioAtual
-                                                              .instance
-                                                              ?.terminalId ==
-                                                          null ||
-                                                      UsuarioAtual
-                                                          .instance!
-                                                          .terminalId!
-                                                          .isEmpty
-                                                  ? 'Sem terminal'
-                                                  : 'Carregando...'))
-                                        : (_usuarioFilialNome ??
-                                              (UsuarioAtual.instance?.filialId ==
-                                                          null ||
-                                                      UsuarioAtual
-                                                          .instance!
-                                                          .filialId!
-                                                          .isEmpty
-                                                  ? 'Sem filial'
-                                                  : 'Carregando...')),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.grey[600],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                        ),
-                        const SizedBox(width: 10),
-                        PopupMenuButton<String>(
-                          surfaceTintColor: Colors.white,
-                          color: Colors.white,
-                          icon: const Icon(
-                            Icons.account_circle,
-                            color: Color(0xFF0D47A1),
-                            size: 30,
-                          ),
-                          onSelected: (value) async {
-                            if (value == 'Perfil') {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const PerfilPage(),
-                                ),
-                              );
-                            }
+                                  );
+                                }
 
-                            if (value == 'Sair') {
-                              await Supabase.instance.client.auth.signOut();
-                              UsuarioAtual.instance = null;
-                              if (context.mounted) {
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const LoginPage(),
+                                if (value == 'Sair') {
+                                  await Supabase.instance.client.auth.signOut();
+                                  UsuarioAtual.instance = null;
+                                  if (context.mounted) {
+                                    Navigator.pushAndRemoveUntil(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const LoginPage(),
+                                      ),
+                                      (route) => false,
+                                    );
+                                  }
+                                }
+                              },
+                              itemBuilder: (context) {
+                                return {'Perfil', 'Sair'}.map((choice) {
+                                  return PopupMenuItem<String>(
+                                    value: choice,
+                                    child: Text(choice),
+                                  );
+                                }).toList();
+                              },
+                            ),
+                            const SizedBox(width: 15),
+                            // Lista suspensa de idiomas (agora o último objeto à direita)
+                            PopupMenuButton<String>(
+                              offset: const Offset(0, 40),
+                              tooltip: 'Selecionar Idioma',
+                              onSelected: (value) {
+                                // Funcionalidade fictícia de troca de idioma
+                              },
+                              surfaceTintColor: Colors.white,
+                              color: Colors.white,
+                              elevation: 8,
+                              itemBuilder: (BuildContext context) => [
+                                const PopupMenuItem<String>(
+                                  value: 'en',
+                                  child: Row(
+                                    children: [
+                                      Text('🇺🇸'),
+                                      SizedBox(width: 8),
+                                      Text('English (US)'),
+                                    ],
                                   ),
-                                  (route) => false,
-                                );
-                              }
-                            }
-                          },
-                          itemBuilder: (context) {
-                            return {'Perfil', 'Sair'}.map((choice) {
-                              return PopupMenuItem<String>(
-                                value: choice,
-                                child: Text(choice),
-                              );
-                            }).toList();
-                          },
-                        ),
-                        const SizedBox(width: 15),
-                        // Lista suspensa de idiomas (agora o último objeto à direita)
-                        PopupMenuButton<String>(
-                          offset: const Offset(0, 40),
-                          tooltip: 'Selecionar Idioma',
-                          onSelected: (value) {
-                            // Funcionalidade fictícia de troca de idioma
-                          },
-                          surfaceTintColor: Colors.white,
-                          color: Colors.white,
-                          elevation: 8,
-                          itemBuilder: (BuildContext context) => [
-                            const PopupMenuItem<String>(
-                              value: 'en',
+                                ),
+                                const PopupMenuItem<String>(
+                                  value: 'es',
+                                  child: Row(
+                                    children: [
+                                      Text('🇪🇸'),
+                                      SizedBox(width: 8),
+                                      Text('Español'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem<String>(
+                                  value: 'pt',
+                                  child: Row(
+                                    children: [
+                                      Text('🇧🇷'),
+                                      SizedBox(width: 8),
+                                      Text('Português (BR)'),
+                                    ],
+                                  ),
+                                ),
+                              ],
                               child: Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Text('🇺🇸'),
-                                  SizedBox(width: 8),
-                                  Text('English (US)'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'es',
-                              child: Row(
-                                children: [
-                                  Text('🇪🇸'),
-                                  SizedBox(width: 8),
-                                  Text('Español'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'pt',
-                              child: Row(
-                                children: [
-                                  Text('🇧🇷'),
-                                  SizedBox(width: 8),
-                                  Text('Português (BR)'),
+                                  const Text(
+                                    '🇧🇷',
+                                    style: TextStyle(fontSize: 18),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'PT-BR',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    size: 20,
+                                    color: Colors.grey[600],
+                                  ),
                                 ],
                               ),
                             ),
                           ],
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                '🇧🇷',
-                                style: TextStyle(fontSize: 18),
-                              ),
-                              const SizedBox(width: 4),
-                              const Text(
-                                'PT-BR',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0D47A1),
-                                ),
-                              ),
-                              Icon(
-                                Icons.arrow_drop_down,
-                                size: 20,
-                                color: Colors.grey[600],
-                              ),
-                            ],
-                          ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                  if (selectedIndex == 0 || selectedIndex == -1)
+                    Center(
+                      child: Text(
+                        _formatarDataAtual(),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          color: Color(0xFF0D47A1),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
+            const Divider(height: 1, thickness: 1, color: Colors.grey),
 
             Expanded(
               child: Row(
@@ -1838,12 +1850,29 @@ class _HomePageLayout1State extends State<HomePageLayout1>
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    'PowerTank Terminais 2026, All rights reserved.',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[600],
-                      letterSpacing: 0.3,
+                  Text.rich(
+                    TextSpan(
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey[600],
+                        letterSpacing: 0.3,
+                      ),
+                      children: [
+                        const TextSpan(text: 'Base X'),
+                        WidgetSpan(
+                          child: Transform.translate(
+                            offset: const Offset(0, -4),
+                            child: Text(
+                              '®',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const TextSpan(text: ' 2026, All rights reserved.'),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 2),
@@ -4279,19 +4308,6 @@ class _HomePageLayout1State extends State<HomePageLayout1>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            usuario != null
-                ? 'Olá, ${usuario.nome}! Bem-vindo ao PowerTank!'
-                : 'Bem-vindo ao PowerTank!',
-            style: const TextStyle(
-              fontSize: 24,
-              color: Color(0xFF0D47A1),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Divider(color: Colors.grey),
-          const SizedBox(height: 20),
           if (favoritos.isEmpty)
             Expanded(
               child: Center(
@@ -4500,6 +4516,39 @@ class _HomePageLayout1State extends State<HomePageLayout1>
   }
 
   // Método para adicionar quebras de linha nos nomes longos
+  String _formatarDataAtual() {
+    final now = DateTime.now();
+    final diasDaSemana = [
+      'segunda-feira',
+      'terça-feira',
+      'quarta-feira',
+      'quinta-feira',
+      'sexta-feira',
+      'sábado',
+      'domingo'
+    ];
+    final meses = [
+      'janeiro',
+      'fevereiro',
+      'março',
+      'abril',
+      'maio',
+      'junho',
+      'julho',
+      'agosto',
+      'setembro',
+      'outubro',
+      'novembro',
+      'dezembro'
+    ];
+
+    String diaSemana = diasDaSemana[now.weekday - 1];
+    diaSemana = diaSemana[0].toUpperCase() + diaSemana.substring(1);
+    String mes = meses[now.month - 1];
+
+    return "$diaSemana, ${now.day} de $mes de ${now.year}";
+  }
+
   String _formatarNomeMenu(String nomeOriginal) {
     // Mapeia os nomes que precisam de quebra de linha
     final Map<String, String> quebras = {
