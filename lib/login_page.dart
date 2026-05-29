@@ -351,7 +351,19 @@ class _LoginPageState extends State<LoginPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 35),
+                        const SizedBox(height: 25),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "E-mail",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
                         TextField(
                           controller: emailController,
                           autofillHints: const [
@@ -361,9 +373,8 @@ class _LoginPageState extends State<LoginPage> {
                           keyboardType: TextInputType.emailAddress,
                           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                           decoration: InputDecoration(
-                            labelText: 'E-mail',
-                            labelStyle: const TextStyle(color: Color.fromARGB(255, 0, 0, 0), fontWeight: FontWeight.bold),
-                            hintStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold),
+                            hintText: 'Digite seu e-mail',
+                            hintStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 13),
                             prefixIcon: const Icon(Icons.email_outlined,
                                 color: Colors.black),
                             enabledBorder: OutlineInputBorder(
@@ -378,6 +389,18 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                         ),
                         const SizedBox(height: 20),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Senha",
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
                         TextField(
                           controller: passwordController,
                           obscureText: _obscureText,
@@ -385,9 +408,8 @@ class _LoginPageState extends State<LoginPage> {
                           onSubmitted: (_) => _isLoading ? null : loginUser(),
                           style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                           decoration: InputDecoration(
-                            labelText: 'Senha',
-                            labelStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                            hintStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold),
+                            hintText: 'Digite sua senha',
+                            hintStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 13),
                             prefixIcon: const Icon(Icons.lock_outline,
                                 color: Colors.black),
                             suffixIcon: IconButton(

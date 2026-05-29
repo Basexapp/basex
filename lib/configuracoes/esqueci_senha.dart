@@ -174,12 +174,25 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
                   const SizedBox(height: 30),
 
                   if (!_emailSent) ...[
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "E-mail",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     Form(
                       key: _formKey,
                       child: TextFormField(
                         controller: _emailController,
                         decoration: InputDecoration(
-                          labelText: 'E-mail',
+                          hintText: 'Digite seu e-mail',
+                          hintStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 13),
                           prefixIcon: const Icon(Icons.email_outlined),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
