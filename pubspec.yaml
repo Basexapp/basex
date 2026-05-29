@@ -1,4 +1,4 @@
-name: cloudtrack
+name: basex
 description: "App de gerenciamento logístico com Supabase e Flutter."
 publish_to: 'none'
 

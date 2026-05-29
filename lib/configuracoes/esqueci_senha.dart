@@ -26,7 +26,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
       // 1️⃣ Disparar e-mail de redefinição direto pelo Supabase (usa SMTP configurado)
       await supabase.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'https://powertankapp.com.br/',
+        redirectTo: 'https://basexapp.com.br',
       );
 
       // 2️⃣ Sucesso
@@ -284,7 +284,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'PowerTank Terminais 2026, All rights reserved.',
+                    'Base X 2026, All rights reserved.',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 13,

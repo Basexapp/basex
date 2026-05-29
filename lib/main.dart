@@ -66,7 +66,7 @@ class _MyAppState extends State<MyApp> {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'PowerTank',
+      title: 'Base X',
       theme: ThemeData(
         fontFamily: 'Arial',
         scaffoldBackgroundColor: Colors.white,

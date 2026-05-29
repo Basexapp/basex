@@ -1,6 +1,6 @@
 {
-    "name": "cloudtrack",
-    "short_name": "cloudtrack",
+    "name": "Base X",
+    "short_name": "basex",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

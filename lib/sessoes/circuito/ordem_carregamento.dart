@@ -186,7 +186,7 @@ class OrdemCarregamentoPdf {
 
               pw.Center(
                 child: pw.Text(
-                  'PowerTank® Terminais',
+                  'Base X',
                   style: pw.TextStyle(
                     fontSize: 7,
                     color: PdfColors.grey600,

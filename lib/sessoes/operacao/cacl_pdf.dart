@@ -244,7 +244,7 @@ class CACLPdf {
                     pw.Divider(height: 0.5, color: PdfColors.grey400),
                     pw.SizedBox(height: 3),
                     pw.Text(
-                      'PowerTank® Terminais - ${_obterApenasData(data)} ${_formatarHoraSimples(hora)}',
+                      'Base X - ${_obterApenasData(data)} ${_formatarHoraSimples(hora)}',
                       style: pw.TextStyle(fontSize: 6, color: PdfColors.grey600),
                       textAlign: pw.TextAlign.center,
                     ),

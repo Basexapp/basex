@@ -311,7 +311,7 @@ class _RedefinirSenhaPageState extends State<RedefinirSenhaPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'PowerTank Terminais 2026, All rights reserved.',
+                    'Base X 2026, All rights reserved.',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 13,

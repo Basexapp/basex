@@ -81,7 +81,7 @@ class _SuportePageState extends State<SuportePage> {
   }
 
   Future<void> _launchEmail() async {
-    final url = Uri.parse('mailto:suporte@powertankapp.com?subject=Suporte PowerTank');
+    final url = Uri.parse('mailto:suporte@basexapp.com.br?subject=Suporte Base X');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
@@ -213,7 +213,7 @@ class _SuportePageState extends State<SuportePage> {
           child: _buildContatoCardSlim(
             icon: Icons.email,
             title: 'E-mail',
-            subtitle: 'suporte@powertankapp.com',
+            subtitle: 'suporte@basexapp.com.br',
             color: const Color(0xFFEA4335),
             onTap: _launchEmail,
           ),

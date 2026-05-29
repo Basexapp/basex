@@ -174,7 +174,7 @@ class _EscolherSenhaPageState extends State<EscolherSenhaPage> {
                   Text(
                     _senhaDefinida
                         ? 'Senha definida com sucesso! Redirecionando...'
-                        : 'Crie uma nova senha para sua conta PowerTank',
+                        : 'Crie uma nova senha para sua conta Base X',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),
@@ -275,7 +275,7 @@ class _EscolherSenhaPageState extends State<EscolherSenhaPage> {
               child: Column(
                 children: [
                   Text(
-                    'PowerTank Terminais 2026, All rights reserved.',
+                    'Base X 2026, All rights reserved.',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 13,
