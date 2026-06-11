@@ -65,6 +65,7 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
   bool _calculandoVolume20 = false;
   double _volumeTotalRaw = 0;
   double _volumeAguaRaw = 0;
+  String? _tabelaArqueacao;
 
   // Debouncers
   Timer? _debounceVolumeAmbiente;
@@ -74,6 +75,7 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
   @override
   void initState() {
     super.initState();
+    _carregarTabelaArqueacao();
     _tanqueCtrl.text = widget.tanqueReferencia ?? '';
     _dataCtrl.text = widget.data ?? DateFormat('dd/MM/yyyy').format(DateTime.now());
     if (widget.horario != null) {
@@ -93,6 +95,31 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
     _mmFocus.addListener(_onHeightFocusChanged);
     _aguaCmFocus.addListener(_onAguaHeightFocusChanged);
     _aguaMmFocus.addListener(_onAguaHeightFocusChanged);
+  }
+
+  Future<void> _carregarTabelaArqueacao() async {
+    final terminalId = UsuarioAtual.instance?.terminalId;
+    if (terminalId == null || terminalId.isEmpty) return;
+
+    try {
+      final supabase = Supabase.instance.client;
+      final terminalResp = await supabase
+          .from('terminais')
+          .select('tabela_arqueacao')
+          .eq('id', terminalId)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() {
+          _tabelaArqueacao = terminalResp?['tabela_arqueacao']?.toString();
+        });
+        // Se já tiver altura, força o recálculo
+        if (_cmCtrl.text.isNotEmpty) _calcularVolumeAmbiente();
+        if (_aguaCmCtrl.text.isNotEmpty) _calcularVolumeAgua();
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar tabela arqueacao: $e');
+    }
   }
 
   void _onFocusChanged() {
@@ -514,14 +541,12 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
   // ── Funções de cálculo replicadas do cacl.dart ────────────────────────────
 
   Future<double> _buscarVolumeReal(String cm, String mm) async {
+    final nomeTabela = _tabelaArqueacao;
+    if (nomeTabela == null || nomeTabela.isEmpty) return 0;
+
     final supabase = Supabase.instance.client;
     final intCm = int.tryParse(cm) ?? 0;
     final intMm = int.tryParse(mm.isEmpty ? '0' : mm) ?? 0;
-
-    final terminalId = UsuarioAtual.instance?.terminalId ?? '';
-    final nomeTabela = (terminalId == '198c2b9b-2708-420e-8992-3b2c9ae3ed6a')
-        ? 'arqueacao_janauba'
-        : 'arqueacao_jequie';
 
     final tanqueRef = widget.tanqueReferencia ?? '';
     String numeroTanque = '01';

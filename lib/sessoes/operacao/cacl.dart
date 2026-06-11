@@ -31,6 +31,7 @@ class CalcPage extends StatefulWidget {
 }
 
 class _CalcPageState extends State<CalcPage> {
+  String? _tabelaArqueacao;
   double volumeInicial = 0;
   double volumeFinal = 0;
   double volumeTotalLiquidoInicial = 0;
@@ -665,6 +666,25 @@ class _CalcPageState extends State<CalcPage> {
   }
 
   Future<void> _calcularVolumesIniciais() async {
+    final String? terminalId = widget.dadosFormulario['terminal_id']?.toString();
+
+    if (terminalId != null && terminalId.isNotEmpty) {
+      try {
+        final supabase = Supabase.instance.client;
+        final terminalResp = await supabase
+            .from('terminais')
+            .select('tabela_arqueacao')
+            .eq('id', terminalId)
+            .maybeSingle();
+
+        if (terminalResp != null) {
+          _tabelaArqueacao = terminalResp['tabela_arqueacao']?.toString();
+        }
+      } catch (e) {
+        debugPrint('Erro ao buscar tabela_arqueacao: $e');
+      }
+    }
+
     final medicoes = widget.dadosFormulario['medicoes'];
 
     final alturaAguaInicial = medicoes['alturaAguaInicial'];
@@ -950,6 +970,11 @@ class _CalcPageState extends State<CalcPage> {
   }
 
   Future<double> _buscarVolumeReal(String? cm, String? mm) async {
+    final nomeTabela = _tabelaArqueacao;
+    if (nomeTabela == null || nomeTabela.isEmpty) {
+      return 0;
+    }
+
     final supabase = Supabase.instance.client;
 
     if (cm == null || cm.isEmpty) {
@@ -958,15 +983,6 @@ class _CalcPageState extends State<CalcPage> {
 
     final intCm = int.tryParse(cm) ?? 0;
     final intMm = int.tryParse(mm ?? '0') ?? 0;
-
-    final String? terminalId = widget.dadosFormulario['terminal_id']?.toString();
-
-    // ✅ REGRA: se for o terminal de Janaúba, usa arqueacao_janauba
-    // TODO: substituir o UUID abaixo pelo terminal_id correspondente ao terminal de Janaúba
-    final String nomeTabela =
-        (terminalId == '198c2b9b-2708-420e-8992-3b2c9ae3ed6a')
-        ? 'arqueacao_janauba'
-        : 'arqueacao_jequie';
 
     final String tanqueRef = widget.dadosFormulario['tanque']?.toString() ?? '';
     String numeroTanque = '01';

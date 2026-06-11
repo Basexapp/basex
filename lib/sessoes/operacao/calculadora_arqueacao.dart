@@ -61,6 +61,7 @@ class _CalculadoraArqueacaoDialogState
   // ── Dados dos tanques ──────────────────────────────────────────────────────
   List<Map<String, dynamic>> _tanques = [];
   Map<String, dynamic>? _tanqueSelecionado;
+  String? _nomeTabelaArqueacao;
   bool _carregandoTanques = true;
 
   // ── Controllers ───────────────────────────────────────────────────────────
@@ -118,6 +119,16 @@ class _CalculadoraArqueacaoDialogState
 
     try {
       final supabase = Supabase.instance.client;
+
+      // Busca o nome da tabela de arqueação do terminal
+      final terminalResp = await supabase
+          .from('terminais')
+          .select('tabela_arqueacao')
+          .eq('id', terminalId)
+          .maybeSingle();
+
+      final tabelaArqueacao = terminalResp?['tabela_arqueacao']?.toString();
+
       final resposta = await supabase
           .from('tanques')
           .select('id, referencia, id_produto, produtos(nome)')
@@ -151,6 +162,7 @@ class _CalculadoraArqueacaoDialogState
       if (mounted) {
         setState(() {
           _tanques = lista;
+          _nomeTabelaArqueacao = tabelaArqueacao;
           _carregandoTanques = false;
           if (lista.isNotEmpty) _tanqueSelecionado = lista.first;
         });
@@ -279,14 +291,12 @@ class _CalculadoraArqueacaoDialogState
   // ── Funções de cálculo replicadas do cacl.dart ────────────────────────────
 
   Future<double> _buscarVolumeReal(String cm, String mm) async {
+    final nomeTabela = _nomeTabelaArqueacao;
+    if (nomeTabela == null || nomeTabela.isEmpty) return 0;
+
     final supabase = Supabase.instance.client;
     final intCm = int.tryParse(cm) ?? 0;
     final intMm = int.tryParse(mm.isEmpty ? '0' : mm) ?? 0;
-
-    final terminalId = UsuarioAtual.instance?.terminalId ?? '';
-    final nomeTabela = (terminalId == '198c2b9b-2708-420e-8992-3b2c9ae3ed6a')
-        ? 'arqueacao_janauba'
-        : 'arqueacao_jequie';
 
     final tanqueRef = _tanqueSelecionado?['referencia']?.toString() ?? '';
     String numeroTanque = '01';
