@@ -918,6 +918,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     final digitsOnly = valor.replaceAll(RegExp(r'[^\d]'), '');
     if (digitsOnly.isEmpty) {
       _capacidadeController.clear();
+      setState(() {});
       return;
     }
     final novoTexto = _formatarMilhar(digitsOnly);
@@ -927,12 +928,14 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         TextPosition(offset: novoTexto.length),
       );
     }
+    setState(() {});
   }
 
   void _aplicarMascaraLastro(String valor) {
     final digitsOnly = valor.replaceAll(RegExp(r'[^\d]'), '');
     if (digitsOnly.isEmpty) {
       _lastroController.clear();
+      setState(() {});
       return;
     }
 
@@ -943,6 +946,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         TextPosition(offset: novoTexto.length),
       );
     }
+    setState(() {});
   }
 
   Future<void> _salvarTanque() async {
@@ -1109,6 +1113,18 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
       }
 
       await _carregarDados();
+
+      // Atualiza o tanque selecionado para que a página de ações reflita as mudanças
+      if (_tanqueEditando != null && _tanqueSelecionadoParaAcoes != null) {
+        final idEditado = _tanqueEditando!['id'];
+        final tanqueAtualizado = tanques.firstWhere(
+          (t) => t['id'] == idEditado,
+          orElse: () => _tanqueSelecionadoParaAcoes!,
+        );
+        setState(() {
+          _tanqueSelecionadoParaAcoes = tanqueAtualizado;
+        });
+      }
 
       if (mounted) {
         final String referencia = _referenciaController.text.trim();

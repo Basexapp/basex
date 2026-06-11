@@ -69,11 +69,19 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
   String? _hoverSwitchOption;
   String? _hoverUnitOption;
 
+  final ScrollController _menuScrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     _carregarDadosTanques();
     _carregarNomeTerminal();
+  }
+
+  @override
+  void dispose() {
+    _menuScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _carregarNomeTerminal() async {
@@ -277,206 +285,233 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
       color: const Color(0xFFF8F9FA),
       child: Column(
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              children: [
-                // Adicionando o botão "Todos" na primeira posição
-                Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: MouseRegion(
-                    cursor: SystemMouseCursors.click,
-                    onEnter: (_) {
-                      setState(() {
-                        _hoverIndex = -1;
-                      });
-                    },
-                    onExit: (_) {
-                      setState(() {
-                        _hoverIndex = null;
-                      });
-                    },
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          tanqueSelecionadoIndex = -1;
-                        });
-                      },
-                      child: SizedBox(
-                        height: 70,
-                        width: 110,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          curve: Curves.easeOut,
-                          alignment: Alignment.center,
-                          transform:
-                              _hoverIndex == -1 && tanqueSelecionadoIndex != -1
-                              ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
-                              : Matrix4.identity(),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: tanqueSelecionadoIndex == -1
-                                ? const Color(0xFF0D47A1)
-                                : (_hoverIndex == -1
-                                      ? const Color(0xFFE8EAF2)
-                                      : const Color(0xFFF0F1F6)),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: tanqueSelecionadoIndex == -1
-                                  ? const Color(0xFF0D47A1)
-                                  : (_hoverIndex == -1
-                                        ? const Color(0xFF3366FF)
-                                        : const Color(0xFFE0E3EB)),
-                              width:
-                                  _hoverIndex == -1 &&
-                                      tanqueSelecionadoIndex != -1
-                                  ? 2.0
-                                  : 1.5,
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                'Visão Geral',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
+          Row(
+            children: [
+              _buildScrollButton(Icons.chevron_left, -200),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _menuScrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      // Adicionando o botão "Todos" na primeira posição
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12, left: 4),
+                        child: MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          onEnter: (_) {
+                            setState(() {
+                              _hoverIndex = -1;
+                            });
+                          },
+                          onExit: (_) {
+                            setState(() {
+                              _hoverIndex = null;
+                            });
+                          },
+                          child: GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                tanqueSelecionadoIndex = -1;
+                              });
+                            },
+                            child: SizedBox(
+                              height: 70,
+                              width: 110,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                curve: Curves.easeOut,
+                                alignment: Alignment.center,
+                                transform:
+                                    _hoverIndex == -1 && tanqueSelecionadoIndex != -1
+                                    ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
+                                    : Matrix4.identity(),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
                                   color: tanqueSelecionadoIndex == -1
-                                      ? const Color(0xFFF8F9FA)
-                                      : const Color(0xFF0D47A1),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                                      ? const Color(0xFF0D47A1)
+                                      : (_hoverIndex == -1
+                                            ? const Color(0xFFE8EAF2)
+                                            : const Color(0xFFF0F1F6)),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: tanqueSelecionadoIndex == -1
+                                        ? const Color(0xFF0D47A1)
+                                        : (_hoverIndex == -1
+                                              ? const Color(0xFF3366FF)
+                                              : const Color(0xFFE0E3EB)),
+                                    width:
+                                        _hoverIndex == -1 &&
+                                            tanqueSelecionadoIndex != -1
+                                        ? 2.0
+                                        : 1.5,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Visão Geral',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: tanqueSelecionadoIndex == -1
+                                            ? const Color(0xFFF8F9FA)
+                                            : const Color(0xFF0D47A1),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ),
-                ...List.generate(tanquesInvertidos.length, (index) {
-                  final tanque = tanquesInvertidos[index];
-                  final realIndex = tanques.length - 1 - index;
-                  final isSelected = tanqueSelecionadoIndex == realIndex;
-                  final isHovered = _hoverIndex == realIndex;
+                      ...List.generate(tanquesInvertidos.length, (index) {
+                        final tanque = tanquesInvertidos[index];
+                        final realIndex = tanques.length - 1 - index;
+                        final isSelected = tanqueSelecionadoIndex == realIndex;
+                        final isHovered = _hoverIndex == realIndex;
 
-                  return Padding(
-                    padding: EdgeInsets.only(
-                      right: index < tanquesInvertidos.length - 1 ? 12 : 0,
-                    ),
-                    child: MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      onEnter: (_) {
-                        setState(() {
-                          _hoverIndex = realIndex;
-                        });
-                      },
-                      onExit: (_) {
-                        setState(() {
-                          _hoverIndex = null;
-                        });
-                      },
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            tanqueSelecionadoIndex = realIndex;
-                          });
-                        },
-                        child: SizedBox(
-                          height: 70, // Aumentado para acomodar quebras de linha
-                          width: 110, // Aumentado levemente para dar mais espaço lateral
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            curve: Curves.easeOut,
-                            alignment: Alignment.center, // Centraliza o conteúdo internally
-                            transform: isHovered && !isSelected
-                                ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
-                                : Matrix4.identity(),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8, // Reduzido o padding horizontal para favorecer o texto
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected
-                                  ? const Color(0xFF0D47A1)
-                                  : (isHovered
-                                        ? const Color(0xFFE8EAF2)
-                                        : const Color(0xFFF0F1F6)),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: isSelected
-                                    ? const Color(0xFF0D47A1)
-                                    : (isHovered
-                                          ? const Color(0xFF3366FF)
-                                          : const Color(0xFFE0E3EB)),
-                                width: isHovered && !isSelected ? 2.0 : 1.5,
-                              ),
-                              boxShadow: isHovered && !isSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: const Color(
-                                          0xFF3366FF,
-                                        ).withOpacity(0.2),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  tanque.nome.split(' - ').first,
-                                  textAlign: TextAlign.center, // Centraliza o texto
-                                  style: TextStyle(
-                                    color: isSelected
-                                        ? const Color(0xFFF8F9FA)
-                                        : const Color(0xFF0D47A1),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            right: index < tanquesInvertidos.length - 1 ? 12 : 0,
+                          ),
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            onEnter: (_) {
+                              setState(() {
+                                _hoverIndex = realIndex;
+                              });
+                            },
+                            onExit: (_) {
+                              setState(() {
+                                _hoverIndex = null;
+                              });
+                            },
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  tanqueSelecionadoIndex = realIndex;
+                                });
+                              },
+                              child: SizedBox(
+                                height: 70, // Aumentado para acomodar quebras de linha
+                                width: 110, // Aumentado levemente para dar mais espaço lateral
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  curve: Curves.easeOut,
+                                  alignment: Alignment.center, // Centraliza o conteúdo internally
+                                  transform: isHovered && !isSelected
+                                      ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
+                                      : Matrix4.identity(),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, // Reduzido o padding horizontal para favorecer o texto
+                                    vertical: 6,
                                   ),
-                                ),
-                                if (tanque.nome.contains(' - ')) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    tanque.nome.split(' - ').last,
-                                    textAlign: TextAlign.center, // Alinhamento central para quebra de linha
-                                    maxLines: 2, // Permite quebra em até 2 linhas para o nome do produto
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? const Color(0xFF0D47A1)
+                                        : (isHovered
+                                              ? const Color(0xFFE8EAF2)
+                                              : const Color(0xFFF0F1F6)),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
                                       color: isSelected
-                                          ? const Color(0xFFBFC8E6)
+                                          ? const Color(0xFF0D47A1)
                                           : (isHovered
                                                 ? const Color(0xFF3366FF)
-                                                : const Color(0xFF5A6275)),
-                                      fontSize: 10,
-                                      fontWeight: isHovered
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
+                                                : const Color(0xFFE0E3EB)),
+                                      width: isHovered && !isSelected ? 2.0 : 1.5,
                                     ),
+                                    boxShadow: isHovered && !isSelected
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(
+                                                0xFF3366FF,
+                                              ).withOpacity(0.2),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ]
+                                        : null,
                                   ),
-                                ],
-                              ],
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        tanque.nome.split(' - ').first,
+                                        textAlign: TextAlign.center, // Centraliza o texto
+                                        style: TextStyle(
+                                          color: isSelected
+                                              ? const Color(0xFFF8F9FA)
+                                              : const Color(0xFF0D47A1),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (tanque.nome.contains(' - ')) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          tanque.nome.split(' - ').last,
+                                          textAlign: TextAlign.center, // Alinhamento central para quebra de linha
+                                          maxLines: 2, // Permite quebra em até 2 linhas para o nome do produto
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: isSelected
+                                                ? const Color(0xFFBFC8E6)
+                                                : (isHovered
+                                                      ? const Color(0xFF3366FF)
+                                                      : const Color(0xFF5A6275)),
+                                            fontSize: 10,
+                                            fontWeight: isHovered
+                                                ? FontWeight.w600
+                                                : FontWeight.w400,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              _buildScrollButton(Icons.chevron_right, 200),
+            ],
           ),
           const SizedBox(height: 8),
           Container(height: 1, color: const Color(0xFFE0E3EB)),
         ],
       ),
+    );
+  }
+
+  Widget _buildScrollButton(IconData icon, double offset) {
+    return IconButton(
+      icon: Icon(icon, color: const Color(0xFF0D47A1), size: 24),
+      onPressed: () {
+        if (_menuScrollController.hasClients) {
+          _menuScrollController.animateTo(
+            (_menuScrollController.offset + offset).clamp(
+              0.0,
+              _menuScrollController.position.maxScrollExtent,
+            ),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      },
     );
   }
 
@@ -649,116 +684,147 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                     builder: (context, constraints) {
                       final int totalTanques = tanques.length;
                       final availableWidth = constraints.maxWidth;
+                      const int tanksPerRow = 6;
+                      final int tanksInThisCalculation =
+                          totalTanques < tanksPerRow
+                              ? totalTanques
+                              : tanksPerRow;
 
-                      // Calcula o tamanho base para que TODOS caibam sem scroll horizontal de imediato.
-                      final double spacing = 16.0;
+                      // Calcula o tamanho base para que caibam até 6 por linha.
+                      const double spacing = 16.0;
                       double dynamicBaseWidth = (((availableWidth -
-                                      (spacing * (totalTanques - 1))) /
-                                  totalTanques) *
+                                      (spacing * (tanksInThisCalculation - 1))) /
+                                  tanksInThisCalculation) *
                               0.85)
                           .clamp(50.0, 240.0);
                       double dynamicBaseHeight = dynamicBaseWidth * 1.15;
                       double dynamicScale = dynamicBaseWidth / 280.0;
 
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: tanques.reversed.map((tanque) {
-                          final percentual = tanque.percentualPreenchimento;
+                      final reversedTanques = tanques.reversed.toList();
+                      final List<Widget> rows = [];
 
-                          return Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: spacing / 2,
-                            ),
-                            child: MouseRegion(
-                              cursor: SystemMouseCursors.click,
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    tanqueSelecionadoIndex =
-                                        tanques.indexOf(tanque);
-                                  });
-                                },
-                                child: Tooltip(
-                                  message:
-                                      'Estoque total: ${_formatarValor(tanque.estoqueAtual)}\nEstoque disponível: ${_formatarValor(tanque.estoqueAtual - tanque.lastro)}\n───────────────\nCapacidade total: ${_formatarValor(tanque.capacidadeTotal)}\nEspaço disponível: ${_formatarValor(tanque.capacidadeTotal - tanque.estoqueAtual)}',
-                                  preferBelow: false,
-                                  verticalOffset: (dynamicBaseHeight / 2) + 30,
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF222B45)
-                                        .withOpacity(0.9),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        width: dynamicBaseWidth,
-                                        height: dynamicBaseHeight,
-                                        child: TankIllustration(
-                                          percentual: percentual / 100,
-                                          lastroPercentual: tanque.capacidadeTotal > 0
-                                              ? (tanque.lastro /
-                                                  tanque.capacidadeTotal)
-                                              : 0,
-                                          estoqueAtual: tanque.estoqueAtual,
-                                          capacidade: tanque.capacidadeTotal,
-                                          produtoDisponivel:
-                                              (tanque.estoqueAtual -
-                                                      tanque.lastro)
+                      for (int i = 0; i < reversedTanques.length; i += tanksPerRow) {
+                        final chunk = reversedTanques.sublist(
+                          i,
+                          (i + tanksPerRow > reversedTanques.length)
+                              ? reversedTanques.length
+                              : i + tanksPerRow,
+                        );
+
+                        rows.add(
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: chunk.map((tanque) {
+                              final percentual = tanque.percentualPreenchimento;
+
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: spacing / 2,
+                                ),
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.click,
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        tanqueSelecionadoIndex =
+                                            tanques.indexOf(tanque);
+                                      });
+                                    },
+                                    child: Tooltip(
+                                      message:
+                                          'Estoque total: ${_formatarValor(tanque.estoqueAtual)}\nEstoque disponível: ${_formatarValor(tanque.estoqueAtual - tanque.lastro)}\n───────────────\nCapacidade total: ${_formatarValor(tanque.capacidadeTotal)}\nEspaço disponível: ${_formatarValor(tanque.capacidadeTotal - tanque.estoqueAtual)}',
+                                      preferBelow: false,
+                                      verticalOffset:
+                                          (dynamicBaseHeight / 2) + 30,
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF222B45)
+                                            .withOpacity(0.9),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                      ),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: dynamicBaseWidth,
+                                            height: dynamicBaseHeight,
+                                            child: TankIllustration(
+                                              percentual: percentual / 100,
+                                              lastroPercentual:
+                                                  tanque.capacidadeTotal > 0
+                                                      ? (tanque.lastro /
+                                                          tanque.capacidadeTotal)
+                                                      : 0,
+                                              estoqueAtual: tanque.estoqueAtual,
+                                              capacidade:
+                                                  tanque.capacidadeTotal,
+                                              produtoDisponivel:
+                                                  (tanque.estoqueAtual -
+                                                          tanque.lastro)
+                                                      .clamp(
+                                                          0,
+                                                          tanque
+                                                              .capacidadeTotal),
+                                              espacoLivre: (tanque.capacidadeTotal -
+                                                      tanque.estoqueAtual)
                                                   .clamp(
                                                       0,
                                                       tanque
                                                           .capacidadeTotal),
-                                          espacoLivre: (tanque.capacidadeTotal -
-                                                  tanque.estoqueAtual)
-                                              .clamp(
-                                                  0,
-                                                  tanque
-                                                      .capacidadeTotal),
-                                          hideDetails: dynamicScale < 0.35,
-                                          scale: dynamicScale,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            tanque.nome.split(' - ').first,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12.0,
-                                              color: Color(0xFF222B45),
+                                              hideDetails: dynamicScale < 0.35,
+                                              scale: dynamicScale,
                                             ),
                                           ),
-                                          if (tanque.nome.contains(' - ')) ...[
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              tanque.nome.split(' - ').last,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 11.0,
-                                                color: Color(0xFF5A6275),
+                                          const SizedBox(height: 8),
+                                          Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                tanque.nome.split(' - ').first,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12.0,
+                                                  color: Color(0xFF222B45),
+                                                ),
                                               ),
-                                              textAlign: TextAlign.center,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ],
+                                              if (tanque.nome.contains(' - ')) ...[
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  tanque.nome.split(' - ').last,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 11.0,
+                                                    color: Color(0xFF5A6275),
+                                                  ),
+                                                  textAlign: TextAlign.center,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
                                         ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                              );
+                            }).toList(),
+                          ),
+                        );
+
+                        if (i + tanksPerRow < reversedTanques.length) {
+                          rows.add(const SizedBox(height: 48));
+                        }
+                      }
+
+                      return Column(
+                        children: rows,
                       );
                     },
                   ),
