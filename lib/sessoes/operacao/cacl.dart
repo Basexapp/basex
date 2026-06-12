@@ -1024,7 +1024,7 @@ class _CalcPageState extends State<CalcPage> {
         return volumeCm;
       }
 
-      final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm]);
+      final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm], isMilimetros: true);
       final volumeTotal = volumeCm + volumeMm;
 
       return double.parse(volumeTotal.toStringAsFixed(3));
@@ -1033,31 +1033,44 @@ class _CalcPageState extends State<CalcPage> {
     }
   }
 
-  double _converterVolumeLitros(dynamic valor) {
+  double _converterVolumeLitros(dynamic valor, {bool isMilimetros = false}) {
     try {
       if (valor == null) return 0.0;
 
-      String str = valor.toString().trim();
-      str = str.replaceAll(',', '.');
-
-      if (str.contains('.')) {
-        final partes = str.split('.');
-
-        if (partes.length == 2) {
-          String parteInteira = partes[0];
-          String parteDecimal = partes[1];
-
-          if (parteDecimal.length < 3) {
-            parteDecimal = parteDecimal.padRight(3, '0');
-          }
-
-          final numeroCompleto =
-              double.tryParse('$parteInteira.$parteDecimal') ?? 0.0;
-          return numeroCompleto * 1000;
-        }
+      // Se já for numérico (double/int vindo do banco/Supabase),
+      // assumimos que está em m³ e convertemos para Litros (multiplicando por 1000).
+      if (valor is num) {
+        double litros = valor.toDouble() * 1000;
+        return isMilimetros ? litros / 1000 : litros;
       }
 
-      return double.tryParse(str) ?? 0.0;
+      String str = valor.toString().trim().replaceAll(',', '.');
+      if (str.isEmpty || str == '-') return 0.0;
+
+      double finalValue = 0.0;
+
+      // Se houver pontos, tratamos o último como separador decimal (m³ -> L)
+      if (str.contains('.')) {
+        final partes = str.split('.');
+        // Removemos todos os pontos exceto o último (suporte a separadores de milhar)
+        // Ex: "1.000.610" -> integerPart = "1000", decimalPart = "610"
+        final decimalPart = partes.last;
+        final integerPart = partes.sublist(0, partes.length - 1).join('');
+
+        // Normalizamos a parte decimal para 3 dígitos para garantir precisão ex: "701.2"
+        String d = decimalPart.padRight(3, '0');
+        if (d.length > 3) d = d.substring(0, 3);
+
+        final double? v = double.tryParse('$integerPart.$d');
+        if (v != null) finalValue = v * 1000;
+      } else {
+        // Se não houver pontos, tratamos como valor m³ inteiro e convertemos para Litros
+        final double? v = double.tryParse(str);
+        if (v != null) finalValue = v * 1000;
+      }
+
+      // Se for milímetros, o valor da tabela (ex: "412") já representa Litros
+      return isMilimetros ? finalValue / 1000 : finalValue;
     } catch (e) {
       return 0.0;
     }

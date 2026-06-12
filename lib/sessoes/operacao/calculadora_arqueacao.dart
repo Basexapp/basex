@@ -328,25 +328,49 @@ class _CalculadoraArqueacaoDialogState
 
       if (resultadoMm == null || resultadoMm[colunaMm] == null) return volumeCm;
 
-      final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm]);
+      final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm], isMilimetros: true);
       return double.parse((volumeCm + volumeMm).toStringAsFixed(3));
     } catch (_) {
       return 0;
     }
   }
 
-  double _converterVolumeLitros(dynamic valor) {
+  double _converterVolumeLitros(dynamic valor, {bool isMilimetros = false}) {
     try {
       if (valor == null) return 0.0;
+      
+      // Se já for numérico (double/int vindo do banco/Supabase),
+      // assumimos que está em m³ e convertemos para Litros (multiplicando por 1000).
+      if (valor is num) {
+        double litros = valor.toDouble() * 1000;
+        return isMilimetros ? litros / 1000 : litros;
+      }
+
       String str = valor.toString().trim().replaceAll(',', '.');
+      if (str.isEmpty || str == '-') return 0.0;
+
+      double finalValue = 0.0;
+
+      // Se houver pontos, tratamos o último como separador decimal (m³ -> L)
       if (str.contains('.')) {
         final partes = str.split('.');
-        if (partes.length == 2) {
-          String parteDecimal = partes[1].padRight(3, '0');
-          return (double.tryParse('${partes[0]}.$parteDecimal') ?? 0.0) * 1000;
-        }
+        final decimalPart = partes.last;
+        final integerPart = partes.sublist(0, partes.length - 1).join('');
+        
+        String d = decimalPart.padRight(3, '0');
+        if (d.length > 3) d = d.substring(0, 3);
+        
+        final double? v = double.tryParse('$integerPart.$d');
+        if (v != null) finalValue = v * 1000;
+      } else {
+        final double? v = double.tryParse(str);
+        if (v != null) finalValue = v * 1000;
       }
-      return double.tryParse(str) ?? 0.0;
+      
+      // Se for milímetros, o valor da tabela (ex: "412") já representa Litros
+      // pois na tabela de arqueação a coluna MM é o delta em litros para aquele milímetro.
+      // Nossa lógica acima multiplicou por 1000 (tratando como m³), então dividimos de volta.
+      return isMilimetros ? finalValue / 1000 : finalValue;
     } catch (_) {
       return 0.0;
     }
