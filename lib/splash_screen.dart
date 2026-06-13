@@ -60,7 +60,10 @@ class _SplashScreenState extends State<SplashScreen> {
           // Segue para o login normalmente — no próximo acesso virá a versão nova.
           html.window.sessionStorage.remove('app_atualizado');
         } else {
-          _mostrarDialogAtualizacao();
+          _statusMessage = 'Atualizando aplicativo...';
+          if (mounted) setState(() {});
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          _recarregarApp();
           return;
         }
       }
@@ -105,7 +108,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   String _getVersaoAtual() {
-    return '2.2.18';
+    return '2.2.20';
   }
 
   void _mostrarDialogAtualizacao() {
