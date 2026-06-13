@@ -215,11 +215,12 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
             id,
             data,
             horario_inicial,
-            produto,
             entrada_saida_ambiente,
             entrada_saida_20,
             tipo,
             numero_controle,
+            produto_id,
+            produtos:produto_id (nome),
             tanques!inner (
               id_produto,
               terminais!inner (

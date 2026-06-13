@@ -92,17 +92,19 @@ class _ListarCaclsPageState extends State<ListarCaclsPage> with WidgetsBindingOb
             id,
             numero_controle,
             data,
-            produto,
             tanque_id,
             tanques:tanque_id (referencia),
+            produto_id,
+            produtos:produto_id (nome),
+            terminal_id,
+            terminais:terminal_id (nome),
             status,
             horario_inicial,
             horario_final,
             volume_produto_inicial,
             volume_produto_final,
             volume_total_liquido_inicial,
-            volume_total_liquido_final,
-            base
+            volume_total_liquido_final
           ''')
           .eq('filial_id', widget.filialId)
           .order('created_at', ascending: false);
@@ -573,7 +575,7 @@ class _ListarCaclsPageState extends State<ListarCaclsPage> with WidgetsBindingOb
                           final statusText = _getStatusText(status);
                           final tanqueNome = cacl['tanques']?['referencia']?.toString();
                           final tanque = tanqueNome ?? '-';
-                          final produto = cacl['produto'] ?? 'Produto não informado';
+                          final produto = cacl['produtos']?['nome']?.toString() ?? 'Produto não informado';
                           final numeroControle = cacl['numero_controle']?.toString() ?? '';
                           final data = _formatarData(cacl['data']);
                           final horario = _formatarHorario(

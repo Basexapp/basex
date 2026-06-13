@@ -46,7 +46,7 @@ class _CaclMovVisualizPageState extends State<CaclMovVisualizPage> {
     try {
       final resultado = await _supabase
           .from('cacl')
-          .select('*, tanques(referencia)')
+          .select('*, tanques(referencia), produtos:produto_id(nome), terminais:terminal_id(nome)')
           .eq('id', widget.caclId)
           .maybeSingle();
 
@@ -286,12 +286,12 @@ class _CaclMovVisualizPageState extends State<CaclMovVisualizPage> {
         const SizedBox(width: 10),
         Expanded(
           flex: 28,
-          child: _campoInfo("BASE:", _dadosCacl['base'] ?? "POLO DE COMBUSTÍVEL"),
+          child: _campoInfo("BASE:", _dadosCacl['terminais']?['nome']?.toString() ?? "POLO DE COMBUSTÍVEL"),
         ),
         const SizedBox(width: 10),
         Expanded(
           flex: 20,
-          child: _campoInfo("PRODUTO:", _dadosCacl['produto'] ?? "-"),
+          child: _campoInfo("PRODUTO:", _dadosCacl['produtos']?['nome']?.toString() ?? "-"),
         ),
         const SizedBox(width: 10),
         Expanded(

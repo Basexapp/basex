@@ -137,7 +137,7 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
       // Busca os dados do CACL pelo ID
       final resultado = await supabase
           .from('cacl')
-          .select('*')
+          .select('*, produtos:produto_id(nome), terminais:terminal_id(nome)')
           .eq('id', widget.caclId)
           .single();     
 
@@ -153,12 +153,12 @@ class _CaclHistoricoPageState extends State<CaclHistoricoPage> {
         _dadosFormulario['data'] = _formatarDataDisplay(resultado['data']);
       }
       
-      if (resultado['base'] != null) {
-        _dadosFormulario['base'] = resultado['base']?.toString();
+      if (resultado['terminais'] != null && resultado['terminais']['nome'] != null) {
+        _dadosFormulario['base'] = resultado['terminais']['nome']?.toString();
       }
       
-      if (resultado['produto'] != null) {
-        _dadosFormulario['produto'] = resultado['produto']?.toString();
+      if (resultado['produtos'] != null && resultado['produtos']['nome'] != null) {
+        _dadosFormulario['produto'] = resultado['produtos']['nome']?.toString();
       }
       
       if (resultado['terminal_id'] != null) {

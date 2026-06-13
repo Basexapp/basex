@@ -243,10 +243,9 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
         id,
         tipo,
         data,
-        base,
-        produto,
         tanque_id,
         terminal_id,
+        terminais:terminal_id (nome),
         created_at,
         status,
         horario_inicial,
@@ -256,6 +255,8 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
         volume_total_liquido_inicial,
         volume_total_liquido_final,
         tanques:tanque_id (referencia),
+        produto_id,
+        produtos:produto_id (nome),
         entrada_saida_20,
         faturado_final,
         diferenca_faturado,
@@ -266,7 +267,7 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
 
       if (pesquisaController.text.isNotEmpty) {
         final search = pesquisaController.text;
-        query = query.or('numero_controle.ilike.%$search%,produto.ilike.%$search%,status.ilike.%$search%');
+        query = query.or('numero_controle.ilike.%$search%,status.ilike.%$search%');
       }
 
       if (dataInicial == null && dataFinal == null) {
@@ -292,7 +293,7 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
       }
 
       if (produtoSelecionado != null && produtoSelecionado!.isNotEmpty) {
-        query = query.eq('produto', produtoSelecionado!);
+        query = query.eq('produto_id', produtoSelecionado!);
       }
 
       final countResponse = await query;
@@ -1089,7 +1090,7 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
                                     final statusColor = _getStatusColor(status);
                                     final statusText = _getStatusText(status);
                                     final tanqueRef = cacl['tanques']?['referencia']?.toString() ?? '-';
-                                    final produto = cacl['produto'] ?? '-';
+                                    final produto = cacl['produtos']?['nome']?.toString() ?? '-';
                                     final data = _formatarData(cacl['data']);
                                     final horarioInicial = _formatarHora(cacl['horario_inicial']);
                                     final horarioFinal = _formatarHora(cacl['horario_final']);

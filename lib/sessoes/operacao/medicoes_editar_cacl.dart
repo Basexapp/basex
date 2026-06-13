@@ -132,8 +132,10 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
             *,
             terminais (nome),
             tanques ( 
+              id,
               referencia,
               capacidade,
+              id_produto,
               produtos (nome)
             )
           ''')
@@ -161,8 +163,10 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
       if (cacl['tanques'] != null) {
         final tanque = cacl['tanques'];
         _tanqueInfo = {
+          'id': tanque['id'],
           'numero': tanque['referencia']?.toString() ?? '',
           'produto': tanque['produtos']?['nome']?.toString() ?? cacl['produto']?.toString() ?? '',
+          'id_produto': tanque['id_produto']?.toString(),
           'capacidade': _formatarCapacidade(tanque['capacidade']),
         };
         
@@ -177,8 +181,10 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
           final tanqueInfo = await supabase
               .from('tanques')
               .select('''
+                id,
                 referencia,
                 capacidade,
+                id_produto,
                 produtos (nome)
               ''')
               .eq('id', tanqueId)
@@ -186,8 +192,10 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
           
           if (tanqueInfo != null) {
             _tanqueInfo = {
+              'id': tanqueInfo['id'],
               'numero': tanqueInfo['referencia']?.toString() ?? '',
               'produto': tanqueInfo['produtos']?['nome']?.toString() ?? cacl['produto']?.toString() ?? '',
+              'id_produto': tanqueInfo['id_produto']?.toString(),
               'capacidade': _formatarCapacidade(tanqueInfo['capacidade']),
             };
             
@@ -549,11 +557,12 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
       'data': _dataController.text,
       'base': _nomeFilial ?? _caclData['base'] ?? 'POLO DE COMBUSTÍVEL',
       'produto': _tanqueInfo['produto'] ?? _caclData['produto'] ?? '',
+      'produto_id': _caclData['produto_id'] ?? _tanqueInfo['id_produto'],
       'tanque': _tanqueInfo['numero'] ?? '',
       'responsavel': UsuarioAtual.instance?.nome ?? 'Usuário',
       'medicoes': dadosMedicoes,
       'terminal_id': _terminalId ?? _caclData['terminal_id'],
-      'tanque_id': _caclData['tanque_id'],
+      'tanque_id': _caclData['tanque_id'] ?? _tanqueInfo['id'],
       'cacl_verificacao': _caclVerificacao,
       'cacl_movimentacao': _caclMovimentacao,
       

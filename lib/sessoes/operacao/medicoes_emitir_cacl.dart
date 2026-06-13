@@ -121,6 +121,7 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
           'id': tanque['id'],
           'numero': tanque['referencia']?.toString() ?? '',
           'produto': tanque['produtos']?['nome']?.toString() ?? '',
+          'id_produto': tanque['id_produto']?.toString(),
           'capacidade': '${tanque['capacidade']?.toString() ?? '0'} L',
         });
       }
@@ -380,6 +381,7 @@ class _MedicaoTanquesPageState extends State<MedicaoTanquesPage> {
       'data': _dataController.text,
       'base': _nomeTerminal ?? 'POLO DE COMBUSTÍVEL',
       'produto': tanqueAtual['produto'],
+      'produto_id': tanqueAtual['id_produto'],
       'tanque': tanqueAtual['numero'],
       'tanque_id': tanqueAtual['id'],
       'origem_estoque_tanque': widget.caclBloqueadoComoVerificacao,

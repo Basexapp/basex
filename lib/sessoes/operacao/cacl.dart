@@ -331,29 +331,18 @@ class _CalcPageState extends State<CalcPage> {
               if (tanqueInfo != null && tanqueInfo['referencia'] != null) {
                 widget.dadosFormulario['tanque'] = tanqueInfo['referencia']
                     ?.toString();
-              } else {
-                widget.dadosFormulario['tanque'] = resultado['produto']
-                    ?.toString();
               }
-            } else {
-              widget.dadosFormulario['tanque'] = resultado['produto']
-                  ?.toString();
             }
 
             widget.dadosFormulario['tanque_id'] = resultado['tanque_id']
+                ?.toString();
+            widget.dadosFormulario['produto_id'] = resultado['produto_id']
                 ?.toString();
 
             if (resultado['data'] != null) {
               widget.dadosFormulario['data'] = _formatarDataDisplay(
                 resultado['data'],
               );
-            }
-            if (resultado['base'] != null) {
-              widget.dadosFormulario['base'] = resultado['base']?.toString();
-            }
-            if (resultado['produto'] != null) {
-              widget.dadosFormulario['produto'] = resultado['produto']
-                  ?.toString();
             }
             if (resultado['terminal_id'] != null) {
               widget.dadosFormulario['terminal_id'] = resultado['terminal_id']
@@ -837,7 +826,7 @@ class _CalcPageState extends State<CalcPage> {
     widget.dadosFormulario['medicoes']['volumeTotalFinal'] =
         volumeTotalFinalFormatado;
 
-    final produtoNome = widget.dadosFormulario['produto']?.toString() ?? '';
+    final produtoNome = _obterNomeProduto();
 
     if (medicoes['tempAmostraInicial'] != null &&
         medicoes['tempAmostraInicial'].toString().isNotEmpty &&
@@ -845,7 +834,8 @@ class _CalcPageState extends State<CalcPage> {
         medicoes['densidadeInicial'] != null &&
         medicoes['densidadeInicial'].toString().isNotEmpty &&
         medicoes['densidadeInicial'].toString() != '-' &&
-        produtoNome.isNotEmpty) {
+        produtoNome != 'Produto' &&
+        produtoNome != 'Carregando...') {
       final densidade20Inicial = await _buscarDensidade20C(
         temperaturaAmostra: medicoes['tempAmostraInicial'].toString(),
         densidadeObservada: medicoes['densidadeInicial'].toString(),
@@ -864,7 +854,8 @@ class _CalcPageState extends State<CalcPage> {
         medicoes['densidadeFinal'] != null &&
         medicoes['densidadeFinal'].toString().isNotEmpty &&
         medicoes['densidadeFinal'].toString() != '-' &&
-        produtoNome.isNotEmpty) {
+        produtoNome != 'Produto' &&
+        produtoNome != 'Carregando...') {
       final densidade20Final = await _buscarDensidade20C(
         temperaturaAmostra: medicoes['tempAmostraFinal'].toString(),
         densidadeObservada: medicoes['densidadeFinal'].toString(),
@@ -1118,13 +1109,15 @@ class _CalcPageState extends State<CalcPage> {
       final timestampReferencia = _obterTimestampBrasiliaComDataReferencia();
 
       final tanqueIdParaSalvar = _obterTanqueId();
+      final produtoIdParaSalvar = _obterProdutoId();
+      final terminalIdParaSalvar = UsuarioAtual.instance?.terminalId ??
+          widget.dadosFormulario['terminal_id']?.toString();
 
       final dadosParaInserir = {
         'data': dataFormatada,
-        'base': widget.dadosFormulario['base']?.toString(),
-        'produto': widget.dadosFormulario['produto']?.toString(),
+        'produto_id': produtoIdParaSalvar,
         'tanque_id': tanqueIdParaSalvar,
-        'terminal_id': widget.dadosFormulario['terminal_id']?.toString(),
+        'terminal_id': terminalIdParaSalvar,
         'status': 'emitido',
         'tipo': tipoCACL,
 
@@ -1743,8 +1736,9 @@ class _CalcPageState extends State<CalcPage> {
                             children: [
                               _secaoTitulo("BASE:"),
                               _linhaValor(
-                                widget.dadosFormulario['base']?.toString() ??
-                                    "POLO DE COMBUSTÍVEL",
+                                UsuarioAtual.instance?.terminalNome ??
+                                    widget.dadosFormulario['base']?.toString() ??
+                                    "FILIAL",
                               ),
                             ],
                           ),
@@ -1756,10 +1750,7 @@ class _CalcPageState extends State<CalcPage> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _secaoTitulo("PRODUTO:"),
-                              _linhaValor(
-                                widget.dadosFormulario['produto']?.toString() ??
-                                    "",
-                              ),
+                              _linhaValor(_obterNomeProduto()),
                             ],
                           ),
                         ),
@@ -3542,7 +3533,7 @@ class _CalcPageState extends State<CalcPage> {
       final base64 = base64Encode(bytes);
       final dataUrl = 'data:application/pdf;base64,$base64';
 
-      final produto = widget.dadosFormulario['produto']?.toString() ?? 'CACL';
+      final produto = _obterNomeProduto();
       final data = widget.dadosFormulario['data']?.toString() ?? '';
       final fileName = 'CACL_${produto}_${data.replaceAll('/', '-')}.pdf';
 
@@ -3666,12 +3657,14 @@ class _CalcPageState extends State<CalcPage> {
       final dataFormatada = _formatarDataParaSQL(dataOriginal);
       final timestampReferencia = _obterTimestampBrasiliaComDataReferencia();
 
+      final terminalIdParaSalvar = UsuarioAtual.instance?.terminalId ??
+          widget.dadosFormulario['terminal_id']?.toString();
+
       final dadosParaInserir = {
         'data': dataFormatada,
-        'base': widget.dadosFormulario['base']?.toString(),
-        'produto': widget.dadosFormulario['produto']?.toString(),
+        'produto_id': _obterProdutoId(),
         'tanque_id': _obterTanqueId(),
-        'terminal_id': widget.dadosFormulario['terminal_id']?.toString(),
+        'terminal_id': terminalIdParaSalvar,
         'status': 'pendente',
         'tipo': tipoCACL,
 
@@ -3949,17 +3942,29 @@ class _CalcPageState extends State<CalcPage> {
   // Adicione este método para obter o ID do tanque
   String? _obterTanqueId() {
     if (widget.dadosFormulario.containsKey('tanque_id')) {
-      final tanqueId = widget.dadosFormulario['tanque_id']?.toString();
+      final tanqueId = widget.dadosFormulario['tanque_id']?.toString().trim();
 
-      if (tanqueId != null && tanqueId.isNotEmpty) {
-        if (_isValidUUID(tanqueId)) {
-          return tanqueId;
-        } else {
-          return null;
-        }
+      if (tanqueId != null && tanqueId.isNotEmpty && tanqueId.toLowerCase() != 'null') {
+        return tanqueId;
+      }
+    } else if (widget.dadosFormulario.containsKey('id_tanque')) {
+      final tanqueId = widget.dadosFormulario['id_tanque']?.toString().trim();
+      if (tanqueId != null && tanqueId.isNotEmpty && tanqueId.toLowerCase() != 'null') {
+        return tanqueId;
       }
     }
 
+    return null;
+  }
+
+  String? _obterProdutoId() {
+    if (widget.dadosFormulario.containsKey('produto_id')) {
+      final produtoId = widget.dadosFormulario['produto_id']?.toString().trim();
+
+      if (produtoId != null && produtoId.isNotEmpty && produtoId.toLowerCase() != 'null') {
+        return produtoId;
+      }
+    }
     return null;
   }
 
@@ -3995,13 +4000,43 @@ class _CalcPageState extends State<CalcPage> {
       return 'Carregando...'; // Retorna temporário
     }
 
-    // Fallback para usar o produto como nome
-    final produto = widget.dadosFormulario['produto']?.toString();
-    if (produto != null && produto.isNotEmpty) {
-      return produto;
+    return 'Tanque';
+  }
+
+  String _obterNomeProduto() {
+    final produtoNome = widget.dadosFormulario['produto']?.toString();
+    if (produtoNome != null &&
+        produtoNome.isNotEmpty &&
+        !_isValidUUID(produtoNome)) {
+      return produtoNome;
     }
 
-    return 'Tanque';
+    final produtoId = _obterProdutoId();
+    if (produtoId != null) {
+      _buscarNomeProdutoPorId(produtoId);
+      return 'Carregando...';
+    }
+
+    return 'Produto';
+  }
+
+  Future<void> _buscarNomeProdutoPorId(String produtoId) async {
+    try {
+      final supabase = Supabase.instance.client;
+      final resultado = await supabase
+          .from('produtos')
+          .select('nome')
+          .eq('id', produtoId)
+          .maybeSingle();
+
+      if (resultado != null && resultado['nome'] != null) {
+        if (mounted) {
+          setState(() {
+            widget.dadosFormulario['produto'] = resultado['nome']?.toString();
+          });
+        }
+      }
+    } catch (e) {}
   }
 
   Future<void> _buscarNomeTanquePorId(String tanqueId) async {

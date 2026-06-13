@@ -389,12 +389,15 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           .select('''
             id,
             data,
-            produto,
             tanque_id,
             status,
             horario_inicial,
             horario_final,
-            tanques:tanque_id (referencia)
+            tanques:tanque_id (referencia),
+            produto_id,
+            produtos:produto_id (nome),
+            terminal_id,
+            terminais:terminal_id (nome)
           ''')
           .eq('tanque_id', tanqueId)
           .order('data', ascending: false)
@@ -1838,7 +1841,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                     final statusText = _getStatusText(status);
                     final tanqueRef =
                         cacl['tanques']?['referencia']?.toString() ?? '-';
-                    final produto = cacl['produto'] ?? 'Produto não informado';
+                    final produto = cacl['produtos']?['nome']?.toString() ?? 'Produto não informado';
 
                     final inicio =
                         _formatarInicio(cacl['data'], cacl['horario_inicial']);
