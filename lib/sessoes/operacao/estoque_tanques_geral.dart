@@ -749,6 +749,15 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
+                                          Text(
+                                            _formatarValor(tanque.estoqueAtual),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF00796B),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
                                           SizedBox(
                                             width: dynamicBaseWidth,
                                             height: dynamicBaseHeight,
@@ -779,34 +788,37 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                                               scale: dynamicScale,
                                             ),
                                           ),
-                                          const SizedBox(height: 8),
-                                          Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                tanque.nome.split(' - ').first,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12.0,
-                                                  color: Color(0xFF222B45),
-                                                ),
-                                              ),
-                                              if (tanque.nome.contains(' - ')) ...[
-                                                const SizedBox(height: 2),
+                                          const SizedBox(height: 0),
+                                          Transform.translate(
+                                            offset: Offset(0, -12 * dynamicScale),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
                                                 Text(
-                                                  tanque.nome.split(' - ').last,
+                                                  tanque.nome.split(' - ').first,
                                                   style: const TextStyle(
                                                     fontWeight: FontWeight.bold,
-                                                    fontSize: 11.0,
-                                                    color: Color(0xFF5A6275),
+                                                    fontSize: 12.0,
+                                                    color: Color(0xFF222B45),
                                                   ),
-                                                  textAlign: TextAlign.center,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
                                                 ),
+                                                if (tanque.nome.contains(' - ')) ...[
+                                                  const SizedBox(height: 1),
+                                                  Text(
+                                                    tanque.nome.split(' - ').last,
+                                                    style: const TextStyle(
+                                                      fontWeight: FontWeight.bold,
+                                                      fontSize: 11.0,
+                                                      color: Color(0xFF5A6275),
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ],
                                               ],
-                                            ],
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -1098,13 +1110,13 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
                     _construirInfoMiniLateral(
                       'Estoque Atual',
                       _formatarValor(estoque),
-                      const Color(0xFF6A1B9A),
+                      const Color(0xFF00B686),
                     ),
                     const SizedBox(height: 16),
                     _construirInfoMiniLateral(
                       'Estoque Disponível',
                       _formatarValor(produtoDisponivel),
-                      const Color(0xFF00B686),
+                      const Color(0xFF6A1B9A),
                     ),
                     const SizedBox(height: 16),
                     _construirInfoMiniLateral(
@@ -1510,7 +1522,6 @@ class TankPainter extends CustomPainter {
 
     // 6. Indicadores e Textos
     if (!hideDetails) {
-      _drawLevelIndicators(canvas, tankX, tankY, tankWidth, tankHeight);
       _drawFloatingPercent(
         canvas,
         tankX,
@@ -1526,50 +1537,6 @@ class TankPainter extends CustomPainter {
     if (percentual >= 0.3) return const Color(0xFF00B686);
     if (percentual >= 0.15) return const Color(0xFFFFA000);
     return const Color(0xFFFF3D71);
-  }
-
-  void _drawLevelIndicators(
-    Canvas canvas,
-    double tankX,
-    double tankY,
-    double tankWidth,
-    double tankHeight,
-  ) {
-    final markerPaint = Paint()
-      ..color = Colors.grey.shade400
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    final textStyle = TextStyle(
-      fontSize: 11.0, // Tamanho fixo para melhor legibilidade
-      color: Colors.grey.shade600,
-      fontWeight: FontWeight.w500,
-    );
-
-    for (int i = 0; i <= 4; i++) {
-      final level = i / 4;
-      final markerY = tankY + tankHeight - (tankHeight * level);
-      final percentValue = (level * 100).round();
-
-      // Marcadores na extremidade esquerda do cilindro
-      canvas.drawLine(
-        Offset(tankX - 10 * scale, markerY),
-        Offset(tankX - 2 * scale, markerY),
-        markerPaint,
-      );
-
-      final textSpan = TextSpan(text: '$percentValue%', style: textStyle);
-      final textPainter = TextPainter(
-        text: textSpan,
-        textDirection: ui.TextDirection.ltr,
-      );
-      textPainter.layout();
-      // Aproximando levemente os percentuais fixos (de +12 para +6 de margem)
-      textPainter.paint(
-        canvas,
-        Offset(tankX - (textPainter.width + 6), markerY - (textPainter.height / 2)),
-      );
-    }
   }
 
   void _drawFloatingPercent(

@@ -56,6 +56,7 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
   bool _carregandoEmpresas = false;
   bool _carregandoTerminais = false;
   bool _terminalVinculado = false;
+  bool _empresaVinculada = false;
 
   @override
   void initState() {
@@ -75,8 +76,21 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
       });
     }
 
-    _empresaSelecionadaId = usuario?.empresaId ?? '';
-    _empresaSelecionadaNome = usuario?.empresaNome;
+    // Verificar se usuário tem empresa vinculada no login
+    if (usuario?.empresaId != null && usuario!.empresaId!.isNotEmpty) {
+      _empresaVinculada = true;
+      _empresaSelecionadaId = usuario.empresaId;
+      _empresaSelecionadaNome = usuario.empresaNome ?? 'Empresa vinculada';
+      // Já inicializa a lista com a empresa fixa
+      _empresasDisponiveis = [
+        {'id': _empresaSelecionadaId!, 'nome': _empresaSelecionadaNome!},
+      ];
+    } else {
+      _empresaVinculada = false;
+      _empresaSelecionadaId = '';
+      _empresaSelecionadaNome = null;
+      _empresasDisponiveis = [];
+    }
 
     _carregarTerminaisDisponiveis();
     if (_terminalVinculado && _terminalSelecionadoId != null) {
@@ -93,15 +107,11 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
       final usuario = UsuarioAtual.instance;
       if (usuario == null) return;
 
-      // Buscar empresa_id do usuário logado
-      String? userEmpresaId = usuario.empresaId;
-
-      if (userEmpresaId == null || userEmpresaId.isEmpty) {
+      // Se empresa já está vinculada ao usuário, não precisa carregar outras
+      if (_empresaVinculada) {
         setState(() {
-          _empresaSelecionadaId = '';
-          _empresaSelecionadaNome = null;
           _empresasDisponiveis = [
-            {'id': '', 'nome': '<empresa não identificada>'},
+            {'id': _empresaSelecionadaId!, 'nome': _empresaSelecionadaNome!},
           ];
         });
         return;
@@ -125,7 +135,7 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
       empresas.add({'id': '', 'nome': '<selecione>'});
 
       final Map<String, String> empresasUnicas = {};
-      
+
       for (var item in response) {
         final empData = item['empresas'] as Map<String, dynamic>?;
         if (empData != null) {
@@ -141,15 +151,10 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
       setState(() {
         _empresasDisponiveis = empresas;
 
-        // Se só tiver uma empresa além de "selecione", ou se a empresa do usuário estiver na lista
+        // Se só tiver uma empresa além de "selecione", pré-selecionar automaticamente
         if (empresas.length == 2) {
           _empresaSelecionadaId = empresas[1]['id'];
           _empresaSelecionadaNome = empresas[1]['nome'];
-        } else if (userEmpresaId.isNotEmpty && 
-                   empresas.any((e) => e['id'] == userEmpresaId)) {
-          _empresaSelecionadaId = userEmpresaId;
-          final emp = empresas.firstWhere((e) => e['id'] == userEmpresaId);
-          _empresaSelecionadaNome = emp['nome'];
         } else {
           _empresaSelecionadaId = '';
           _empresaSelecionadaNome = null;
@@ -908,16 +913,22 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
       if (!_terminalVinculado) {
         _terminalSelecionadoId = '';
         _terminalSelecionadoNome = null;
-        _empresasDisponiveis = [];
+        _produtosDisponiveis = []; // Limpar produtos
+      }
+
+      // Se não tiver empresa vinculada, resetar também
+      if (!_empresaVinculada) {
         _empresaSelecionadaId = '';
         _empresaSelecionadaNome = null;
-        _produtosDisponiveis = []; // Limpar produtos
+        _empresasDisponiveis = [];
       }
     });
 
     // Se tiver terminal vinculado, recarregar os produtos dele
     if (_terminalVinculado && _terminalSelecionadoId != null) {
       _carregarProdutosPorTerminal(_terminalSelecionadoId!);
+      // E as empresas dele (se não estiverem vinculadas)
+      _carregarEmpresasPorTerminal(_terminalSelecionadoId!);
     }
   }
 
@@ -1044,13 +1055,21 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Empresa',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0D47A1),
-                      ),
+                    Row(
+                      children: [
+                        const Text(
+                          'Empresa',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0D47A1),
+                          ),
+                        ),
+                        if (_empresaVinculada) ...[
+                          const SizedBox(width: 4),
+                          const Icon(Icons.lock, size: 14, color: Colors.grey),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 4),
                     SizedBox(height: 50, child: _buildCampoEmpresa()),
@@ -1346,7 +1365,40 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
   }
 
   Widget _buildCampoEmpresa() {
-    // Carregando empresas
+    // Se a empresa está vinculada, mostra o campo fixo de imediato
+    if (_empresaVinculada) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          border: Border.all(color: Colors.grey.shade400, width: 1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: _empresaSelecionadaId,
+            isExpanded: true,
+            itemHeight: 50,
+            icon: const SizedBox.shrink(),
+            style: const TextStyle(fontSize: 13, color: Colors.black),
+            onChanged: null, // Desabilitado
+            items: _empresasDisponiveis.map<DropdownMenuItem<String>>((empresa) {
+              return DropdownMenuItem<String>(
+                value: empresa['id']!,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    empresa['nome']!,
+                    style: const TextStyle(color: Colors.black),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+      );
+    }
+
+    // Carregando empresas (apenas se não for vinculada)
     if (_carregandoEmpresas) {
       return Container(
         decoration: BoxDecoration(
@@ -1803,8 +1855,8 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _terminalVinculado
-                      ? 'Terminal vinculado ao seu usuário (não pode ser alterado).'
+                  _terminalVinculado || _empresaVinculada
+                      ? 'Terminal ou Empresa vinculados ao seu usuário (não podem ser alterados).'
                       : 'Mostra o estoque do produto no terminal selecionado no período informado.',
                   style: TextStyle(fontSize: 11, color: Colors.orange.shade700),
                 ),
