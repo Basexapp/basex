@@ -756,7 +756,7 @@ class _CalculadoraArqueacaoDialogState
                           children: [
                             _labelField('Altura (cm)'),
                             const SizedBox(height: 4),
-                            _buildIntField(_cmCtrl, 'Ex: 280', maxLength: 3),
+                            _buildIntField(_cmCtrl, 'Ex: 1280', maxLength: 4),
                           ],
                         ),
                       ),
