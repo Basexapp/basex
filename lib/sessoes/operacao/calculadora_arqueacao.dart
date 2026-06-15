@@ -73,8 +73,11 @@ class _CalculadoraArqueacaoDialogState
 
   // ── Resultados ─────────────────────────────────────────────────────────────
   String _volumeAmbiente = '-';
-  double _volumeAmbienteRaw = 0; // ← raw double, evita re-parsear string formatada
+  double _volumeAmbienteRaw = 0;
   String _volume20 = '-';
+  String _massa = '-';
+  String _grauAlcoolGL = '-';
+  String _fcv = '-';
   bool _calculandoVolume = false;
   bool _calculandoVolume20 = false;
 
@@ -120,7 +123,6 @@ class _CalculadoraArqueacaoDialogState
     try {
       final supabase = Supabase.instance.client;
 
-      // Busca o nome da tabela de arqueação do terminal
       final terminalResp = await supabase
           .from('terminais')
           .select('tabela_arqueacao')
@@ -145,7 +147,6 @@ class _CalculadoraArqueacaoDialogState
         });
       }
 
-      // Ordenação numérica pela referência (ex: TQ-01-JN)
       lista.sort((a, b) {
         int getNum(String ref) {
           final parts = ref.split('-');
@@ -154,7 +155,6 @@ class _CalculadoraArqueacaoDialogState
           }
           return 0;
         }
-
         return getNum(a['referencia'] ?? '')
             .compareTo(getNum(b['referencia'] ?? ''));
       });
@@ -198,6 +198,9 @@ class _CalculadoraArqueacaoDialogState
           _volumeAmbiente = '-';
           _volumeAmbienteRaw = 0;
           _volume20 = '-';
+          _massa = '-';
+          _grauAlcoolGL = '-';
+          _fcv = '-';
         });
       }
       return;
@@ -214,7 +217,6 @@ class _CalculadoraArqueacaoDialogState
           _volumeAmbiente = volume > 0 ? _formatarVolume(volume) : '-';
           _calculandoVolume = false;
         });
-        // Se já temos os dados de temperatura/densidade, recalcular a 20ºC
         if (volume > 0) _calcularVolume20();
       }
     } catch (_) {
@@ -228,28 +230,119 @@ class _CalculadoraArqueacaoDialogState
     }
   }
 
-  // ── Cálculo do volume a 20ºC ──────────────────────────────────────────────
+  // ── Verifica se o produto é Álcool ────────────────────────────────────────
+  
+  bool _isProdutoAlcool() {
+    final produtoNome = _tanqueSelecionado?['produto']?.toString().toLowerCase() ?? '';
+    return produtoNome.contains('anidro') || produtoNome.contains('hidratado') || produtoNome.contains('álcool') || produtoNome.contains('alcool');
+  }
+
+  // ── Cálculo do volume a 20ºC (com lógica específica para Álcool) ──────────
 
   Future<void> _calcularVolume20() async {
+    final tempTanque = _tempTanqueCtrl.text.trim();
+    final densObs = _densidadeObsCtrl.text.trim();
+
+    if (tempTanque.isEmpty || densObs.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _volume20 = '-';
+          _massa = '-';
+          _grauAlcoolGL = '-';
+          _fcv = '-';
+        });
+      }
+      return;
+    }
+
+    final volAmb = _volumeAmbienteRaw;
+    if (volAmb <= 0) {
+      if (mounted) {
+        setState(() {
+          _volume20 = '-';
+          _massa = '-';
+          _grauAlcoolGL = '-';
+          _fcv = '-';
+        });
+      }
+      return;
+    }
+
+    if (mounted) setState(() => _calculandoVolume20 = true);
+
+    try {
+      if (_isProdutoAlcool()) {
+        // Cálculo específico para Álcool usando tabela tcv_alcool
+        final resultado = await _buscarTabelaAlcool(
+          temperatura: tempTanque,
+          densidadeObservada: densObs,
+        );
+
+        if (resultado == null) {
+          if (mounted) {
+            setState(() {
+              _volume20 = '-';
+              _massa = '-';
+              _grauAlcoolGL = '-';
+              _fcv = '-';
+              _calculandoVolume20 = false;
+            });
+          }
+          return;
+        }
+
+        final fcvNum = resultado['fcv'];
+        final vol20 = volAmb * fcvNum;
+        
+        // Densidade a 20°C (kg/m³) -> converte para kg/L dividindo por 1000
+        final densidade20 = resultado['densidade20'] / 1000;
+        final massa = vol20 * densidade20;
+
+        if (mounted) {
+          setState(() {
+            _grauAlcoolGL = resultado['grauGl'].toStringAsFixed(2).replaceAll('.', ',');
+            _fcv = resultado['fcv'].toStringAsFixed(4).replaceAll('.', ',');
+            _volume20 = _formatarVolume(vol20).replaceAll(' L', '');
+            _massa = _formatarVolume(massa).replaceAll(' L', '');
+            _calculandoVolume20 = false;
+          });
+        }
+      } else {
+        // Cálculo para Gasolina/Diesel usando lógica original
+        await _calcularVolume20GasolinaDiesel(volAmb);
+      }
+    } catch (e) {
+      print('Erro no cálculo do volume a 20°C: $e');
+      if (mounted) {
+        setState(() {
+          _volume20 = '-';
+          _massa = '-';
+          _grauAlcoolGL = '-';
+          _fcv = '-';
+          _calculandoVolume20 = false;
+        });
+      }
+    }
+  }
+
+  // ── Cálculo para Gasolina/Diesel (lógica original) ────────────────────────
+
+  Future<void> _calcularVolume20GasolinaDiesel(double volAmb) async {
     final tempTanque = _tempTanqueCtrl.text.trim();
     final densObs = _densidadeObsCtrl.text.trim();
     final tempAmostra = _tempAmostraCtrl.text.trim();
 
     if (tempTanque.isEmpty || densObs.isEmpty || tempAmostra.isEmpty) {
-      if (mounted) setState(() => _volume20 = '-');
-      return;
-    }
-
-    // Usa o double bruto armazenado — sem re-parsear a string formatada
-    final volAmb = _volumeAmbienteRaw;
-    if (volAmb <= 0) {
-      if (mounted) setState(() => _volume20 = '-');
+      if (mounted) setState(() {
+        _volume20 = '-';
+        _massa = '-';
+        _grauAlcoolGL = '-';
+        _fcv = '-';
+      });
       return;
     }
 
     final produtoNome = _tanqueSelecionado?['produto']?.toString() ?? '';
-
-    if (mounted) setState(() => _calculandoVolume20 = true);
 
     try {
       final dens20 = await _buscarDensidade20C(
@@ -259,7 +352,13 @@ class _CalculadoraArqueacaoDialogState
       );
 
       if (dens20 == '-') {
-        if (mounted) setState(() { _volume20 = '-'; _calculandoVolume20 = false; });
+        if (mounted) setState(() { 
+          _volume20 = '-'; 
+          _massa = '-';
+          _grauAlcoolGL = '-';
+          _fcv = '-';
+          _calculandoVolume20 = false; 
+        });
         return;
       }
 
@@ -270,7 +369,13 @@ class _CalculadoraArqueacaoDialogState
       );
 
       if (fcv == '-') {
-        if (mounted) setState(() { _volume20 = '-'; _calculandoVolume20 = false; });
+        if (mounted) setState(() { 
+          _volume20 = '-'; 
+          _massa = '-';
+          _grauAlcoolGL = '-';
+          _fcv = '-';
+          _calculandoVolume20 = false; 
+        });
         return;
       }
 
@@ -279,102 +384,88 @@ class _CalculadoraArqueacaoDialogState
 
       if (mounted) {
         setState(() {
+          _fcv = fcv;
           _volume20 = _formatarVolume(vol20);
+          _massa = '-'; // Massa não é calculada para gasolina/diesel
+          _grauAlcoolGL = '-';
           _calculandoVolume20 = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() { _volume20 = '-'; _calculandoVolume20 = false; });
+      if (mounted) setState(() { 
+        _volume20 = '-'; 
+        _massa = '-';
+        _grauAlcoolGL = '-';
+        _fcv = '-';
+        _calculandoVolume20 = false; 
+      });
     }
   }
 
-  // ── Funções de cálculo replicadas do cacl.dart ────────────────────────────
+  // ── Busca na tabela específica para Álcool (tcv_alcool) ───────────────────
 
-  Future<double> _buscarVolumeReal(String cm, String mm) async {
-    final nomeTabela = _nomeTabelaArqueacao;
-    if (nomeTabela == null || nomeTabela.isEmpty) return 0;
-
+  Future<Map<String, dynamic>?> _buscarTabelaAlcool({
+    required String temperatura,
+    required String densidadeObservada,
+  }) async {
     final supabase = Supabase.instance.client;
-    final intCm = int.tryParse(cm) ?? 0;
-    final intMm = int.tryParse(mm.isEmpty ? '0' : mm) ?? 0;
-
-    final tanqueRef = _tanqueSelecionado?['referencia']?.toString() ?? '';
-    String numeroTanque = '01';
-    if (tanqueRef.isNotEmpty) {
-      final numeros = tanqueRef.replaceAll(RegExp(r'[^0-9]'), '');
-      if (numeros.isNotEmpty) numeroTanque = numeros.padLeft(2, '0');
-    }
-
-    final colunaCm = 'tq_${numeroTanque}_cm';
-    final colunaMm = 'tq_${numeroTanque}_mm';
-
+    
     try {
-      final resultadoCm = await supabase
-          .from(nomeTabela)
-          .select(colunaCm)
-          .eq('altura_cm_mm', intCm)
-          .maybeSingle();
+      // Converte os valores de entrada (vírgula para ponto)
+      final tempNum = double.tryParse(temperatura.replaceAll(',', '.')) ?? 0;
+      double densNum = double.tryParse(densidadeObservada.replaceAll(',', '.')) ?? 0;
+      
+      // Converte de kg/L para kg/m³ (multiplica por 1000) se necessário
+      if (densNum < 10) {
+        densNum = densNum * 1000;
+      }
+      
+      // Busca todos os registros com a mesma temperatura (com tolerância de 0.1°C)
+      final registros = await supabase
+          .from('tcv_alcool')
+          .select('*')
+          .gte('temp_obs', tempNum - 0.1)
+          .lte('temp_obs', tempNum + 0.1)
+          .order('densid_obs');
+      
+      if (registros.isEmpty) {
+        debugPrint('Tabela Alcoométrica: Nenhum registro para temperatura $tempNum');
+        return null;
+      }
+      
+      // Encontra o registro com densidade observada mais próxima
+      Map<String, dynamic>? melhorRegistro;
+      double menorDiferenca = double.infinity;
+      
+      for (var reg in registros) {
+        final densReg = (reg['densid_obs'] as num).toDouble();
+        final diferenca = (densReg - densNum).abs();
+        
+        if (diferenca < menorDiferenca) {
+          menorDiferenca = diferenca;
+          melhorRegistro = reg;
+        }
+      }
+      
+      if (melhorRegistro == null) return null;
 
-      if (resultadoCm == null || resultadoCm[colunaCm] == null) return 0;
-
-      final volumeCm = _converterVolumeLitros(resultadoCm[colunaCm]);
-      if (intMm == 0) return volumeCm;
-
-      final resultadoMm = await supabase
-          .from(nomeTabela)
-          .select(colunaMm)
-          .eq('altura_cm_mm', intMm)
-          .maybeSingle();
-
-      if (resultadoMm == null || resultadoMm[colunaMm] == null) return volumeCm;
-
-      final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm], isMilimetros: true);
-      return double.parse((volumeCm + volumeMm).toStringAsFixed(3));
-    } catch (_) {
-      return 0;
+      // Extrai os valores numéricos
+      final fcv = (melhorRegistro['fcv'] as num).toDouble();
+      final densidade20 = (melhorRegistro['densid_vinte'] as num).toDouble();
+      final grauGl = (melhorRegistro['grau_alcol_gl'] as num).toDouble();
+      
+      return {
+        'fcv': fcv,
+        'densidade20': densidade20,
+        'grauGl': grauGl,
+      };
+    } catch (e) {
+      debugPrint('Erro na busca da tabela alcoométrica: $e');
+      return null;
     }
   }
 
-  double _converterVolumeLitros(dynamic valor, {bool isMilimetros = false}) {
-    try {
-      if (valor == null) return 0.0;
-      
-      // Se já for numérico (double/int vindo do banco/Supabase),
-      // assumimos que está em m³ e convertemos para Litros (multiplicando por 1000).
-      if (valor is num) {
-        double litros = valor.toDouble() * 1000;
-        return isMilimetros ? litros / 1000 : litros;
-      }
-
-      String str = valor.toString().trim().replaceAll(',', '.');
-      if (str.isEmpty || str == '-') return 0.0;
-
-      double finalValue = 0.0;
-
-      // Se houver pontos, tratamos o último como separador decimal (m³ -> L)
-      if (str.contains('.')) {
-        final partes = str.split('.');
-        final decimalPart = partes.last;
-        final integerPart = partes.sublist(0, partes.length - 1).join('');
-        
-        String d = decimalPart.padRight(3, '0');
-        if (d.length > 3) d = d.substring(0, 3);
-        
-        final double? v = double.tryParse('$integerPart.$d');
-        if (v != null) finalValue = v * 1000;
-      } else {
-        final double? v = double.tryParse(str);
-        if (v != null) finalValue = v * 1000;
-      }
-      
-      // Se for milímetros, o valor da tabela (ex: "412") já representa Litros
-      // pois na tabela de arqueação a coluna MM é o delta em litros para aquele milímetro.
-      // Nossa lógica acima multiplicou por 1000 (tratando como m³), então dividimos de volta.
-      return isMilimetros ? finalValue / 1000 : finalValue;
-    } catch (_) {
-      return 0.0;
-    }
-  }
+  // ── Funções originais para Gasolina/Diesel ────────────────────────────────
 
   Future<String> _buscarDensidade20C({
     required String temperaturaAmostra,
@@ -398,7 +489,6 @@ class _CalculadoraArqueacaoDialogState
 
       final int alvo = (densNum * 1000).round();
 
-      // Idêntico ao cacl.dart: testa 5 formatos de temperatura
       final temperaturasTeste = <String>{
         tempNum.toStringAsFixed(0).replaceAll('.', ','),
         tempNum.toStringAsFixed(1).replaceAll('.', ','),
@@ -455,7 +545,6 @@ class _CalculadoraArqueacaoDialogState
           ? 'tcv_anidro_hidratado_vw'
           : 'tcv_gasolina_diesel_vw';
 
-      // Mesmo tratamento do cacl.dart
       String temperaturaFormatada = temperaturaTanque
           .replaceAll(' ºC', '')
           .replaceAll('°C', '')
@@ -488,7 +577,6 @@ class _CalculadoraArqueacaoDialogState
       final colunaExata = 'v_$codigoBase';
       final prefixo = 'v_${codigoBase.substring(0, 4)}';
 
-      // Funções locais idênticas ao cacl.dart
       int? codigoFcvAlvo() {
         final cod = colunaExata.replaceFirst('v_', '');
         return int.tryParse(cod);
@@ -522,7 +610,6 @@ class _CalculadoraArqueacaoDialogState
         return {'coluna': melhorColuna, 'valor': melhorValor};
       }
 
-      // 1ª tentativa: coluna exata
       bool colunaInexistente = false;
       try {
         final r1 = await supabase
@@ -540,7 +627,6 @@ class _CalculadoraArqueacaoDialogState
         }
       }
 
-      // 2ª tentativa: se coluna não existe, busca todas e usa a mais próxima
       if (colunaInexistente) {
         final linha = await supabase
             .from(nomeView)
@@ -554,7 +640,6 @@ class _CalculadoraArqueacaoDialogState
         }
       }
 
-      // 3ª tentativa: linha completa + prefixo
       final linha = await supabase
           .from(nomeView)
           .select('*')
@@ -568,7 +653,6 @@ class _CalculadoraArqueacaoDialogState
         }
       }
 
-      // 4ª tentativa: variantes de temperatura (idêntico ao cacl.dart)
       List<String> temperaturasParaTentar = [];
       if (temperaturaFormatada.contains(',')) {
         final p = temperaturaFormatada.split(',');
@@ -608,6 +692,88 @@ class _CalculadoraArqueacaoDialogState
     }
   }
 
+  // ── Funções auxiliares ────────────────────────────────────────────────────
+
+  Future<double> _buscarVolumeReal(String cm, String mm) async {
+    final nomeTabela = _nomeTabelaArqueacao;
+    if (nomeTabela == null || nomeTabela.isEmpty) return 0;
+
+    final supabase = Supabase.instance.client;
+    final intCm = int.tryParse(cm) ?? 0;
+    final intMm = int.tryParse(mm.isEmpty ? '0' : mm) ?? 0;
+
+    final tanqueRef = _tanqueSelecionado?['referencia']?.toString() ?? '';
+    String numeroTanque = '01';
+    if (tanqueRef.isNotEmpty) {
+      final numeros = tanqueRef.replaceAll(RegExp(r'[^0-9]'), '');
+      if (numeros.isNotEmpty) numeroTanque = numeros.padLeft(2, '0');
+    }
+
+    final colunaCm = 'tq_${numeroTanque}_cm';
+    final colunaMm = 'tq_${numeroTanque}_mm';
+
+    try {
+      final resultadoCm = await supabase
+          .from(nomeTabela)
+          .select(colunaCm)
+          .eq('altura_cm_mm', intCm)
+          .maybeSingle();
+
+      if (resultadoCm == null || resultadoCm[colunaCm] == null) return 0;
+
+      final volumeCm = _converterVolumeLitros(resultadoCm[colunaCm]);
+      if (intMm == 0) return volumeCm;
+
+      final resultadoMm = await supabase
+          .from(nomeTabela)
+          .select(colunaMm)
+          .eq('altura_cm_mm', intMm)
+          .maybeSingle();
+
+      if (resultadoMm == null || resultadoMm[colunaMm] == null) return volumeCm;
+
+      final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm], isMilimetros: true);
+      return double.parse((volumeCm + volumeMm).toStringAsFixed(3));
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  double _converterVolumeLitros(dynamic valor, {bool isMilimetros = false}) {
+    try {
+      if (valor == null) return 0.0;
+      
+      if (valor is num) {
+        double litros = valor.toDouble() * 1000;
+        return isMilimetros ? litros / 1000 : litros;
+      }
+
+      String str = valor.toString().trim().replaceAll(',', '.');
+      if (str.isEmpty || str == '-') return 0.0;
+
+      double finalValue = 0.0;
+
+      if (str.contains('.')) {
+        final partes = str.split('.');
+        final decimalPart = partes.last;
+        final integerPart = partes.sublist(0, partes.length - 1).join('');
+        
+        String d = decimalPart.padRight(3, '0');
+        if (d.length > 3) d = d.substring(0, 3);
+        
+        final double? v = double.tryParse('$integerPart.$d');
+        if (v != null) finalValue = v * 1000;
+      } else {
+        final double? v = double.tryParse(str);
+        if (v != null) finalValue = v * 1000;
+      }
+      
+      return isMilimetros ? finalValue / 1000 : finalValue;
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
   String _formatarResultadoFCV(String valorBruto) {
     String valorLimpo = valorBruto.trim().replaceAll('.', ',');
     if (!valorLimpo.contains(',')) valorLimpo = '$valorLimpo,0';
@@ -640,12 +806,14 @@ class _CalculadoraArqueacaoDialogState
 
   @override
   Widget build(BuildContext context) {
+    final isAlcool = _isProdutoAlcool();
+    
     return Dialog(
       backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 8,
       child: SizedBox(
-        width: 360,
+        width: 400,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -738,6 +906,9 @@ class _CalculadoraArqueacaoDialogState
                                   _volumeAmbiente = '-';
                                   _volumeAmbienteRaw = 0;
                                   _volume20 = '-';
+                                  _massa = '-';
+                                  _grauAlcoolGL = '-';
+                                  _fcv = '-';
                                 });
                                 _onAlturaChanged();
                               },
@@ -815,15 +986,54 @@ class _CalculadoraArqueacaoDialogState
 
                   const SizedBox(height: 10),
 
-                  // ── Temp. amostra ──────────────────────────────────────
-                  _labelField('Temp. Amostra (ºC)'),
-                  const SizedBox(height: 4),
-                  _buildTemperatureField(_tempAmostraCtrl, 'Ex: 30'),
+                  // ── Temp. amostra (apenas para Gasolina/Diesel) ─────────
+                  if (!isAlcool) ...[
+                    _labelField('Temp. Amostra (ºC)'),
+                    const SizedBox(height: 4),
+                    _buildTemperatureField(_tempAmostraCtrl, 'Ex: 30'),
+                    const SizedBox(height: 12),
+                  ],
 
-                  const SizedBox(height: 12),
+                  // ── Resultados específicos para Álcool ──────────────────
+                  if (isAlcool) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _labelField('Grau Alcoólico GL'),
+                              const SizedBox(height: 4),
+                              _buildResultField(_grauAlcoolGL, false),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _labelField('FCV'),
+                              const SizedBox(height: 4),
+                              _buildResultField(_fcv, false),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
 
-                  // ── Resultado: volume a 20ºC ───────────────────────────
-                  _labelField('Volume a 20 ºC'),
+                  // ── Massa (apenas para Álcool) - AGORA VEM PRIMEIRO ─────────────────────
+                  if (isAlcool) ...[
+                    _labelField('Massa do Produto'),
+                    const SizedBox(height: 4),
+                    _buildResultField(_massa, false),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // ── Resultado: volume a 20ºC ───────────────────────────────────────────
+                  _labelField(isAlcool ? 'Volume a 20 ºC' : 'Volume a 20 ºC'),
                   const SizedBox(height: 4),
                   _buildResultField(_volume20, _calculandoVolume20, isHighlighted: true),
 
@@ -882,6 +1092,9 @@ class _CalculadoraArqueacaoDialogState
       _volumeAmbiente = '-';
       _volumeAmbienteRaw = 0;
       _volume20 = '-';
+      _massa = '-';
+      _grauAlcoolGL = '-';
+      _fcv = '-';
     });
   }
 

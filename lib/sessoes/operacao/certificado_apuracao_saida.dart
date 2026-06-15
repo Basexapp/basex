@@ -1704,6 +1704,94 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       );
 
   // ================= CÁLCULOS =================
+  Future<Map<String, dynamic>?> _buscarTabelaAlcool({
+    required String temperatura,
+    required String densidadeObservada,
+  }) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final tempNum = double.tryParse(temperatura.replaceAll(',', '.')) ?? 0;
+      double densNum =
+          double.tryParse(densidadeObservada.replaceAll(',', '.')) ?? 0;
+
+      if (densNum < 10) {
+        densNum = densNum * 1000;
+      }
+
+      final registros = await supabase
+          .from('tcv_alcool')
+          .select('*')
+          .gte('temp_obs', tempNum - 0.1)
+          .lte('temp_obs', tempNum + 0.1)
+          .order('densid_obs');
+
+      if (registros.isEmpty) return null;
+
+      Map<String, dynamic>? melhorRegistro;
+      double menorDiferenca = double.infinity;
+
+      for (var reg in registros) {
+        final densReg = (reg['densid_obs'] as num).toDouble();
+        final diferenca = (densReg - densNum).abs();
+
+        if (diferenca < menorDiferenca) {
+          menorDiferenca = diferenca;
+          melhorRegistro = reg;
+        }
+      }
+
+      return melhorRegistro;
+    } catch (e) {
+      debugPrint('Erro na busca da tabela alcoométrica (densidade obs): $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _buscarTabelaAlcoolPorDensidade20({
+    required String temperatura,
+    required String densidade20,
+  }) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final tempNum = double.tryParse(temperatura.replaceAll(',', '.')) ?? 0;
+      double dens20Num =
+          double.tryParse(densidade20.replaceAll(',', '.')) ?? 0;
+
+      if (dens20Num < 10) {
+        dens20Num = dens20Num * 1000;
+      }
+
+      final registros = await supabase
+          .from('tcv_alcool')
+          .select('*')
+          .gte('temp_obs', tempNum - 0.1)
+          .lte('temp_obs', tempNum + 0.1)
+          .order('densid_vinte');
+
+      if (registros.isEmpty) return null;
+
+      Map<String, dynamic>? melhorRegistro;
+      double menorDiferenca = double.infinity;
+
+      for (var reg in registros) {
+        final densReg = (reg['densid_vinte'] as num).toDouble();
+        final diferenca = (densReg - dens20Num).abs();
+
+        if (diferenca < menorDiferenca) {
+          menorDiferenca = diferenca;
+          melhorRegistro = reg;
+        }
+      }
+
+      return melhorRegistro;
+    } catch (e) {
+      debugPrint('Erro na busca da tabela alcoométrica (densidade 20): $e');
+      return null;
+    }
+  }
+
   Future<String> _buscarDensidade20C({
     required String temperaturaAmostra,
     required String densidadeObservada,
@@ -1719,11 +1807,32 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         print('   ⚠️ Campos vazios, abortando.');
         return '-';
       }
-      
+
       final nomeProdutoLower = produtoNome.toLowerCase().trim();
-      final bool usarViewAnidroHidratado = 
+      final bool ehAlcool = 
           nomeProdutoLower.contains('anidro') || 
           nomeProdutoLower.contains('hidratado');
+
+      // Se for álcool, usa a tabela tcv_alcool conforme metodologia do dialog de medições
+      if (ehAlcool) {
+        print('   🧪 Produto Alcoólico detectado. Usando tcv_alcool...');
+        final resultado = await _buscarTabelaAlcool(
+          temperatura: temperaturaAmostra,
+          densidadeObservada: densidadeObservada,
+        );
+
+        if (resultado != null) {
+          final densVinte = (resultado['densid_vinte'] as num).toDouble();
+          // Converte de kg/m³ para kg/L (ex: 793,5 -> 0,7935)
+          final densVinteFormatada = (densVinte / 1000).toStringAsFixed(4).replaceAll('.', ',');
+          print('   ✅ Sucesso via tcv_alcool: $densVinteFormatada');
+          return densVinteFormatada;
+        } else {
+          print('   ⚠️ Nenhum registro encontrado em tcv_alcool.');
+        }
+      }
+      
+      final bool usarViewAnidroHidratado = ehAlcool; // Mantém compatibilidade se falhar ou para outros casos
       
       String temperaturaFormatada = temperaturaAmostra
           .replaceAll(' ºC', '')
@@ -1927,8 +2036,29 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       }
 
       final nomeProdutoLower = produtoNome.toLowerCase().trim();
-      final nomeView = (nomeProdutoLower.contains('anidro') ||
-              nomeProdutoLower.contains('hidratado'))
+      final bool ehAlcool = 
+          nomeProdutoLower.contains('anidro') || 
+          nomeProdutoLower.contains('hidratado');
+
+      // Se for álcool, usa a tabela tcv_alcool conforme metodologia do dialog de medições
+      if (ehAlcool) {
+        print('   🧪 Produto Alcoólico detectado. Usando tcv_alcool para FCV...');
+        final resultado = await _buscarTabelaAlcoolPorDensidade20(
+          temperatura: temperaturaTanque,
+          densidade20: densidade20C,
+        );
+
+        if (resultado != null) {
+          final fcv = (resultado['fcv'] as num).toDouble();
+          final fcvFormatado = fcv.toStringAsFixed(4).replaceAll('.', ',');
+          print('   ✅ Sucesso via tcv_alcool (FCV): $fcvFormatado');
+          return fcvFormatado;
+        } else {
+          print('   ⚠️ Nenhum registro encontrado em tcv_alcool para FCV.');
+        }
+      }
+
+      final nomeView = ehAlcool
           ? 'tcv_anidro_hidratado_vw'
           : 'tcv_gasolina_diesel_vw';
       
