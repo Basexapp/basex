@@ -125,13 +125,25 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
   Future<void> _carregarEstoqueInicialDoBanco() async {
     try {
       final dataStr = widget.dataInicial.toIso8601String().split('T')[0];
+      final terminalId = _terminalId;
+      
+      if (terminalId == null || terminalId.isEmpty) {
+        throw Exception('Terminal não identificado');
+      }
 
+      print('🔍 DEBUG: Calculando estoque para terminal $terminalId, produto ${widget.produtoId}, data $dataStr');
+
+      // Chamar a função do produto (agora com terminal_id)
       final response = await _supabase.rpc(
         'calcular_estoque_inicial_produto',
-        params: {'p_produto_id': widget.produtoId, 'p_data': dataStr},
+        params: {
+          'p_terminal_id': terminalId,
+          'p_produto_id': widget.produtoId,
+          'p_data': dataStr,
+        },
       );
 
-      print('DEBUG PRODUTO: $response'); // 👈 importante
+      print('📊 RESPOSTA COMPLETA: $response');
 
       num saldo = 0;
 
@@ -139,16 +151,22 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
         saldo = (response['estoque_inicial'] ?? 0) as num;
 
         if (response.containsKey('debug')) {
-          print('DEBUG DETALHADO PRODUTO: ${response['debug']}');
+          print('🐛 DEBUG DETALHADO: ${response['debug']}');
         }
       } else {
         saldo = (response ?? 0) as num;
       }
 
-      _estoqueInicial = {'amb': saldo, 'vinte': saldo};
+      print('✅ ESTOQUE INICIAL CALCULADO: $saldo');
+
+      setState(() {
+        _estoqueInicial = {'amb': saldo, 'vinte': saldo};
+      });
     } catch (e) {
-      debugPrint('Erro ao buscar estoque inicial via função: $e');
-      _estoqueInicial = {'amb': 0, 'vinte': 0};
+      debugPrint('❌ Erro ao buscar estoque inicial via função: $e');
+      setState(() {
+        _estoqueInicial = {'amb': 0, 'vinte': 0};
+      });
     }
   }
 
@@ -197,6 +215,7 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
             saida_amb,
             saida_vinte,
             tanques!inner (
+              id,
               id_produto,
               terminais!inner (
                 id
@@ -222,6 +241,7 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
             produto_id,
             produtos:produto_id (nome),
             tanques!inner (
+              id,
               id_produto,
               terminais!inner (
                 id

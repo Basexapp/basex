@@ -475,6 +475,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
   }
 
   Future<void> _carregarDadosMovimentacao(String idMovimentacao) async {
+    print('📥 ENTRANDO EM _carregarDadosMovimentacao: $idMovimentacao');
     setState(() {
       _carregandoDadosMovimentacao = true;
     });
@@ -495,6 +496,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           .maybeSingle();
 
       if (movimentacao != null) {
+        print('   ✅ Movimentação encontrada para produto: ${movimentacao['produtos']?['nome']}');
         if (movimentacao['nota_fiscal'] != null) {
           campos['notas']!.text =
               movimentacao['nota_fiscal'].toString();
@@ -688,7 +690,9 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
 
   // ================= NOVA LÓGICA DE CARREGAMENTO DE TEMP/DENS =================
   Future<void> _carregarDadosTempEDens() async {
+    print('🔄 ENTRANDO EM _carregarDadosTempEDens');
     if (_modoVisualizacao) {
+      print('   - Abortando: modo visualização');
       return;
     }
 
@@ -768,6 +772,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           .order('data_hora_medicao', ascending: false);
       
       if (registros.isNotEmpty) {
+        print('   ✅ Encontrado(s) ${registros.length} registro(s)');
         // Calcular médias
         double somaTempAmostra = 0;
         double somaDensObs = 0;
@@ -809,6 +814,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         }
         
         // Preencher campos
+        print('   📊 Preenchendo campos com médias calculadas');
         setState(() {
           if (mediaTempAmostra != null) {
             final valorArredondado = arredondarTemperatura(mediaTempAmostra);
@@ -877,18 +883,28 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
   }
 
   Future<void> _calcularResultadosObtidos() async {
+    print('🚀 ENTRANDO EM _calcularResultadosObtidos - Visualização: $_modoVisualizacao');
     if (_modoVisualizacao) return;
 
+    print('   - Produto selecionado: $produtoSelecionado');
     if (produtoSelecionado == null) return;
 
     final tempAmostra = campos['tempAmostra']!.text;
     final densObs = campos['densidadeAmostra']!.text;
     final tempCT = campos['tempCT']!.text;
 
+    print('🚀 DEBUG _calcularResultadosObtidos:');
+    print('   - tempAmostra: $tempAmostra');
+    print('   - densObs: $densObs');
+    print('   - tempCT: $tempCT');
+
     campos['densidade20']!.text = '';
     campos['fatorCorrecao']!.text = '';
 
-    if (tempAmostra.isEmpty || densObs.isEmpty) return;
+    if (tempAmostra.isEmpty || densObs.isEmpty) {
+      print('   ⚠️ Dados de entrada insuficientes para cálculo.');
+      return;
+    }
 
     final dens20 = await _buscarDensidade20C(
       temperaturaAmostra: tempAmostra,
@@ -896,9 +912,11 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       produtoNome: produtoSelecionado!,
     );
 
+    print('   📊 Resultado Densidade 20C: $dens20');
     campos['densidade20']!.text = dens20;
 
     if (dens20 == '-' || dens20.isEmpty || tempCT.isEmpty) {
+      print('   ⚠️ Densidade 20C ou Temp CT faltando para o cálculo do FCV.');
       campos['fatorCorrecao']!.text = '-';
       setState(() {});
       return;
@@ -910,11 +928,8 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       produtoNome: produtoSelecionado!,
     );
 
-    if (fcv != '-' && fcv.isNotEmpty) {
-      campos['fatorCorrecao']!.text = fcv;
-    } else {
-      campos['fatorCorrecao']!.text = '-';
-    }
+    print('   📊 Resultado FCV: $fcv');
+    campos['fatorCorrecao']!.text = fcv;
 
     // Calcular volume 20°C para todos os tanques que tiverem volume ambiente preenchido
     if (fcv != '-' && fcv.isNotEmpty) {
@@ -1697,7 +1712,11 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
     final supabase = Supabase.instance.client;
     
     try {
+      print('🔍 DEBUG _buscarDensidade20C:');
+      print('   > Entrada: Temp=$temperaturaAmostra, Dens=$densidadeObservada, Produto=$produtoNome');
+
       if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) {
+        print('   ⚠️ Campos vazios, abortando.');
         return '-';
       }
       
@@ -1733,6 +1752,8 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         }
       }
       
+      print('   > Formatado: Temp=$temperaturaFormatada, Dens=$densidadeFormatada');
+
       String nomeColuna;
       if (densidadeFormatada.contains(',')) {
         final partes = densidadeFormatada.split(',');
@@ -1764,6 +1785,8 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           ? 'tcd_anidro_hidratado_vw' 
           : 'tcd_gasolina_diesel_vw';
       
+      print('   > View Target: $nomeView, Coluna: $nomeColuna');
+
       String _formatarResultado(String valorBruto) {
         String valorLimpo = valorBruto.trim();
         valorLimpo = valorLimpo.replaceAll('.', ',');
@@ -1797,9 +1820,12 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       
       if (resultado != null && resultado[nomeColuna] != null) {
         String valorBruto = resultado[nomeColuna].toString();
-        return _formatarResultado(valorBruto);
+        final formatado = _formatarResultado(valorBruto);
+        print('   ✅ Sucesso (direto): $formatado');
+        return formatado;
       }
       
+      print('   ⚠️ Não encontrado (direto). Tentando variações de temperatura...');
       List<String> formatosParaTentar = [];
       
       if (temperaturaFormatada.contains(',')) {
@@ -1853,6 +1879,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       
       for (final formatoTemp in formatosParaTentar) {
         try {
+          print('     - Tentando: $formatoTemp');
           final resultado = await supabase
               .from(nomeView)
               .select(nomeColuna)
@@ -1861,16 +1888,21 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           
           if (resultado != null && resultado[nomeColuna] != null) {
             String valorBruto = resultado[nomeColuna].toString();
-            return _formatarResultado(valorBruto);
+            final formatado = _formatarResultado(valorBruto);
+            print('   ✅ Sucesso (variação): $formatado');
+            return formatado;
           }
         } catch (e) {
+          print('     ❌ Erro na variação $formatoTemp: $e');
           continue;
         }
       }
       
+      print('   ❌ Nenhum resultado encontrado após variações.');
       return '-';
       
     } catch (e) {
+      print('   🔴 ERRO CRÍTICO _buscarDensidade20C: $e');
       return '-';
     }
   }
@@ -1883,10 +1915,14 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
     final supabase = Supabase.instance.client;
 
     try {
+      print('🔍 DEBUG _buscarFCV:');
+      print('   > Entrada: TempTanque=$temperaturaTanque, Dens20C=$densidade20C, Produto=$produtoNome');
+
       if (temperaturaTanque.isEmpty ||
           temperaturaTanque == '-' ||
           densidade20C.isEmpty ||
           densidade20C == '-') {
+        print('   ⚠️ Parâmetros inválidos ou vazios.');
         return '-';
       }
 
@@ -1895,6 +1931,8 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
               nomeProdutoLower.contains('hidratado'))
           ? 'tcv_anidro_hidratado_vw'
           : 'tcv_gasolina_diesel_vw';
+      
+      print('   > View Target: $nomeView');
 
       String temperaturaFormatada = temperaturaTanque
           .replaceAll('°C', '')
@@ -1911,8 +1949,11 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           double.tryParse(densidadeFormatada.replaceAll(',', '.'));
 
       if (densidadeNum == null) {
+        print('   ⚠️ Erro ao parsear densidade: $densidadeFormatada');
         return '-';
       }
+
+      print('   > Formatado: Temp=$temperaturaFormatada, DensNum=$densidadeNum');
 
       String _formatarFCV(String valor) {
         String v = valor.replaceAll('.', ',').trim();
@@ -1942,9 +1983,11 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
       }
 
       final codigoOriginal = _densidadeParaCodigo(densidadeFormatada);
+      print('   > Código Densidade: $codigoOriginal');
 
       Future<String?> _buscarFCVPorCodigo(String codigo) async {
         final coluna = 'v_$codigo';
+        print('     - Buscando FCV na coluna: $coluna para temp $temperaturaFormatada');
 
         try {
           final r = await supabase
@@ -1956,13 +1999,19 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           if (r != null && r[coluna] != null) {
             return _formatarFCV(r[coluna].toString());
           }
-        } catch (_) {}
+        } catch (e) {
+          print('     ⚠️ Erro na consulta _buscarFCVPorCodigo: $e');
+        }
         return null;
       }
 
       final direto = await _buscarFCVPorCodigo(codigoOriginal);
-      if (direto != null) return direto;
+      if (direto != null) {
+        print('   ✅ FCV encontrado (direto): $direto');
+        return direto;
+      }
 
+      print('   ⚠️ FCV direto não mapeado. Buscando densidade disponível mais próxima...');
       final sampleRow = await supabase
           .from(nomeView)
           .select()
@@ -2005,13 +2054,16 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
 
       final densidadeMaisProxima = densidadesDisponiveis.first;
       final codigoMaisProximo = densidadeMaisProxima['codigo'] as String;
+      print('   > Densidade mais próxima identificada: ${densidadeMaisProxima['valor']} (Cód: $codigoMaisProximo)');
 
       final aproximado = await _buscarFCVPorCodigo(codigoMaisProximo);
       
       if (aproximado != null) {        
+        print('   ✅ FCV encontrado (por aproximação de densidade): $aproximado');
         return aproximado;
       }
 
+      print('   ⚠️ Aproximação falhou. Tentando variações de temperatura para código $codigoMaisProximo...');
       final temperaturaAlternativas = [
         temperaturaFormatada,
         temperaturaFormatada.replaceAll(',', '.'),
@@ -2020,6 +2072,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
 
       for (final tempAlt in temperaturaAlternativas) {
         try {
+          print('     - Tentando Variação Temp: $tempAlt');
           final r = await supabase
               .from(nomeView)
               .select('v_$codigoMaisProximo')
@@ -2027,15 +2080,20 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
               .maybeSingle();
 
           if (r != null && r['v_$codigoMaisProximo'] != null) {
-            return _formatarFCV(r['v_$codigoMaisProximo'].toString());
+            final res = _formatarFCV(r['v_$codigoMaisProximo'].toString());
+            print('   ✅ FCV encontrado (variação temp): $res');
+            return res;
           }
-        } catch (_) {
+        } catch (e) {
+          print('     ❌ Erro na variação temp $tempAlt: $e');
           continue;
         }
       }
 
+      print('   ❌ Nenhum FCV encontrado para os parâmetros fornecidos.');
       return '-';
-    } catch (_) {
+    } catch (e) {
+      print('   🔴 ERRO CRÍTICO _buscarFCV: $e');
       return '-';
     }
   }
@@ -2073,6 +2131,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
     
     return variacoes.toSet().toList();
   }
+
 
   // ================= DOWNLOAD PDF =================
   Future<void> _baixarPDF() async {
