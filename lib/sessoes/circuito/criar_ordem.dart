@@ -262,6 +262,8 @@ class _CriarOrdemPageState extends State<CriarOrdemPage> {
         'terminal_id': _terminalSelecionado,
         'data_ordem': agoraSaoPaulo.toIso8601String(),
         'tipo': _tipoOp.toLowerCase(),
+        'terminal_id_orig': _tipoOperacao == 'Saída' ? _terminalSelecionado : null,
+        'terminal_id_dest': _tipoOperacao == 'Entrada' ? _terminalSelecionado : null,
       }).select().single();
 
       await supabase.from('notas_fiscais').insert({
@@ -456,252 +458,307 @@ class _CriarOrdemPageState extends State<CriarOrdemPage> {
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Align(
-        alignment: Alignment.topLeft,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 700),
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Dados da ordem',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0D47A1),
+          alignment: Alignment.topLeft,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 700),
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Dados da ordem',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0D47A1),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 30),
-                        Wrap(
-                          spacing: 20,
-                          runSpacing: 14,
-                          children: [
-                            // Linha 1: Terminal e Origem/Destino
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    focusNode: _terminalFocus,
-                                    value: _terminalSelecionado,
-                                    decoration: _decoracaoSlim('Terminal'),
-                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                    dropdownColor: Colors.white,
-                                    items: _terminais
-                                        .map<DropdownMenuItem<String>>(
-                                          (t) => DropdownMenuItem<String>(
-                                            value: t['id']?.toString(),
-                                            child: Text(
-                                              t['nome'] ?? '',
-                                              style: const TextStyle(fontSize: 14),
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                    onChanged: usuario?.nivel == 3
-                                        ? (v) => setState(() => _terminalSelecionado = v)
-                                        : null,
-                                    validator: (v) {
-                                      if (usuario?.nivel == 3 && v == null) return 'Obrigatório';
-                                      return null;
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: _campo(_tipoOperacao == 'Entrada' ? 'Origem' : 'Destino', _origemCtrl, maiusculo: true, max: 50, letrasOnly: true, focusNode: _origemFocus, nextFocus: _notaFocus),
-                                ),
-                              ],
-                            ),
-
-                            // Linha 2: Tipo de Op., Placa e Nota Fiscal
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: DropdownButtonFormField<String>(
-                                    value: _tipoOp,
-                                    decoration: _decoracaoSlim('Tipo Op.'),
-                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                    items: const [
-                                      DropdownMenuItem(value: 'Compra', child: Text('Compra')),
-                                      DropdownMenuItem(value: 'Empréstimo', child: Text('Empréstimo')),
-                                    ],
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _tipoOp = value!;
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  flex: 2,
-                                  child: _campo('Placa', _placaCtrl, placa: true, focusNode: _placaFocus, nextFocus: _notaFocus),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  flex: 1,
-                                  child: Shortcuts(
-                                    shortcuts: <LogicalKeySet, Intent>{
-                                      LogicalKeySet(LogicalKeyboardKey.tab): const _FocusDataIntent(),
-                                    },
-                                    child: Actions(
-                                      actions: <Type, Action<Intent>>{
-                                        _FocusDataIntent: CallbackAction<_FocusDataIntent>(
-                                          onInvoke: (Intent intent) {
-                                            _dataFocus.requestFocus();
-                                            return null;
-                                          },
-                                        ),
-                                      },
-                                      child: _campo('Nota fiscal', _notaCtrl, milhar: true, max: 8, focusNode: _notaFocus, nextFocus: _dataFocus),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _campo('Data de emissão', _dataCtrl, data: true, focusNode: _dataFocus, nextFocus: _qtdAmbFocus),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: Shortcuts(
-                                    shortcuts: <LogicalKeySet, Intent>{
-                                      LogicalKeySet(LogicalKeyboardKey.tab): const _FocusQtd20Intent(),
-                                    },
-                                    child: Actions(
-                                      actions: <Type, Action<Intent>>{
-                                        _FocusQtd20Intent: CallbackAction<_FocusQtd20Intent>(
-                                          onInvoke: (Intent intent) {
-                                            _qtd20Focus.requestFocus();
-                                            return null;
-                                          },
-                                        ),
-                                      },
-                                      child: _campo('Quantidade (ambiente)', _qtdAmbCtrl, milhar: true, max: 5, focusNode: _qtdAmbFocus, nextFocus: _qtd20Focus),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: _campo('Quantidade faturada (20ºC)', _qtd20Ctrl, milhar: true, max: 5, focusNode: _qtd20Focus, nextFocus: _produtoFocus),
-                                ),
-                              ],
-                            ),
-
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: Shortcuts(
-                                    shortcuts: <LogicalKeySet, Intent>{
-                                      LogicalKeySet(LogicalKeyboardKey.tab): const _FocusPrecoIntent(),
-                                    },
-                                    child: Actions(
-                                      actions: <Type, Action<Intent>>{
-                                        _FocusPrecoIntent: CallbackAction<_FocusPrecoIntent>(
-                                          onInvoke: (Intent intent) {
-                                            _valorUnitFocus.requestFocus();
-                                            return null;
-                                          },
-                                        ),
-                                      },
-                                      child: DropdownButtonFormField<String>(
-                                        focusNode: _produtoFocus,
-                                        decoration: _decoracaoSlim('Produto'),
-                                        style: const TextStyle(fontSize: 14, color: Colors.black87),
-                                        items: _produtos
-                                            .map<DropdownMenuItem<String>>(
-                                              (p) => DropdownMenuItem<String>(
-                                                value: p['id']?.toString(),
-                                                child: Text(
-                                                  p['nome'] ?? '',
-                                                  style: const TextStyle(fontSize: 14),
-                                                ),
+                          const SizedBox(height: 30),
+                          Wrap(
+                            spacing: 20,
+                            runSpacing: 14,
+                            children: [
+                              // Linha 1: Terminal e Origem/Destino
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      focusNode: _terminalFocus,
+                                      value: _terminalSelecionado,
+                                      decoration: _decoracaoSlim('Terminal'),
+                                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                      dropdownColor: Colors.white,
+                                      items: _terminais
+                                          .map<DropdownMenuItem<String>>(
+                                            (t) => DropdownMenuItem<String>(
+                                              value: t['id']?.toString(),
+                                              child: Text(
+                                                t['nome'] ?? '',
+                                                style: const TextStyle(fontSize: 14),
                                               ),
-                                            )
-                                            .toList(),
-                                        onChanged: (v) => _produtoSelecionado = v,
-                                        validator: (v) => v == null ? 'Obrigatório' : null,
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: usuario?.nivel == 3
+                                          ? (v) => setState(() => _terminalSelecionado = v)
+                                          : null,
+                                      validator: (v) {
+                                        if (usuario?.nivel == 3 && v == null) return 'Obrigatório';
+                                        return null;
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: _campo(
+                                      _tipoOperacao == 'Entrada' ? 'Origem' : 'Destino',
+                                      _origemCtrl,
+                                      maiusculo: true,
+                                      max: 50,
+                                      letrasOnly: true,
+                                      focusNode: _origemFocus,
+                                      nextFocus: _notaFocus,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              // Linha 2: Tipo de Op., Placa e Nota Fiscal
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 2,
+                                    child: DropdownButtonFormField<String>(
+                                      value: _tipoOp,
+                                      decoration: _decoracaoSlim('Tipo Op.'),
+                                      style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                      items: const [
+                                        DropdownMenuItem(value: 'Compra', child: Text('Compra')),
+                                        DropdownMenuItem(value: 'Empréstimo', child: Text('Empréstimo')),
+                                      ],
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _tipoOp = value!;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    flex: 2,
+                                    child: _campo(
+                                      'Placa',
+                                      _placaCtrl,
+                                      placa: true,
+                                      focusNode: _placaFocus,
+                                      nextFocus: _notaFocus,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Shortcuts(
+                                      shortcuts: <LogicalKeySet, Intent>{
+                                        LogicalKeySet(LogicalKeyboardKey.tab): const _FocusDataIntent(),
+                                      },
+                                      child: Actions(
+                                        actions: <Type, Action<Intent>>{
+                                          _FocusDataIntent: CallbackAction<_FocusDataIntent>(
+                                            onInvoke: (Intent intent) {
+                                              _dataFocus.requestFocus();
+                                              return null;
+                                            },
+                                          ),
+                                        },
+                                        child: _campo(
+                                          'Nota fiscal',
+                                          _notaCtrl,
+                                          milhar: true,
+                                          max: 8,
+                                          focusNode: _notaFocus,
+                                          nextFocus: _dataFocus,
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  flex: 1,
-                                  child: _campo('Preço', _valorUnitCtrl, allowDecimalSeparators: true, max: 6, focusNode: _valorUnitFocus, nextFocus: _valorNfFocus),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  flex: 1,
-                                  child: _campo('Valor NF', _valorNfCtrl, moeda: true, max: 10, focusNode: _valorNfFocus),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+                                ],
+                              ),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _campo(
+                                      'Data de emissão',
+                                      _dataCtrl,
+                                      data: true,
+                                      focusNode: _dataFocus,
+                                      nextFocus: _qtdAmbFocus,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: Shortcuts(
+                                      shortcuts: <LogicalKeySet, Intent>{
+                                        LogicalKeySet(LogicalKeyboardKey.tab): const _FocusQtd20Intent(),
+                                      },
+                                      child: Actions(
+                                        actions: <Type, Action<Intent>>{
+                                          _FocusQtd20Intent: CallbackAction<_FocusQtd20Intent>(
+                                            onInvoke: (Intent intent) {
+                                              _qtd20Focus.requestFocus();
+                                              return null;
+                                            },
+                                          ),
+                                        },
+                                        child: _campo(
+                                          'Quantidade (ambiente)',
+                                          _qtdAmbCtrl,
+                                          milhar: true,
+                                          max: 5,
+                                          focusNode: _qtdAmbFocus,
+                                          nextFocus: _qtd20Focus,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    child: _campo(
+                                      'Quantidade faturada (20ºC)',
+                                      _qtd20Ctrl,
+                                      milhar: true,
+                                      max: 5,
+                                      focusNode: _qtd20Focus,
+                                      nextFocus: _produtoFocus,
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 2,
+                                    child: Shortcuts(
+                                      shortcuts: <LogicalKeySet, Intent>{
+                                        LogicalKeySet(LogicalKeyboardKey.tab): const _FocusPrecoIntent(),
+                                      },
+                                      child: Actions(
+                                        actions: <Type, Action<Intent>>{
+                                          _FocusPrecoIntent: CallbackAction<_FocusPrecoIntent>(
+                                            onInvoke: (Intent intent) {
+                                              _valorUnitFocus.requestFocus();
+                                              return null;
+                                            },
+                                          ),
+                                        },
+                                        child: DropdownButtonFormField<String>(
+                                          focusNode: _produtoFocus,
+                                          decoration: _decoracaoSlim('Produto'),
+                                          style: const TextStyle(fontSize: 14, color: Colors.black87),
+                                          items: _produtos
+                                              .map<DropdownMenuItem<String>>(
+                                                (p) => DropdownMenuItem<String>(
+                                                  value: p['id']?.toString(),
+                                                  child: Text(
+                                                    p['nome'] ?? '',
+                                                    style: const TextStyle(fontSize: 14),
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                          onChanged: (v) => _produtoSelecionado = v,
+                                          validator: (v) => v == null ? 'Obrigatório' : null,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    flex: 1,
+                                    child: _campo(
+                                      'Preço',
+                                      _valorUnitCtrl,
+                                      allowDecimalSeparators: true,
+                                      max: 6,
+                                      focusNode: _valorUnitFocus,
+                                      nextFocus: _valorNfFocus,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 20),
+                                  Expanded(
+                                    flex: 1,
+                                    child: _campo(
+                                      'Valor NF',
+                                      _valorNfCtrl,
+                                      moeda: true,
+                                      max: 10,
+                                      focusNode: _valorNfFocus,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
 
-              Container(
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  border: Border(top: BorderSide(color: Colors.grey.shade300)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    SizedBox(
-                      height: 36,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          if (widget.onVoltar != null) {
-                            widget.onVoltar!();
-                          } else {
-                            Navigator.pop(context);
-                          }
-                        },
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          textStyle: const TextStyle(fontSize: 13),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border(top: BorderSide(color: Colors.grey.shade300)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        height: 36,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            if (widget.onVoltar != null) {
+                              widget.onVoltar!();
+                            } else {
+                              Navigator.pop(context);
+                            }
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            textStyle: const TextStyle(fontSize: 13),
+                          ),
+                          child: const Text('Cancelar'),
                         ),
-                        child: const Text('Cancelar'),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      height: 36,
-                      child: ElevatedButton(
-                        onPressed: _criarOrdem,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          textStyle: const TextStyle(fontSize: 13),
-                          backgroundColor: const Color(0xFF0D47A1),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        height: 36,
+                        child: ElevatedButton(
+                          onPressed: _criarOrdem,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            textStyle: const TextStyle(fontSize: 13),
+                            backgroundColor: const Color(0xFF0D47A1),
+                          ),
+                          child: const Text('Criar'),
                         ),
-                        child: const Text('Criar'),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 }
