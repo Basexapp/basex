@@ -1224,17 +1224,17 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // BOTÃO CANCELAR CERTIFICADO (Novo)
+                              // 1 - BOTÃO VOLTAR
                               ElevatedButton.icon(
-                                onPressed: _modoVisualizacao ? _cancelarCertificado : null,
-                                icon: Icon(Icons.cancel_outlined, size: 24, color: _modoVisualizacao ? Colors.white : Colors.grey[600]),
+                                onPressed: _voltar,
+                                icon: const Icon(Icons.arrow_back, size: 24),
                                 label: const Text(
-                                  'Cancelar Certificado',
+                                  'Voltar',
                                   style: TextStyle(fontSize: 16),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _modoVisualizacao ? Colors.red[700] : Colors.grey[300],
-                                  foregroundColor: _modoVisualizacao ? Colors.white : Colors.grey[600],
+                                  backgroundColor: Colors.green,
+                                  foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
@@ -1242,30 +1242,8 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                 ),
                               ),
 
-                              // BOTÃO GERAR PDF
-                              ElevatedButton.icon(
-                                onPressed: _modoVisualizacao ? _baixarPDF : null,
-                                icon: const Icon(Icons.picture_as_pdf, size: 24),
-                                label: const Text(
-                                  'Gerar Certificado PDF',
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _modoVisualizacao
-                                      ? const Color(0xFF0D47A1)
-                                      : Colors.grey[300],
-                                  foregroundColor:
-                                      _modoVisualizacao ? Colors.white : Colors.grey[600],
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-
-                              // BOTÃO EMITIR CERTIFICADO
                               if (!_modoVisualizacao)
+                                // BOTÃO EMITIR CERTIFICADO (Apenas em modo criação/edição)
                                 ElevatedButton.icon(
                                   onPressed: (_salvandoCertificado || !_todosVolumes20Validos() || _camposTempVazios()) ? null : _confirmarEmissaoCertificado,
                                   icon: _salvandoCertificado 
@@ -1292,25 +1270,43 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                                     ),
                                   ),
                                 )
-                              else
-                                // BOTÃO CONCLUIR (Antigo Voltar)
+                              else ...[
+                                // 2 - BOTÃO GERAR PDF (Apenas em modo visualização)
                                 ElevatedButton.icon(
-                                  onPressed: _voltar,
-                                  icon: const Icon(Icons.check_circle_outline, size: 24),
+                                  onPressed: _baixarPDF,
+                                  icon: const Icon(Icons.picture_as_pdf, size: 24),
                                   label: const Text(
-                                    'Concluir',
+                                    'Gerar Certificado PDF',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blue[800],
+                                    backgroundColor: const Color(0xFF0D47A1),
                                     foregroundColor: Colors.white,
-                                    padding:
-                                        const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
                                 ),
+
+                                // 3 - BOTÃO CANCELAR CERTIFICADO (Apenas em modo visualização)
+                                ElevatedButton.icon(
+                                  onPressed: _cancelarCertificado,
+                                  icon: const Icon(Icons.delete_forever, size: 24),
+                                  label: const Text(
+                                    'Cancelar Certificado',
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ],
@@ -1829,21 +1825,19 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           return densVinteFormatada;
         } else {
           print('   ⚠️ Nenhum registro encontrado em tcv_alcool.');
+          return '-';
         }
       }
       
-      final bool usarViewAnidroHidratado = ehAlcool; // Mantém compatibilidade se falhar ou para outros casos
-      
-      String temperaturaFormatada = temperaturaAmostra
+String temperaturaFormatada = temperaturaAmostra
           .replaceAll(' ºC', '')
           .replaceAll('°C', '')
           .replaceAll('ºC', '')
           .replaceAll('°', '')
           .replaceAll('C', '')
-          .trim();
-      
-      temperaturaFormatada = temperaturaFormatada.replaceAll('.', ',');
-      
+          .trim()
+          .replaceAll('.', ',');
+
       String densidadeFormatada = densidadeObservada
           .replaceAll(' ', '')
           .replaceAll('°C', '')
@@ -1890,9 +1884,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
         return '-';
       }
       
-      final nomeView = usarViewAnidroHidratado 
-          ? 'tcd_anidro_hidratado_vw' 
-          : 'tcd_gasolina_diesel_vw';
+      const String nomeView = 'tcd_gasolina_diesel_vw';
       
       print('   > View Target: $nomeView, Coluna: $nomeColuna');
 
@@ -1943,43 +1935,27 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           String parteInteira = partes[0];
           String parteDecimal = partes[1];
           
-          if (usarViewAnidroHidratado) {
-            formatosParaTentar.addAll([
-              '$parteInteira,$parteDecimal',
-              '$parteInteira,${parteDecimal}0',
-              '$parteInteira,${parteDecimal.padLeft(2, '0')}',
-              '$parteInteira,0$parteDecimal',
-            ]);
-            
-            if (parteDecimal.length == 1) {
-              formatosParaTentar.add('$parteInteira,${parteDecimal}0');
-            }
-            
-            if (parteDecimal.length == 2) {
-              formatosParaTentar.add('$parteInteira,${parteDecimal.substring(0, 1)}');
-            }
-          } else {
-            formatosParaTentar.addAll([
-              '$parteInteira,$parteDecimal',
-              '$parteInteira,${parteDecimal}0',
-              '$parteInteira,0',
-            ]);
+          formatosParaTentar.addAll([
+            '$parteInteira,$parteDecimal',
+            '$parteInteira,${parteDecimal}0',
+            '$parteInteira,${parteDecimal.padLeft(2, '0')}',
+            '$parteInteira,0$parteDecimal',
+          ]);
+          
+          if (parteDecimal.length == 1) {
+            formatosParaTentar.add('$parteInteira,${parteDecimal}0');
+          }
+          
+          if (parteDecimal.length == 2) {
+            formatosParaTentar.add('$parteInteira,${parteDecimal.substring(0, 1)}');
           }
         }
       } else {
-        if (usarViewAnidroHidratado) {
-          formatosParaTentar.addAll([
-            '$temperaturaFormatada,00',
-            '$temperaturaFormatada,0',
-            temperaturaFormatada,
-          ]);
-        } else {
-          formatosParaTentar.addAll([
-            '$temperaturaFormatada,0',
-            temperaturaFormatada,
-            '$temperaturaFormatada,00',
-          ]);
-        }
+        formatosParaTentar.addAll([
+          '$temperaturaFormatada,00',
+          '$temperaturaFormatada,0',
+          temperaturaFormatada,
+        ]);
       }
       
       final formatosComPonto = formatosParaTentar.map((f) => f.replaceAll(',', '.')).toList();
@@ -2055,12 +2031,11 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
           return fcvFormatado;
         } else {
           print('   ⚠️ Nenhum registro encontrado em tcv_alcool para FCV.');
+          return '-';
         }
       }
 
-      final nomeView = ehAlcool
-          ? 'tcv_anidro_hidratado_vw'
-          : 'tcv_gasolina_diesel_vw';
+      const String nomeView = 'tcv_gasolina_diesel_vw';
       
       print('   > View Target: $nomeView');
 
@@ -2494,7 +2469,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
                         text: 'Tem certeza que quer cancelar este certificado?\n',
                       ),
                       TextSpan(
-                        text: 'Atenção: Esta ação é irreversível e o certificado será removido permanentemente do banco.',
+                        text: 'Atenção: Esta ação é irreversível. O certificado será removido permanentemente.',
                         style: TextStyle(
                           color: Colors.red,
                           fontWeight: FontWeight.bold,

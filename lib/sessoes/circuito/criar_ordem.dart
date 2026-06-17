@@ -304,6 +304,7 @@ class _CriarOrdemPageState extends State<CriarOrdemPage> {
         'tipo_op': _tipoOp.toLowerCase(),
         'tipo_mov': _tipoOperacao.toLowerCase(),
         'data_carga': dataEmissao.toIso8601String(),
+        'seta_carregada': _tipoOperacao == 'Entrada' ? quantidadeAmb : null,
       });
 
       if (!mounted) return;

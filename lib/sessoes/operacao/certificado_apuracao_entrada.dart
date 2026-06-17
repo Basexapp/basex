@@ -566,10 +566,10 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         }
       }
 
-      if (movimentacao['entrada_amb'] != null) {
+      if (movimentacao['seta_carregada'] != null) {
         try {
-            campos['origemAmb']!.text =
-              _aplicarMascaraMilhar(movimentacao['entrada_amb'].toString());
+          campos['origemAmb']!.text =
+              _aplicarMascaraMilhar(movimentacao['seta_carregada'].toString());
         } catch (_) {}
       }
 
@@ -1265,9 +1265,11 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                             ),
                           ),
                           if (!_carregandoDadosMovimentacao)
+                          // ================= BOTÕES =================
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
+                              // 1 - BOTÃO VOLTAR
                               ElevatedButton.icon(
                                 onPressed: _voltar,
                                 icon: const Icon(Icons.arrow_back, size: 24),
@@ -1276,31 +1278,9 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                   style: TextStyle(fontSize: 16),
                                 ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.blue,
+                                  backgroundColor: Colors.green,
                                   foregroundColor: Colors.white,
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                ),
-                              ),
-
-                              ElevatedButton.icon(
-                                onPressed: _modoVisualizacao ? _baixarPDF : null,
-                                icon: const Icon(Icons.picture_as_pdf, size: 24),
-                                label: const Text(
-                                  'Gerar Certificado PDF',
-                                  style: TextStyle(fontSize: 16),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: _modoVisualizacao
-                                      ? const Color(0xFF0D47A1)
-                                      : Colors.grey[300],
-                                  foregroundColor:
-                                      _modoVisualizacao ? Colors.white : Colors.grey[600],
-                                  padding:
-                                      const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8),
                                   ),
@@ -1308,10 +1288,11 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                               ),
 
                               if (!_modoVisualizacao)
+                                // BOTÃO EMITIR CERTIFICADO (Apenas em modo criação/edição)
                                 ElevatedButton.icon(
-                                    onPressed: (_salvandoCertificado || (_converterParaInteiro(campos['destino20']!.text) ?? 0) <= 0)
-                                      ? null
-                                      : _confirmarEmissaoCertificado,
+                                  onPressed: (_salvandoCertificado || (_converterParaInteiro(campos['destino20']!.text) ?? 0) <= 0)
+                                    ? null
+                                    : _confirmarEmissaoCertificado,
                                   icon: _salvandoCertificado 
                                       ? const SizedBox(
                                           width: 20,
@@ -1336,24 +1317,45 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                     ),
                                   ),
                                 )
-                              else
+                              else ...[
+                                // 2 - BOTÃO GERAR PDF (Apenas em modo visualização)
                                 ElevatedButton.icon(
-                                  onPressed: null,
-                                  icon: const Icon(Icons.check_circle, size: 24),
+                                  onPressed: _baixarPDF,
+                                  icon: const Icon(Icons.picture_as_pdf, size: 24),
                                   label: const Text(
-                                    'Certificado emitido',
+                                    'Gerar Certificado PDF',
                                     style: TextStyle(fontSize: 16),
                                   ),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.grey[400],
+                                    backgroundColor: const Color(0xFF0D47A1),
                                     foregroundColor: Colors.white,
-                                    padding:
-                                        const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                   ),
                                 ),
+
+                                // 3 - BOTÃO CANCELAR CERTIFICADO (Apenas em modo visualização)
+                                if (widget.idAnaliseExistente != null)
+                                  ElevatedButton.icon(
+                                    onPressed: _salvandoCertificado ? null : _cancelarCertificado,
+                                    icon: const Icon(Icons.delete_forever, size: 24),
+                                    label: const Text(
+                                      'Cancelar certificado',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 16),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ],
                           ),
                         ],
@@ -1435,6 +1437,95 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         ],
       );
 
+  // ================= CÁLCULOS =================
+  Future<Map<String, dynamic>?> _buscarTabelaAlcool({
+    required String temperatura,
+    required String densidadeObservada,
+  }) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final tempNum = double.tryParse(temperatura.replaceAll(',', '.')) ?? 0;
+      double densNum =
+          double.tryParse(densidadeObservada.replaceAll(',', '.')) ?? 0;
+
+      if (densNum < 10) {
+        densNum = densNum * 1000;
+      }
+
+      final registros = await supabase
+          .from('tcv_alcool')
+          .select('*')
+          .gte('temp_obs', tempNum - 0.1)
+          .lte('temp_obs', tempNum + 0.1)
+          .order('densid_obs');
+
+      if (registros.isEmpty) return null;
+
+      Map<String, dynamic>? melhorRegistro;
+      double menorDiferenca = double.infinity;
+
+      for (var reg in registros) {
+        final densReg = (reg['densid_obs'] as num).toDouble();
+        final diferenca = (densReg - densNum).abs();
+
+        if (diferenca < menorDiferenca) {
+          menorDiferenca = diferenca;
+          melhorRegistro = reg;
+        }
+      }
+
+      return melhorRegistro;
+    } catch (e) {
+      debugPrint('Erro na busca da tabela alcoométrica (densidade obs): $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> _buscarTabelaAlcoolPorDensidade20({
+    required String temperatura,
+    required String densidade20,
+  }) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final tempNum = double.tryParse(temperatura.replaceAll(',', '.')) ?? 0;
+      double dens20Num =
+          double.tryParse(densidade20.replaceAll(',', '.')) ?? 0;
+
+      if (dens20Num < 10) {
+        dens20Num = dens20Num * 1000;
+      }
+
+      final registros = await supabase
+          .from('tcv_alcool')
+          .select('*')
+          .gte('temp_obs', tempNum - 0.1)
+          .lte('temp_obs', tempNum + 0.1)
+          .order('densid_vinte');
+
+      if (registros.isEmpty) return null;
+
+      Map<String, dynamic>? melhorRegistro;
+      double menorDiferenca = double.infinity;
+
+      for (var reg in registros) {
+        final densReg = (reg['densid_vinte'] as num).toDouble();
+        final diferenca = (densReg - dens20Num).abs();
+
+        if (diferenca < menorDiferenca) {
+          menorDiferenca = diferenca;
+          melhorRegistro = reg;
+        }
+      }
+
+      return melhorRegistro;
+    } catch (e) {
+      debugPrint('Erro na busca da tabela alcoométrica (densidade 20): $e');
+      return null;
+    }
+  }
+
   Future<String> _buscarDensidade20C({
     required String temperaturaAmostra,
     required String densidadeObservada,
@@ -1448,20 +1539,35 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
       
       final nomeProdutoLower = produtoNome.toLowerCase().trim();
-      final bool usarViewAnidroHidratado = 
+      final bool ehAlcool = 
           nomeProdutoLower.contains('anidro') || 
           nomeProdutoLower.contains('hidratado');
-      
+
+      // Se for álcool, usa a tabela tcv_alcool conforme metodologia do certificado de saída
+      if (ehAlcool) {
+        final resultado = await _buscarTabelaAlcool(
+          temperatura: temperaturaAmostra,
+          densidadeObservada: densidadeObservada,
+        );
+
+        if (resultado != null) {
+          final densVinte = (resultado['densid_vinte'] as num).toDouble();
+          // Converte de kg/m³ para kg/L (ex: 793,5 -> 0,7935)
+          final densVinteFormatada = (densVinte / 1000).toStringAsFixed(4).replaceAll('.', ',');
+          return densVinteFormatada;
+        }
+        return '-';
+      }
+
       String temperaturaFormatada = temperaturaAmostra
           .replaceAll(' ºC', '')
           .replaceAll('°C', '')
           .replaceAll('ºC', '')
           .replaceAll('°', '')
           .replaceAll('C', '')
-          .trim();
-      
-      temperaturaFormatada = temperaturaFormatada.replaceAll('.', ',');
-      
+          .trim()
+          .replaceAll('.', ',');
+
       String densidadeFormatada = densidadeObservada
           .replaceAll(' ', '')
           .replaceAll('°C', '')
@@ -1506,9 +1612,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         return '-';
       }
       
-      final nomeView = usarViewAnidroHidratado 
-          ? 'tcd_anidro_hidratado_vw' 
-          : 'tcd_gasolina_diesel_vw';
+      const String nomeView = 'tcd_gasolina_diesel_vw';
       
       String _formatarResultado(String valorBruto) {
         String valorLimpo = valorBruto.trim();
@@ -1554,43 +1658,27 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           String parteInteira = partes[0];
           String parteDecimal = partes[1];
           
-          if (usarViewAnidroHidratado) {
-            formatosParaTentar.addAll([
-              '$parteInteira,$parteDecimal',
-              '$parteInteira,${parteDecimal}0',
-              '$parteInteira,${parteDecimal.padLeft(2, '0')}',
-              '$parteInteira,0$parteDecimal',
-            ]);
-            
-            if (parteDecimal.length == 1) {
-              formatosParaTentar.add('$parteInteira,${parteDecimal}0');
-            }
-            
-            if (parteDecimal.length == 2) {
-              formatosParaTentar.add('$parteInteira,${parteDecimal.substring(0, 1)}');
-            }
-          } else {
-            formatosParaTentar.addAll([
-              '$parteInteira,$parteDecimal',
-              '$parteInteira,${parteDecimal}0',
-              '$parteInteira,0',
-            ]);
+          formatosParaTentar.addAll([
+            '$parteInteira,$parteDecimal',
+            '$parteInteira,${parteDecimal}0',
+            '$parteInteira,${parteDecimal.padLeft(2, '0')}',
+            '$parteInteira,0$parteDecimal',
+          ]);
+          
+          if (parteDecimal.length == 1) {
+            formatosParaTentar.add('$parteInteira,${parteDecimal}0');
+          }
+          
+          if (parteDecimal.length == 2) {
+            formatosParaTentar.add('$parteInteira,${parteDecimal.substring(0, 1)}');
           }
         }
       } else {
-        if (usarViewAnidroHidratado) {
-          formatosParaTentar.addAll([
-            '$temperaturaFormatada,00',
-            '$temperaturaFormatada,0',
-            temperaturaFormatada,
-          ]);
-        } else {
-          formatosParaTentar.addAll([
-            '$temperaturaFormatada,0',
-            temperaturaFormatada,
-            '$temperaturaFormatada,00',
-          ]);
-        }
+        formatosParaTentar.addAll([
+          '$temperaturaFormatada,00',
+          '$temperaturaFormatada,0',
+          temperaturaFormatada,
+        ]);
       }
       
       final formatosComPonto = formatosParaTentar.map((f) => f.replaceAll(',', '.')).toList();
@@ -1637,10 +1725,26 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
 
       final nomeProdutoLower = produtoNome.toLowerCase().trim();
-      final nomeView = (nomeProdutoLower.contains('anidro') ||
-              nomeProdutoLower.contains('hidratado'))
-          ? 'tcv_anidro_hidratado_vw'
-          : 'tcv_gasolina_diesel_vw';
+      final bool ehAlcool = 
+          nomeProdutoLower.contains('anidro') || 
+          nomeProdutoLower.contains('hidratado');
+
+      // Se for álcool, usa a tabela tcv_alcool conforme metodologia do certificado de saída
+      if (ehAlcool) {
+        final resultado = await _buscarTabelaAlcoolPorDensidade20(
+          temperatura: temperaturaTanque,
+          densidade20: densidade20C,
+        );
+
+        if (resultado != null) {
+          final fcv = (resultado['fcv'] as num).toDouble();
+          final fcvFormatado = fcv.toStringAsFixed(4).replaceAll('.', ',');
+          return fcvFormatado;
+        }
+        return '-';
+      }
+
+      const String nomeView = 'tcv_gasolina_diesel_vw';
 
       String temperaturaFormatada = temperaturaTanque
           .replaceAll('°C', '')
@@ -2041,6 +2145,164 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       widget.onVoltar();
     } catch (_) {
       Navigator.of(context).pop(true);
+    }
+  }
+
+  // Método para cancelar o certificado no banco
+  Future<void> _cancelarCertificado() async {
+    if (!_modoVisualizacao || (widget.idAnaliseExistente == null && campos['numeroControle']!.text.isEmpty)) return;
+
+    final confirmacao = await showDialog<bool>(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+        ),
+        child: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0D47A1),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Confirmar cancelamento',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: RichText(
+                  textAlign: TextAlign.center,
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.4,
+                      color: Colors.black,
+                    ),
+                    children: [
+                      TextSpan(
+                        text: 'Tem certeza que quer cancelar este certificado?\n',
+                      ),
+                      TextSpan(
+                        text: 'Atenção: Esta ação é irreversível. O certificado será removido permanentemente.',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade300, width: 1),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 120,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          side: BorderSide(color: Colors.grey.shade400),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: const Text(
+                          'Voltar',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 120,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: const Text(
+                          'Sim, cancelar',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmacao != true) return;
+
+    setState(() {
+      _salvandoCertificado = true; // Reutilizando flag de loading
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+      final idCert = widget.idAnaliseExistente;
+
+      if (idCert != null) {
+        await supabase
+            .from('ordens_analises')
+            .delete()
+            .eq('id', idCert);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Certificado cancelado com sucesso!'), backgroundColor: Colors.green),
+          );
+          _voltar(); // Volta para a tela anterior após cancelar
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao cancelar certificado: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _salvandoCertificado = false;
+        });
+      }
     }
   }
 
