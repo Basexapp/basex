@@ -131,8 +131,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
         throw Exception('Terminal não identificado');
       }
 
-      print('🔍 DEBUG: Calculando estoque para terminal $terminalId, produto ${widget.produtoId}, data $dataStr');
-
       // Chamar a função do produto (agora com terminal_id)
       final response = await _supabase.rpc(
         'calcular_estoque_inicial_produto',
@@ -143,21 +141,13 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
         },
       );
 
-      print('📊 RESPOSTA COMPLETA: $response');
-
       num saldo = 0;
 
       if (response is Map) {
         saldo = (response['estoque_inicial'] ?? 0) as num;
-
-        if (response.containsKey('debug')) {
-          print('🐛 DEBUG DETALHADO: ${response['debug']}');
-        }
       } else {
         saldo = (response ?? 0) as num;
       }
-
-      print('✅ ESTOQUE INICIAL CALCULADO: $saldo');
 
       setState(() {
         _estoqueInicial = {'amb': saldo, 'vinte': saldo};

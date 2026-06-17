@@ -32,6 +32,7 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
   String? terminalSelecionadoId;
   String? tanqueSelecionadoId;
   String? produtoSelecionado;
+  String? statusSelecionado;
   int? _hoverIndex;
   
   final TextEditingController dataInicialController = TextEditingController();
@@ -292,6 +293,11 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
         query = query.eq('tanque_id', tanqueSelecionadoId!);
       }
 
+      if (statusSelecionado != null && statusSelecionado!.isNotEmpty) {
+        final s = statusSelecionado!.toString().toLowerCase();
+        query = query.eq('status', s);
+      }
+
       if (produtoSelecionado != null && produtoSelecionado!.isNotEmpty) {
         query = query.eq('produto_id', produtoSelecionado!);
       }
@@ -443,45 +449,7 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
 
                 const SizedBox(width: 8),
 
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: tanqueSelecionadoId,
-                    decoration: InputDecoration(
-                      labelText: 'Tanque',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.storage, size: 18),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      isDense: true,
-                    ),
-                    isExpanded: true,
-                    items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: Text('Todos os tanques', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13)),
-                      ),
-                      ...tanquesDisponiveis
-                          .where((tanque) =>
-                              terminalSelecionadoId == null ||
-                              tanque['terminal_id']?.toString() == terminalSelecionadoId)
-                          .map((tanque) {
-                        return DropdownMenuItem(
-                          value: tanque['id']?.toString(),
-                          child: Text(
-                            tanque['referencia']?.toString() ?? '',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        );
-                      }).toList(),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        tanqueSelecionadoId = value;
-                      });
-                      _aplicarFiltros();
-                    },
-                  ),
-                ),
+                const SizedBox(width: 8),
 
                 const SizedBox(width: 8),
 
@@ -518,9 +486,84 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
                         : (value) {
                             setState(() {
                               terminalSelecionadoId = value;
+                              tanqueSelecionadoId = null; // reset tank when terminal changes
                             });
                             _aplicarFiltros();
                           },
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // Tanque (após Terminal) — listar tanques do terminal do usuário/selecionado
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: tanqueSelecionadoId,
+                    decoration: InputDecoration(
+                      labelText: 'Tanque',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.storage, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                    ),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('Todos os tanques', overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13)),
+                      ),
+                      ...tanquesDisponiveis
+                          .where((tanque) {
+                            final usuarioTerminal = _usuarioData?['terminal_id']?.toString();
+                            final filtroTerminal = usuarioTerminal ?? terminalSelecionadoId;
+                            if (filtroTerminal == null) return true;
+                            return tanque['terminal_id']?.toString() == filtroTerminal;
+                          })
+                          .map((tanque) {
+                        return DropdownMenuItem(
+                          value: tanque['id']?.toString(),
+                          child: Text(
+                            tanque['referencia']?.toString() ?? '',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        tanqueSelecionadoId = value;
+                      });
+                      _aplicarFiltros();
+                    },
+                  ),
+                ),
+
+                const SizedBox(width: 8),
+
+                // Status filter — apenas Emitido e Cancelado
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: statusSelecionado,
+                    decoration: InputDecoration(
+                      labelText: 'Status',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.info_outline, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                    ),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Todos os status', style: TextStyle(fontSize: 13))),
+                      const DropdownMenuItem(value: 'Emitido', child: Text('Emitido', style: TextStyle(fontSize: 13))),
+                      const DropdownMenuItem(value: 'Cancelado', child: Text('Cancelado', style: TextStyle(fontSize: 13))),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        statusSelecionado = value;
+                      });
+                      _aplicarFiltros();
+                    },
                   ),
                 ),
 

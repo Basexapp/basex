@@ -93,6 +93,7 @@ class _MyAppState extends State<MyApp> {
         '/redefinir-senha': (context) => const RedefinirSenhaPage(),
         '/escolher-senha': (context) => const EscolherSenhaPage(),
       },
+      navigatorObservers: [routeObserver],
       // Adiciona fallback para rotas não encontradas
       onUnknownRoute: (settings) {
         return MaterialPageRoute(
@@ -102,3 +103,7 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
+
+// Observador global de rotas para páginas que implementam RouteAware
+final RouteObserver<ModalRoute<void>> routeObserver =
+  RouteObserver<ModalRoute<void>>();

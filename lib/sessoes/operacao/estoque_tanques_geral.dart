@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'estoque_tanque_dia.dart';
 import 'estoque_tanque_mensal.dart';
+import '../../main.dart';
 
 class DadosTanque {
   final String id;
@@ -58,7 +59,8 @@ class EstoquePorTanquePage extends StatefulWidget {
   State<EstoquePorTanquePage> createState() => _EstoquePorTanquePageState();
 }
 
-class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
+class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
+  with RouteAware {
   List<DadosTanque> tanques = [];
   bool _carregando = true;
   int tanqueSelecionadoIndex = -1; // -1 significa "Todos"
@@ -79,9 +81,35 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route as ModalRoute<dynamic>);
+    }
+  }
+
+  @override
   void dispose() {
+    try {
+      routeObserver.unsubscribe(this);
+    } catch (_) {}
     _menuScrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didPush() {
+    // Página foi empurrada para a pilha — atualizar sempre ao abrir
+    _carregarDadosTanques();
+    _carregarNomeTerminal();
+  }
+
+  @override
+  void didPopNext() {
+    // Voltou para esta página a partir de outra — atualizar incondicionalmente
+    _carregarDadosTanques();
+    _carregarNomeTerminal();
   }
 
   Future<void> _carregarNomeTerminal() async {
