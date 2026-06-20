@@ -18,7 +18,7 @@ class HomeRouter extends StatelessWidget {
     
     final layout = UsuarioAtual.instance!.layout;
     if (layout == 2) {
-      return const HomePageLayout1();
+      return const HomePageCards();
     }
     return const HomePage();
   }

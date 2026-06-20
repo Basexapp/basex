@@ -50,17 +50,17 @@ import 'sessoes/operacao/calculadora_arqueacao.dart';
 import 'sessoes/operacao/controle_aditivo.dart';
 import 'sessoes/operacao/filtro_controle_aditivo.dart';
 
-class HomePageLayout1 extends StatefulWidget {
-  const HomePageLayout1({super.key});
+class HomePageCards extends StatefulWidget {
+  const HomePageCards({super.key});
 
   @override
-  State<HomePageLayout1> createState() => _HomePageLayout1State();
+  State<HomePageCards> createState() => _HomePageCardsState();
 }
 
 @JS()
 external JSFunction? atualizarApp;
 
-class _HomePageLayout1State extends State<HomePageLayout1>
+class _HomePageCardsState extends State<HomePageCards>
     with SingleTickerProviderStateMixin {
   int selectedIndex = 0;
   int _hoveredMenuIndex = -1;

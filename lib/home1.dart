@@ -49,6 +49,7 @@ import 'sessoes/operacao/presets.dart';
 import 'sessoes/operacao/calculadora_arqueacao.dart';
 import 'sessoes/operacao/controle_aditivo.dart';
 import 'sessoes/operacao/filtro_controle_aditivo.dart';
+import 'sessoes/operacao/alocacao.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -129,6 +130,7 @@ class _HomePageState extends State<HomePage>
   bool _mostrarCalculadoraArqueacao = false;
   bool _mostrarControleAditivo = false;
   bool _mostrarFiltroControleAditivo = false;
+  bool _mostrarAlocacao = false;
   bool _mostrarCardsFilial = false;
 
   // Parâmetros de filtro para aditivos
@@ -587,6 +589,14 @@ class _HomePageState extends State<HomePage>
         'tipo': 'controle_aditivo',
         'sessao_pai': 'Operação',
         'favorito': false,
+      },
+      {
+        'id': 'fallback-alocacao',
+        'icon': Icons.sync_alt,
+        'label': 'Alocação',
+        'descricao': 'Gestão de alocação de tanques',
+        'tipo': 'alocacao',
+        'sessao_pai': 'Operação',
       },
     ];
 
@@ -1200,6 +1210,7 @@ class _HomePageState extends State<HomePage>
       _voltarParaTanquesApoCACL = false;
       _mostrarGestaoBombeios = false;
       _mostrarCalculadoraArqueacao = false;
+      _mostrarAlocacao = false;
       _resetarTodasFlagsGestaoFrota();
       _mostrarFilhosSessao = false;
       _sessaoAtual = null;
@@ -2620,6 +2631,17 @@ class _HomePageState extends State<HomePage>
         );
       }
 
+      if (_mostrarAlocacao) {
+        return AlocacaoPage(
+          onVoltar: () {
+            setState(() {
+              _mostrarAlocacao = false;
+              _mostrarFilhosDaSessao('Operação');
+            });
+          },
+        );
+      }
+
       if (_mostrarControleAditivo) {
         return ControleAditivoPage(
           key: const ValueKey('controle-aditivo-page'),
@@ -3548,6 +3570,11 @@ class _HomePageState extends State<HomePage>
           _mostrarResultadoMensal = true;
         });
         break;
+      case 'alocacao':
+        setState(() {
+          _mostrarAlocacao = true;
+        });
+        break;
       case 'registro_preset':
         setState(() {
           _mostrarRegistroPreset = true;
@@ -4405,6 +4432,7 @@ class _HomePageState extends State<HomePage>
       case 'estoque_produto': return _mostrarEstoqueProduto;
       case 'controle_aditivo': return _mostrarFiltroControleAditivo || _mostrarControleAditivo;
       case 'resultados': return _mostrarResultadoMensal;
+      case 'alocacao': return _mostrarAlocacao;
       case 'registro_preset': return _mostrarRegistroPreset;
       case 'calculadora_arqueacao': return _mostrarCalculadoraArqueacao;
       case 'estoque_fiscal': return _mostrarFiltrosEstoque;
@@ -4441,6 +4469,7 @@ class _HomePageState extends State<HomePage>
         _mostrarFiltroControleAditivo ||
         _mostrarControleAditivo ||
         _mostrarResultadoMensal ||
+        _mostrarAlocacao ||
         _mostrarRegistroPreset ||
         _mostrarCalculadoraArqueacao ||
         _mostrarFiltrosEstoque ||
