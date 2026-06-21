@@ -123,6 +123,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             transportadoras!transportadora_id(nome),
             produtos!produto_id(nome_dois),
             empresas!empresa_id(nome_dois),
+            ordens_analises(id, tipo_analise),
             ordens!ordem_id!inner(id, terminal_id_orig, terminal_id_dest, status_term_orig, status_term_dest, posicao_fila)
           ''')
           .or('terminal_id_orig.eq.$_usuarioTerminalId,terminal_id_dest.eq.$_usuarioTerminalId',
@@ -185,6 +186,19 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             primeiroItem['ordens']?['terminal_id_dest']?.toString() ==
             _usuarioTerminalId;
 
+        // Verifica se houve apuração (certificado emitido) para o lado do usuário
+        final sideToSearch = isOrigem ? 'origem' : 'destino';
+        final bool apuracaoRealizada = itens.any((mov) {
+          final analises = mov['ordens_analises'] as List?;
+          return analises?.any((a) =>
+                  a['tipo_analise']
+                      ?.toString()
+                      .toLowerCase()
+                      .contains(sideToSearch) ??
+                  false) ??
+              false;
+        });
+
         final statusTermOrig =
             primeiroItem['ordens']?['status_term_orig']?.toString() ?? '1';
         final statusTermDest =
@@ -239,6 +253,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
           posicaoFila: primeiroItem['ordens']?['posicao_fila']?.toString(),
           vendedor: vendedor,
           comprador: comprador,
+          apuracaoRealizada: apuracaoRealizada,
         );
       }).toList();
 
@@ -335,6 +350,47 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Erro ao atualizar status: $e')));
+      }
+    }
+  }
+
+  Future<void> _liberarVeiculo(_Veiculo v) async {
+    if (v.ordemId.isEmpty) return;
+
+    try {
+      final Map<String, dynamic> updatesOrdem = {};
+      final Map<String, dynamic> updatesMov = {};
+
+      if (_usuarioTerminalId != null && _usuarioTerminalId!.isNotEmpty) {
+        if (v.terminalIdOrig == _usuarioTerminalId) {
+          updatesOrdem['status_term_orig'] = '4';
+          updatesMov['status_circuito_orig'] = '4';
+        } else if (v.terminalIdDest == _usuarioTerminalId) {
+          updatesOrdem['status_term_dest'] = '4';
+          updatesMov['status_circuito_dest'] = '4';
+        }
+      }
+
+      if (updatesOrdem.isNotEmpty) {
+        await _supabase.from('ordens').update(updatesOrdem).eq('id', v.ordemId);
+      }
+
+      if (updatesMov.isNotEmpty) {
+        await _supabase
+            .from('movimentacoes')
+            .update(updatesMov)
+            .eq('ordem_id', v.ordemId);
+      }
+
+      if (mounted) {
+        Navigator.pop(context);
+        _carregarDados();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao liberar veículo: $e')),
+        );
       }
     }
   }
@@ -603,9 +659,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                     width: double.infinity,
                     height: 40,
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        // Ação de liberar futuramente
-                      },
+                      onPressed: () => _liberarVeiculo(v),
                       icon: const Icon(Icons.local_shipping_outlined, size: 18),
                       label: const Text(
                         'LIBERAR VEÍCULO',
@@ -1771,6 +1825,35 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                                     ),
                                   ),
                                   const SizedBox(width: 4),
+                                  if (v.statusAtual == '3' &&
+                                      v.apuracaoRealizada) ...[
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 1,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: Colors.green.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'APURAÇÃO REALIZADA',
+                                        style: TextStyle(
+                                          color: Colors.green,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 4,
@@ -1947,6 +2030,7 @@ class _Veiculo {
   final String? posicaoFila;
   final String vendedor;
   final String comprador;
+  final bool apuracaoRealizada;
 
   _Veiculo({
     required this.id,
@@ -1966,5 +2050,6 @@ class _Veiculo {
     this.posicaoFila,
     required this.vendedor,
     required this.comprador,
+    required this.apuracaoRealizada,
   });
 }
