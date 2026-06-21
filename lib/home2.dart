@@ -34,7 +34,6 @@ import 'sessoes/suporte/suporte.dart';
 import 'sessoes/suporte/fila_solic.dart';
 import 'sessoes/suporte/acesso_desenvolvedor.dart';
 import 'sessoes/circuito/criar_ordem.dart';
-import 'sessoes/circuito/radar.dart';
 import 'sessoes/circuito/visao_geral.dart';
 import 'sessoes/almoxerifado/frascos_amostras.dart';
 import 'sessoes/almoxerifado/filtro_estoque_frascos.dart';
@@ -713,14 +712,6 @@ class _HomePageCardsState extends State<HomePageCards>
 
     _filhosPorSessao['Circuito'] = [
       {
-        'id': 'fallback-acompanhar',
-        'icon': Icons.directions_car,
-        'label': 'Acompanhar ordem',
-        'descricao': 'Acompanhar situação da ordem',
-        'tipo': 'acompanhar_ordem',
-        'sessao_pai': 'Circuito',
-      },
-      {
         'id': 'fallback-visao',
         'icon': Icons.dashboard,
         'label': 'Visão geral',
@@ -734,14 +725,6 @@ class _HomePageCardsState extends State<HomePageCards>
         'label': 'Criar Ordem',
         'descricao': 'Criar uma nova ordem',
         'tipo': 'criar_ordem',
-        'sessao_pai': 'Circuito',
-      },
-      {
-        'id': 'c94451c8-2c41-49b1-9181-be3a5f1e7205',
-        'icon': Icons.radar,
-        'label': 'Radar',
-        'descricao': 'Visualização em radar das ordens',
-        'tipo': 'radar',
         'sessao_pai': 'Circuito',
       },
     ];
@@ -3095,14 +3078,6 @@ class _HomePageCardsState extends State<HomePageCards>
               });
             },
           );
-        case 'radar':
-          return RadarPage(
-            onVoltar: () {
-              setState(() {
-                _filhoSelecionadoTipo = null;
-              });
-            },
-          );
         case 'ordem_bombeio':
           return _buildPaginaPadronizada(
             titulo: 'Ordem de Bombeio',
@@ -3891,12 +3866,6 @@ class _HomePageCardsState extends State<HomePageCards>
 
   void _navegarParaCardCircuito(String tipo) {
     switch (tipo) {
-      case 'acompanhar_ordem':
-        // Acompanhamento de ordens agora usa terminal_id; não exigir filial vinculada
-        setState(() {
-          _mostrarAcompanhamentoOrdens = true;
-        });
-        break;
       case 'visao_geral_circuito':
         Navigator.push(
           context,
@@ -3913,11 +3882,6 @@ class _HomePageCardsState extends State<HomePageCards>
           _mostrarFilhosSessao = true;
           _sessaoAtual = 'Circuito';
           _filhosSessaoAtual = List.from(_filhosPorSessao['Circuito'] ?? []);
-        });
-        break;
-      case 'radar':
-        setState(() {
-          _filhoSelecionadoTipo = 'radar';
         });
         break;
     }
