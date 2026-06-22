@@ -16,6 +16,7 @@ class _PerfilPageState extends State<PerfilPage> {
   String email = "";
   String nivelTexto = "";
   String terminalNome = "";
+  String empresaNome = "";
   bool carregando = true;
 
   @override
@@ -33,9 +34,9 @@ class _PerfilPageState extends State<PerfilPage> {
     }
 
     try {
-      final dados = await supabase
+        final dados = await supabase
           .from('usuarios')
-          .select('email, nivel, terminal_id')
+          .select('email, nivel, terminal_id, empresa_id')
           .eq('id', usuario.id)
           .maybeSingle();
 
@@ -45,8 +46,9 @@ class _PerfilPageState extends State<PerfilPage> {
         nivelTexto = _traduzirNivel(nivel);
 
         final terminalId = dados['terminal_id'];
+        final empresaId = dados['empresa_id'];
 
-        // Apenas para usuários nível 1 ou 2 mostramos o terminal
+        // Apenas para usuários nível 1 ou 2 mostramos o terminal e a empresa
         if (nivel == 1 || nivel == 2) {
           if (terminalId != null) {
             final fil = await supabase
@@ -59,9 +61,22 @@ class _PerfilPageState extends State<PerfilPage> {
           } else {
             terminalNome = "Nenhuma";
           }
+
+          if (empresaId != null) {
+            final emp = await supabase
+                .from('empresas')
+                .select('nome_abrev')
+                .eq('id', empresaId)
+                .maybeSingle();
+
+            empresaNome = emp?['nome_abrev'] ?? "Não encontrada";
+          } else {
+            empresaNome = "Nenhuma";
+          }
         } else {
           // Nível 3: não mostrar campo
           terminalNome = "";
+          empresaNome = "";
         }
       }
     } catch (e) {
@@ -151,8 +166,10 @@ class _PerfilPageState extends State<PerfilPage> {
                     const SizedBox(height: 25),
 
                     _infoBox("Nível de acesso", nivelTexto),
-                    if ((usuario?.nivel ?? 0) == 1 || (usuario?.nivel ?? 0) == 2)
+                    if ((usuario?.nivel ?? 0) == 1 || (usuario?.nivel ?? 0) == 2) ...[
                       _infoBox("Terminal", terminalNome),
+                      _infoBox("Empresa", empresaNome),
+                    ],
 
                     const SizedBox(height: 30),
 
@@ -255,6 +272,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
   final email = TextEditingController();
   final celular = TextEditingController();
   final funcao = TextEditingController();
+  final empresa = TextEditingController();
 
   List<Map<String, dynamic>> terminais = [];
   String? terminalSelecionada;
@@ -274,9 +292,9 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
       // ----------------------------------------------------------
       // 1️⃣ Buscar DADOS DO USUÁRIO
       // ----------------------------------------------------------
-      final dados = await supabase
+        final dados = await supabase
           .from('usuarios')
-          .select('nome, email, celular, funcao, terminal_id')
+          .select('nome, email, celular, funcao, terminal_id, empresa_id')
           .eq('id', usuario.id)
           .maybeSingle();
 
@@ -289,6 +307,18 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
 
         // 🔹 Convertendo terminal_id para String
         terminalSelecionada = dados['terminal_id']?.toString();
+
+        // 🔹 Carregar nome abreviado da empresa (se existir)
+        final empresaId = dados['empresa_id'];
+        if (empresaId != null) {
+          final emp = await supabase
+              .from('empresas')
+              .select('nome_abrev')
+              .eq('id', empresaId)
+              .maybeSingle();
+
+          empresa.text = emp?['nome_abrev'] ?? "";
+        }
       }
 
       // ----------------------------------------------------------
@@ -386,6 +416,7 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                     _campoTexto("Email", email, true),
                     _campoTexto("Celular", celular, widget.readOnly),
                     _campoTexto("Função", funcao, widget.readOnly),
+                    _campoTexto("Empresa", empresa, true),
 
                     const SizedBox(height: 10),
                     // Mostrar seleção de terminal apenas para níveis 1 e 2

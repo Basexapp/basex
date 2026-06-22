@@ -262,7 +262,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         usuario.terminalId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Configuração de usuário incompleta (Empresa/Terminal). Não é possível criar nova venda.'),
+          content: const Text('Apenas usuários vinculados a uma empresa (não apenas ao terminal) podem gerar nova venda.'),
           backgroundColor: Colors.red,
         ),
       );

@@ -349,8 +349,14 @@ class _CriarOrdemPageState extends State<CriarOrdemPage> {
       });
     } catch (e) {
       if (mounted) {
+        final errorStr = e?.toString() ?? '';
+        String userMessage = 'Erro ao criar ordem: $e';
+        if (errorStr.contains('empresa_id') || errorStr.contains('null value in column "empresa_id"') || errorStr.contains('23502')) {
+          userMessage = 'Apenas usuários vinculados a uma empresa (não apenas ao terminal) podem criar ordens.';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao criar ordem: $e')),
+          SnackBar(content: Text(userMessage)),
         );
       }
     }
