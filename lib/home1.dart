@@ -190,15 +190,7 @@ class _HomePageState extends State<HomePage>
   // MAPA UNIFICADO DE FILHOS POR SESSÃO
   final Map<String, List<Map<String, dynamic>>> _filhosPorSessao = {};
 
-  // NOVA LISTA PARA ARMAZENAR FILIAIS PARA PROGRAMACAO
-  List<Map<String, dynamic>> _filiaisProgramacao = [];
-
   // Mapa nome normalizado -> UUID real do banco (para match de cards de filiais)
-  Map<String, String> _idPorNome = {};
-  Set<String> _favoritosIds = {};
-  Map<String, int> _ordemPorId = {};
-
-  // NOVO: Mapa de cores por sessão
   final Map<String, Color> _coresSessoes = {
     'Estoques': const Color(0xFFFF9800), // Laranja
     'Operação': const Color(0xFF2196F3), // Azul
@@ -226,7 +218,6 @@ class _HomePageState extends State<HomePage>
     super.initState();
     selectedIndex = -1;
     _inicializarFilhosPorSessaoFallback();
-    _carregarFilialParaProgramacao();
     _carregarCardsDoBanco();
     _carregarNomeFilialUsuario();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -430,11 +421,6 @@ class _HomePageState extends State<HomePage>
           c['id'].toString(): (c['ordem'] as int? ?? 0),
       };
 
-      // Armazenar para uso em _carregarFilialParaProgramacao (que pode rodar depois)
-      _idPorNome = idPorNome;
-      _favoritosIds = favoritosIds;
-      _ordemPorId = ordemPorId;
-
       // Para cada card do fallback: encontrar o UUID real pelo nome e atualizar id/favorito/label
       for (final cards in _filhosPorSessao.values) {
         for (final card in cards) {
@@ -454,9 +440,6 @@ class _HomePageState extends State<HomePage>
             ((a['ordem'] as int?) ?? 0).compareTo((b['ordem'] as int?) ?? 0));
       }
 
-      // Também atualizar _filiaisProgramacao caso já esteja carregado
-      _aplicarIdsDoBancoEmFiliais();
-
       setState(() {
         _carregandoCards = false;
       });
@@ -464,25 +447,6 @@ class _HomePageState extends State<HomePage>
       debugPrint('❌ Erro ao carregar cards do banco: $e');
       setState(() => _carregandoCards = false);
     }
-  }
-
-  /// Atualiza os IDs e favoritos dos cards de _filiaisProgramacao usando o mapa do banco.
-  void _aplicarIdsDoBancoEmFiliais() {
-    if (_idPorNome.isEmpty) return;
-    for (final card in _filiaisProgramacao) {
-      final labelNorm = card['label']?.toString().trim().toLowerCase() ?? '';
-      final realId = _idPorNome[labelNorm];
-      if (realId != null && realId.isNotEmpty) {
-        card['id'] = realId;
-      }
-      final currentId = card['id']?.toString() ?? '';
-      card['favorito'] = _favoritosIds.contains(currentId);
-      if (_ordemPorId.containsKey(currentId)) {
-        card['ordem'] = _ordemPorId[currentId];
-      }
-    }
-    _filiaisProgramacao.sort((a, b) =>
-        ((a['ordem'] as int?) ?? 0).compareTo((b['ordem'] as int?) ?? 0));
   }
 
   void _inicializarFilhosPorSessaoFallback() {
@@ -726,6 +690,15 @@ class _HomePageState extends State<HomePage>
 
     _filhosPorSessao['Vendas'] = [
       {
+        'id': 'vendas-prog',
+        'icon': Icons.calendar_today,
+        'label': 'Programação',
+        'descricao': 'Programação de carregamentos',
+        'tipo': 'programacao',
+        'sessao_pai': 'Vendas',
+        'favorito': false,
+      },
+      {
         'id': 'fallback-mov',
         'icon': Icons.swap_horiz,
         'label': 'Relatório de Saídas',
@@ -881,79 +854,6 @@ class _HomePageState extends State<HomePage>
       },
     ];
   }    
-
-  Future<void> _carregarFilialParaProgramacao() async {
-    final supabase = Supabase.instance.client;
-
-    try {
-      // Busca todas as filiais — terminal_id_1 é apenas parâmetro, não critério
-      final filiaisData = await supabase
-          .from('filiais')
-          .select('id, nome, nome_dois, terminal_id_1')
-          .order('nome');
-
-      if (!mounted) return;
-
-      if (filiaisData.isEmpty) {
-        setState(() {
-          _filiaisProgramacao = [];
-        });
-        return;
-      }
-
-      final List<Map<String, dynamic>> filiaisProcessadas = [];
-
-      for (var filial in filiaisData) {
-        final filialId = filial['id'];
-        final filialNome = filial['nome'] ?? 'Sem nome';
-        final filialNomeDois = filial['nome_dois'] ?? filialNome;
-        final terminalId = filial['terminal_id_1']; // pode ser null
-
-        filiaisProcessadas.add({
-          'id': filialId.toString(),
-          'label': filialNomeDois,
-          'descricao': '',
-          'tipo': 'programacao_filial',
-          'filial_id': filialId,
-          'filial_nome': filialNome,
-          'filial_nome_dois': filialNomeDois,
-          'terminal_id': terminalId,
-          'icon': Icons.local_gas_station,
-          'sessao_pai': 'Vendas',
-          'favorito': false,
-        });
-      }
-
-      filiaisProcessadas.sort((a, b) {
-        final nomeA = a['label']?.toString() ?? '';
-        final nomeB = b['label']?.toString() ?? '';
-        return nomeA.compareTo(nomeB);
-      });
-
-      setState(() {
-        _filiaisProgramacao = filiaisProcessadas;
-      });
-
-      // Aplicar UUIDs do banco caso _carregarCardsDoBanco já tenha rodado
-      _aplicarIdsDoBancoEmFiliais();
-    } catch (e) {
-      debugPrint('❌ ERRO ao carregar filiais: $e');
-      debugPrint('❌ Stack trace: ${StackTrace.current}');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erro ao carregar filiais: ${e.toString()}'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-
-      setState(() {
-        _filiaisProgramacao = [];
-      });
-    }
-  }
 
   Future<void> _carregarEmpresas() async {
     setState(() => carregandoEmpresas = true);
@@ -1246,22 +1146,6 @@ class _HomePageState extends State<HomePage>
         _filhosSessaoAtual = configItems;
         showControleAcesso = false;
         showUsuarios = false;
-      });
-      return;
-    }
-
-    if (nomeSessao == 'Vendas') {
-      // Combinar cards do banco (ou fallback) + filiais de programação
-      // Excluir programacao_filial do banco para evitar duplicação com _filiaisProgramacao
-      final cardsVendas = <Map<String, dynamic>>[
-        ...(_filhosPorSessao['Vendas'] ?? []).where((c) => c['tipo'] != 'programacao_filial'),
-        ..._filiaisProgramacao,
-      ];
-
-      setState(() {
-        _mostrarFilhosSessao = true;
-        _sessaoAtual = nomeSessao;
-        _filhosSessaoAtual = List.from(cardsVendas);
       });
       return;
     }
@@ -3779,12 +3663,7 @@ class _HomePageState extends State<HomePage>
         _navegarParaMovimentacoesVendas();
         break;
 
-      case 'programacao_filial':
-        final filialId = card['filial_id'];
-        final filialNome = card['filial_nome'];
-        final filialNomeDois = card['filial_nome_dois'];
-        final terminalId = card['terminal_id']; // NOVO: pega o terminal_id
-
+      case 'programacao':
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -3792,10 +3671,6 @@ class _HomePageState extends State<HomePage>
               onVoltar: () {
                 Navigator.pop(context);
               },
-              filialId: filialId,
-              filialNome: filialNome,
-              filialNomeDois: filialNomeDois,
-              terminalId: terminalId, // NOVO: passa o terminal_id
             ),
           ),
         );
@@ -3991,15 +3866,6 @@ class _HomePageState extends State<HomePage>
           if (usuario == null || cardId == null || usuario.podeAcessarCard(cardId)) {
             favoritos.add(card);
           }
-        }
-      }
-    }
-    for (final card in _filiaisProgramacao) {
-      if (card['favorito'] == true) {
-        // Verifica se o usuário tem permissão para este card
-        final cardId = card['id']?.toString();
-        if (usuario == null || cardId == null || usuario.podeAcessarCard(cardId)) {
-          favoritos.add(card);
         }
       }
     }

@@ -9,21 +9,14 @@ import 'ordem_carregamento_venda_pdf.dart';
 import 'nova_venda.dart';
 import 'dialog_venda_total.dart';
 import 'dart:async';
+import '../../login_page.dart';
 
 class ProgramacaoPage extends StatefulWidget {
   final VoidCallback onVoltar;
-  final String? filialId;
-  final String? filialNome;
-  final String? filialNomeDois;
-  final String? terminalId;
 
   const ProgramacaoPage({
     super.key, 
     required this.onVoltar,
-    this.filialId,
-    this.filialNome,
-    this.filialNomeDois,
-    this.terminalId,
   });
 
   @override
@@ -98,6 +91,7 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
 
     try {
       final supabase = Supabase.instance.client;
+      final usuario = UsuarioAtual.instance;
 
       var query = supabase
           .from("movimentacoes")
@@ -117,8 +111,13 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           """)
           .eq("tipo_op", "venda");
 
-      if (widget.filialId != null && widget.filialId!.isNotEmpty) {
-        query = query.eq("filial_id", widget.filialId!);
+      if (usuario != null) {
+        if (usuario.empresaId != null && usuario.empresaId!.isNotEmpty) {
+          query = query.eq("empresa_id", usuario.empresaId!);
+        }
+        if (usuario.terminalId != null && usuario.terminalId!.isNotEmpty) {
+          query = query.eq("terminal_orig_id", usuario.terminalId!);
+        }
       }
       
       final dataFormatada = _dataFiltro.toIso8601String().split('T')[0];
@@ -192,10 +191,13 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   }
 
   void _mostrarDialogNovaVenda() async {
-    if (widget.filialId == null || widget.filialId!.isEmpty) {
+    final usuario = UsuarioAtual.instance;
+    if (usuario == null || 
+        usuario.empresaId == null || 
+        usuario.terminalId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Filial não definida. Não é possível criar nova venda.'),
+          content: const Text('Configuração de usuário incompleta (Empresa/Terminal). Não é possível criar nova venda.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -223,8 +225,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
             );
           }
         },
-        filialId: widget.filialId!,
-        filialNome: widget.filialNome,
+        terminalId: usuario.terminalId!,
+        empresaId: usuario.empresaId!,
         dataFiltro: _dataFiltro,
       ),
     );
@@ -408,6 +410,11 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       return;
     }
 
+    final usuario = UsuarioAtual.instance;
+    if (usuario == null || 
+        usuario.empresaId == null || 
+        usuario.terminalId == null) return;
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => NovaVendaDialog(
@@ -429,8 +436,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
             );
           }
         },
-        filialId: widget.filialId!,
-        filialNome: widget.filialNome,
+        terminalId: usuario.terminalId!,
+        empresaId: usuario.empresaId!,
         movimentacaoParaEdicao: movimentacao,
         ordemId: ordemId,
       ),
@@ -873,9 +880,9 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Programação - ${widget.filialNomeDois ?? widget.filialNome ?? "Vendas"}",
-                      style: const TextStyle(
+                    child: const Text(
+                      "Programação de Carregamentos",
+                      style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF0D47A1),

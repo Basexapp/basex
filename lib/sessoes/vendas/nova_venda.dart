@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../login_page.dart';
 import '../gestao_de_frota/dialog_cadastro_placas.dart';
 
 class NovaVendaDialog extends StatefulWidget {
   final Function(bool, String?) onSalvar;
-  final String filialId;
-  final String? filialNome;
+  final String empresaId;
+  final String terminalId;
   final Map<String, dynamic>? movimentacaoParaEdicao;
   final String? ordemId;
   final DateTime? dataFiltro;
@@ -15,8 +14,8 @@ class NovaVendaDialog extends StatefulWidget {
   const NovaVendaDialog({
     super.key,
     required this.onSalvar,
-    required this.filialId,
-    this.filialNome,
+    required this.empresaId,
+    required this.terminalId,
     this.movimentacaoParaEdicao,
     this.ordemId,
     this.dataFiltro,
@@ -376,11 +375,6 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
 
 
   Future<void> _salvarVenda() async {
-    if (widget.filialId.isEmpty) {
-      _mostrarErro('Filial não informada');
-      return;
-    }
-
     final placasUnicas = <String>[];
     for (final placaVenda in _placasVenda) {
       final placa = placaVenda.controller.text.trim().toUpperCase();
@@ -665,9 +659,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
   Future<void> _processarSalvamentoVenda() async {
     setState(() => _salvando = true);
 
-    final terminalId = UsuarioAtual.instance?.terminalId;
-    if (terminalId == null || terminalId.isEmpty) {
-      _mostrarErro('O seu usuário não possui um terminal vinculado. Contate o suporte.');
+    final terminalId = widget.terminalId;
+    if (terminalId.isEmpty) {
+      _mostrarErro('Terminal não informado.');
       setState(() => _salvando = false);
       return;
     }
@@ -675,10 +669,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
     try {
       final supabase = Supabase.instance.client;
 
-      // Pega a empresa_id do usuário logado
-      final empresaId = UsuarioAtual.instance?.empresaId;
-      if (empresaId == null || empresaId.isEmpty) {
-        _mostrarErro('Empresa não encontrada para o usuário logado.');
+      final empresaId = widget.empresaId;
+      if (empresaId.isEmpty) {
+        _mostrarErro('Empresa não informada.');
         setState(() => _salvando = false);
         return;
       }
@@ -795,9 +788,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
   Future<void> _processarEdicaoVenda() async {
     setState(() => _salvando = true);
 
-    final terminalId = UsuarioAtual.instance?.terminalId;
-    if (terminalId == null || terminalId.isEmpty) {
-      _mostrarErro('O seu usuário não possui um terminal vinculado. Contate o suporte.');
+    final terminalId = widget.terminalId;
+    if (terminalId.isEmpty) {
+      _mostrarErro('Terminal não informado.');
       setState(() => _salvando = false);
       return;
     }
@@ -810,10 +803,9 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         throw Exception('Usuário não autenticado');
       }
 
-      // Pega a empresa_id do usuário logado
-      final empresaId = UsuarioAtual.instance?.empresaId;
-      if (empresaId == null || empresaId.isEmpty) {
-        _mostrarErro('Empresa não encontrada para o usuário logado.');
+      final empresaId = widget.empresaId;
+      if (empresaId.isEmpty) {
+        _mostrarErro('Empresa não informada.');
         setState(() => _salvando = false);
         return;
       }
