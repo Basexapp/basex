@@ -675,13 +675,13 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
     try {
       final supabase = Supabase.instance.client;
 
-      final filialResponse = await supabase
-          .from('filiais')
-          .select('empresa_id')
-          .eq('id', widget.filialId)
-          .single();
-      
-      final empresaId = filialResponse['empresa_id'];
+      // Pega a empresa_id do usuário logado
+      final empresaId = UsuarioAtual.instance?.empresaId;
+      if (empresaId == null || empresaId.isEmpty) {
+        _mostrarErro('Empresa não encontrada para o usuário logado.');
+        setState(() => _salvando = false);
+        return;
+      }
 
       final user = supabase.auth.currentUser;
       if (user == null) {
@@ -718,7 +718,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
           .from('ordens')
           .insert({
             'empresa_id': empresaId,
-            'filial_id': widget.filialId,
+            'filial_id': null, // Não salva mais filial
             'usuario_id': user.id,
             'tipo': 'venda',
             'data_ordem': dataMov,
@@ -747,8 +747,8 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
 
           final Map<String, dynamic> movimentacao = {
             'ordem_id': ordemId,
-            'filial_id': widget.filialId,
-            'filial_origem_id': widget.filialId,
+            'filial_id': null, // Não salva mais filial
+            'filial_origem_id': null, // Não salva mais filial
             'terminal_orig_id': terminalId,
             'empresa_id': empresaId,
             'usuario_id': user.id,
@@ -810,20 +810,19 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
         throw Exception('Usuário não autenticado');
       }
 
+      // Pega a empresa_id do usuário logado
+      final empresaId = UsuarioAtual.instance?.empresaId;
+      if (empresaId == null || empresaId.isEmpty) {
+        _mostrarErro('Empresa não encontrada para o usuário logado.');
+        setState(() => _salvando = false);
+        return;
+      }
+
       final ordemId = widget.ordemId ?? widget.movimentacaoParaEdicao!['ordem_id']?.toString();
       
       if (ordemId == null || ordemId.isEmpty) {
         throw Exception('Ordem ID não encontrado para esta movimentação');
       }
-
-      // Buscar empresa_id da filial para novos inserts se necessário
-      final filialResponse = await supabase
-          .from('filiais')
-          .select('empresa_id')
-          .eq('id', widget.filialId)
-          .single();
-      
-      final empresaId = filialResponse['empresa_id'];
 
       DateTime timestampParaSalvar;
       if (_dataSelecionada != null) {
@@ -869,6 +868,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'data_ordem': dataMov,
             'veic_parcial': veicParcialOrdem,
             'terminal_id_orig': terminalId,
+            'filial_id': null, // Não salva mais filial
           })
           .eq('id', ordemId);
 
@@ -907,6 +907,8 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             'qtd_faturada': capacidadeLitros,
             'saida_amb': capacidadeLitros,
             'terminal_orig_id': terminalId,
+            'filial_id': null, // Não salva mais filial
+            'filial_origem_id': null, // Não salva mais filial
           };
 
           if (tanque.movimentacaoId != null) {
@@ -920,8 +922,6 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
             final Map<String, dynamic> novaMov = {
               ...dadosMovimentacao,
               'ordem_id': ordemId,
-              'filial_id': widget.filialId,
-              'filial_origem_id': widget.filialId,
               'empresa_id': empresaId,
               'usuario_id': user.id,
               'tipo_op': 'venda',
