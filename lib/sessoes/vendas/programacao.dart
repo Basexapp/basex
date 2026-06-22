@@ -32,6 +32,12 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   final ScrollController _verticalScrollController = ScrollController();
   int grupoAtual = 0;
   DateTime _dataFiltro = DateTime.now();
+  // Empresas vinculadas ao terminal
+  List<Map<String, String>> _empresas = [
+    {'id': '', 'nome': 'Todas'},
+  ];
+  String _empresaSelecionadaId = '';
+  bool _empresaFixa = false; // true quando usuário possui empresa_id e o campo deve ficar fixo
   
   static const Map<String, Color> _alphabetColors = {
     'A': Color(0xFFE53935), 'B': Color(0xFF1E88E5), 'C': Color(0xFF43A047),
@@ -93,6 +99,63 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       final supabase = Supabase.instance.client;
       final usuario = UsuarioAtual.instance;
 
+      // Carregar empresas vinculadas ao terminal do usuário
+      if (usuario != null && usuario.terminalId != null && usuario.terminalId!.isNotEmpty) {
+        try {
+            final relacoesResponse = await supabase
+              .from('relacoes_terminais')
+              .select('empresas(id,nome_dois)')
+              .eq('terminal_id', usuario.terminalId!);
+
+          final List<Map<String, String>> empresasVinc = [
+            {'id': '', 'nome': 'Todas'},
+          ];
+
+          for (var item in (relacoesResponse as List)) {
+            final emp = item['empresas'];
+            final id = emp?['id']?.toString();
+            final nome = emp?['nome_dois']?.toString();
+            if (id != null && nome != null) {
+              if (!empresasVinc.any((e) => e['id'] == id)) {
+                empresasVinc.add({'id': id, 'nome': nome});
+              }
+            }
+          }
+
+          // Se o usuário tiver empresa_id definido, fixa a seleção
+          if (usuario.empresaId != null && usuario.empresaId!.isNotEmpty) {
+            _empresaSelecionadaId = usuario.empresaId!;
+            _empresaFixa = true;
+            if (!empresasVinc.any((e) => e['id'] == _empresaSelecionadaId)) {
+              try {
+                final resp = await supabase
+                    .from('empresas')
+                    .select('nome_dois')
+                    .eq('id', _empresaSelecionadaId)
+                    .maybeSingle();
+                final nome = resp != null ? resp['nome_dois']?.toString() : null;
+                empresasVinc.add({'id': _empresaSelecionadaId, 'nome': nome ?? 'Minha Empresa'});
+              } catch (_) {
+                empresasVinc.add({'id': _empresaSelecionadaId, 'nome': 'Minha Empresa'});
+              }
+            }
+          } else {
+            // mantém seleção atual (ou 'Todas')
+            _empresaFixa = false;
+            if (_empresaSelecionadaId.isEmpty) _empresaSelecionadaId = '';
+          }
+
+          setState(() {
+            _empresas = empresasVinc;
+            if (!_empresas.any((e) => e['id'] == _empresaSelecionadaId)) {
+              _empresaSelecionadaId = '';
+            }
+          });
+        } catch (e) {
+          // ignorar erro ao carregar empresas, continua sem filtro
+        }
+      }
+
       var query = supabase
           .from("movimentacoes")
           .select("""
@@ -111,10 +174,12 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
           """)
           .eq("tipo_op", "venda");
 
+      // Aplica filtro de empresa selecionada (se houver)
+      if (_empresaSelecionadaId.isNotEmpty) {
+        query = query.eq('empresa_id', _empresaSelecionadaId);
+      }
+
       if (usuario != null) {
-        if (usuario.empresaId != null && usuario.empresaId!.isNotEmpty) {
-          query = query.eq("empresa_id", usuario.empresaId!);
-        }
         if (usuario.terminalId != null && usuario.terminalId!.isNotEmpty) {
           query = query.eq("terminal_orig_id", usuario.terminalId!);
         }
@@ -893,6 +958,11 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
                   ),
                 ),
                 Container(
+                  width: 260,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: _buildEmpresaDropdown(),
+                ),
+                Container(
                   margin: const EdgeInsets.only(right: 12),
                   child: _buildSeletorDataPresets(),
                 ),
@@ -1064,6 +1134,39 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmpresaDropdown() {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _empresaSelecionadaId,
+          isDense: true,
+          icon: Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey.shade600),
+          items: _empresas.map((e) {
+            return DropdownMenuItem<String>(
+              value: e['id'] ?? '',
+              child: Text(e['nome'] ?? ''),
+            );
+          }).toList(),
+          onChanged: _empresaFixa
+              ? null
+              : (val) {
+                  setState(() {
+                    _empresaSelecionadaId = val ?? '';
+                  });
+                  carregar();
+                },
+        ),
       ),
     );
   }
