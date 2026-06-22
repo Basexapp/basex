@@ -85,7 +85,7 @@ class _TemperaturaDensidadeMediaPageState
 
   // Variáveis para Paginação
   int _paginaAtual = 0;
-  final int _itensPorPagina = 10;
+  final int _itensPorPagina = 15;
 
   final TextEditingController _placaController = TextEditingController();
   final ScrollController _verticalScrollController = ScrollController();
@@ -1069,9 +1069,9 @@ class _TemperaturaDensidadeMediaPageState
   List<Map<String, dynamic>> get _registrosPaginados {
     final filtrados = _registrosFiltrados;
     final totalRegistros = filtrados.length;
-    final totalPaginas = (totalRegistros / _itensPorPagina).ceil();
+    final totalPaginas = totalRegistros > 0 ? (totalRegistros / _itensPorPagina).ceil() : 1;
 
-    if (_paginaAtual >= totalPaginas && totalPaginas > 0) {
+    if (_paginaAtual >= totalPaginas) {
       _paginaAtual = totalPaginas - 1;
     }
 
@@ -1316,7 +1316,7 @@ class _TemperaturaDensidadeMediaPageState
 
     final registrosFiltrados = _registrosFiltrados;
     final totalRegistros = registrosFiltrados.length;
-    final totalPaginas = (totalRegistros / _itensPorPagina).ceil();
+    final totalPaginas = totalRegistros > 0 ? (totalRegistros / _itensPorPagina).ceil() : 1;
     final registrosExibidos = _registrosPaginados;
     final medias = _calcularMedias(registrosFiltrados);
 
@@ -1411,7 +1411,7 @@ class _TemperaturaDensidadeMediaPageState
                         child: _buildTable(registrosExibidos, medias),
                       ),
                       // Controle de Paginação
-                      if (totalPaginas > 1)
+                      if (totalPaginas >= 1)
                         Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
                           decoration: BoxDecoration(
