@@ -1398,8 +1398,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   Widget _buildEmptyRow(int index, double viewportWidth, {bool isSpacer = false}) {
     double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
     double larguraRestante = viewportWidth - larguraFixaSemCliente;
-    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
-    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity).roundToDouble();
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity).roundToDouble();
 
     final bgColor = isSpacer ? Colors.white : (index % 2 == 0 ? Colors.grey.shade50 : Colors.white);
 
@@ -1415,9 +1415,9 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
             height: 22,
             decoration: BoxDecoration(
               border: Border(
-                left: BorderSide(color: Colors.grey.shade400, width: 0.6),
-                right: BorderSide(color: Colors.grey.shade400, width: 0.6),
-                bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+                left: BorderSide(color: Colors.grey.shade400, width: 1.0),
+                right: BorderSide(color: Colors.grey.shade400, width: 1.0),
+                bottom: BorderSide(color: Colors.grey.shade400, width: 1.0),
               ),
             ),
           ), // Menu placeholder
@@ -1568,9 +1568,9 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
     double larguraRestante = viewportWidth - larguraFixaSemCliente;
     
     // Tentamos dar 200px para cliente e o resto para produtos (min 50px cada)
-    // Se sobrar muito espaço, ambos se expandem proporcionalmente
-    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
-    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+    // Arredondamos para evitar pixels fracionários que causam anti-aliasing
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity).roundToDouble();
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity).roundToDouble();
     
     return larguraFixaSemCliente + larguraCliente + (larguraProduto * 10);
   }
@@ -1578,8 +1578,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   List<Widget> _obterColunasCabecalho(double viewportWidth) {
     double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
     double larguraRestante = viewportWidth - larguraFixaSemCliente;
-    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
-    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity).roundToDouble();
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity).roundToDouble();
 
     final colunasFixas = [
       _th("", 40, isFirst: true),
@@ -1642,8 +1642,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   ) {
     double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
     double larguraRestante = viewportWidth - larguraFixaSemCliente;
-    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
-    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity).roundToDouble();
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity).roundToDouble();
 
     final placas = t["placa"];
     final placaText = placas is List && placas.isNotEmpty 
@@ -1681,9 +1681,9 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
         alignment: Alignment.center,
         decoration: BoxDecoration(
           border: Border(
-            left: BorderSide(color: Colors.grey.shade400, width: 0.6),
-            right: BorderSide(color: Colors.grey.shade400, width: 0.6),
-            bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+            left: BorderSide(color: Colors.grey.shade400, width: 1.0),
+            right: BorderSide(color: Colors.grey.shade400, width: 1.0),
+            bottom: BorderSide(color: Colors.grey.shade400, width: 1.0),
           ),
         ),
         child: isPrimeiraLinhaOrdem ? _buildMenuButton(context, t) : null,
@@ -1732,8 +1732,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         border: Border(
-          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
-          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          right: BorderSide(color: Colors.grey.shade400, width: 1.0),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 1.0),
         ),
       ),
       child: isParcial
@@ -1795,9 +1795,9 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       decoration: BoxDecoration(
         color: bgColor,
         border: Border(
-          left: isFirst ? BorderSide(color: Colors.grey.shade400, width: 0.6) : BorderSide.none,
-          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
-          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          left: isFirst ? BorderSide(color: Colors.grey.shade400, width: 1.0) : BorderSide.none,
+          right: BorderSide(color: Colors.grey.shade400, width: 1.0),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 1.0),
         ),
       ),
       child: Text(
@@ -1822,8 +1822,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         border: Border(
-          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
-          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          right: BorderSide(color: Colors.grey.shade400, width: 1.0),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 1.0),
         ),
       ),
       child: Text(
@@ -1848,8 +1848,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         border: Border(
-          right: BorderSide(color: Colors.grey.shade400, width: 0.6),
-          bottom: BorderSide(color: Colors.grey.shade400, width: 0.6),
+          right: BorderSide(color: Colors.grey.shade400, width: 1.0),
+          bottom: BorderSide(color: Colors.grey.shade400, width: 1.0),
         ),
       ),
       child: statusTexto.trim().isEmpty 
@@ -1899,8 +1899,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
   Widget _buildTotalizadorLinha(double viewportWidth) {
     double larguraFixaSemCliente = 40 + 110 + 90 + 70 + 50 + 90;
     double larguraRestante = viewportWidth - larguraFixaSemCliente;
-    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity);
-    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity);
+    double larguraCliente = (larguraRestante * 0.3).clamp(200.0, double.infinity).roundToDouble();
+    double larguraProduto = ((larguraRestante - larguraCliente) / 10).clamp(50.0, double.infinity).roundToDouble();
 
     final totais = List.filled(10, 0.0);
 
@@ -1947,8 +1947,8 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
       alignment: Alignment.center,
       decoration: BoxDecoration(
         border: Border(
-          right: BorderSide(color: Colors.orange.shade300, width: 0.6),
-          bottom: BorderSide(color: Colors.orange.shade300, width: 0.6),
+          right: BorderSide(color: Colors.orange.shade300, width: 1.0),
+          bottom: BorderSide(color: Colors.orange.shade300, width: 1.0),
         ),
       ),
       child: Text(
