@@ -165,7 +165,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
 
         try {
           final rpc = await supabase.rpc(
-            'fn_estoque_inicial_tanque',
+            'saldo_inicial_estoque_tanques_geral',
             params: {'p_tanque_id': id, 'p_data': dataStr},
           );
 

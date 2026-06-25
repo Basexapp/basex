@@ -1,7 +1,7 @@
-import 'package:basex/login_page.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../login_page.dart';
 
 /// ===============================
 /// MODELO DE DADOS DO ESTOQUE
@@ -206,17 +206,20 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
   // Filtros de Data
   DateTime _dataInicial = DateTime.now();
   DateTime _dataFinal = DateTime.now();
+  
+  // Empresa ID do usuário logado (pode ser null)
+  String? _empresaId;
 
   @override
   void initState() {
     super.initState();
-    _carregarTerminaisDaEmpresa();
+    _carregarDadosIniciais();
   }
 
-  /// Carrega apenas os terminais que pertencem à empresa do usuário logado
-  Future<void> _carregarTerminaisDaEmpresa() async {
+  /// Carrega dados iniciais do usuário e terminais
+  Future<void> _carregarDadosIniciais() async {
     final usuario = UsuarioAtual.instance;
-    
+
     // Verificar se usuário está logado
     if (usuario == null) {
       debugPrint('❌ Usuário não logado');
@@ -228,52 +231,92 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
       return;
     }
 
-    final empresaId = usuario.empresaId;
-    
-    // Verificar se empresa_id existe
-    if (empresaId == null || empresaId.isEmpty) {
-      debugPrint('❌ Usuário não possui empresa associada');
+    // Carregar empresa_id do usuário (pode ser null)
+    _empresaId = usuario.empresaId;
+
+    // Se o usuário tiver um `terminalId` definido, mostrar APENAS esse terminal
+    final userTerminalId = usuario.terminalId;
+    final userTerminalNome = usuario.terminalNome;
+
+    if (userTerminalId != null && userTerminalId.isNotEmpty) {
       if (mounted) {
         setState(() {
+          _terminais = [
+            {
+              'id': userTerminalId,
+              'nome': userTerminalNome ?? userTerminalId,
+            }
+          ];
+          _terminalSelecionadoId = userTerminalId;
           _carregando = false;
         });
       }
+
+      // Carregar produtos apenas do terminal do usuário
+      await _carregarProdutosDoTerminal();
       return;
     }
 
+    // Sem terminal no usuário: carregar terminais normalmente
+    await _carregarTerminais();
+  }
+
+  /// Carrega os terminais disponíveis para o usuário
+  Future<void> _carregarTerminais() async {
     try {
-      // Buscar na tabela relacoes_terminais os terminais da empresa
-      final resp = await _supabase
-          .from('relacoes_terminais')
-          .select('''
-            terminal_id,
-            terminais (
-              id,
-              nome
-            )
-          ''')
-          .eq('empresa_id', empresaId)
-          .not('terminal_id', 'is', null);
+      List<Map<String, dynamic>> lista = [];
 
-      final lista = <Map<String, dynamic>>[];
-      final vistos = <String>{};
+      // Se o usuário tem empresa_id, busca apenas os terminais da empresa
+      if (_empresaId != null && _empresaId!.isNotEmpty) {
+        final resp = await _supabase
+            .from('relacoes_terminais')
+            .select('''
+              terminal_id,
+              terminais (
+                id,
+                nome
+              )
+            ''')
+            .eq('empresa_id', _empresaId!)
+            .not('terminal_id', 'is', null);
 
-      for (final row in List<Map<String, dynamic>>.from(resp)) {
-        final terminal = row['terminais'] as Map<String, dynamic>?;
-        if (terminal == null) {
-          continue;
+        final vistos = <String>{};
+
+        for (final row in List<Map<String, dynamic>>.from(resp)) {
+          final terminal = row['terminais'] as Map<String, dynamic>?;
+          if (terminal == null) {
+            continue;
+          }
+          
+          final id = terminal['id']?.toString() ?? '';
+          if (id.isEmpty || vistos.contains(id)) {
+            continue;
+          }
+          
+          vistos.add(id);
+          lista.add({
+            'id': id, 
+            'nome': terminal['nome']?.toString() ?? id
+          });
         }
-        
-        final id = terminal['id']?.toString() ?? '';
-        if (id.isEmpty || vistos.contains(id)) {
-          continue;
+      } else {
+        // Se NÃO tem empresa_id, busca TODOS os terminais
+        final resp = await _supabase
+            .from('terminais')
+            .select('id, nome')
+            .order('nome');
+
+        for (final terminal in List<Map<String, dynamic>>.from(resp)) {
+          final id = terminal['id']?.toString() ?? '';
+          final nome = terminal['nome']?.toString() ?? id;
+          
+          if (id.isNotEmpty) {
+            lista.add({
+              'id': id,
+              'nome': nome,
+            });
+          }
         }
-        
-        vistos.add(id);
-        lista.add({
-          'id': id, 
-          'nome': terminal['nome']?.toString() ?? id
-        });
       }
 
       // Ordenar por nome
@@ -303,24 +346,35 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
     }
   }
 
-  /// Busca o saldo inicial de um produto para uma data específica
-  Future<double> _buscarSaldoInicialProduto(String produtoId, DateTime data) async {
+  /// Busca o saldo inicial de um produto usando a função estoque_geral
+  Future<double> _buscarSaldoInicialProduto(String produtoId) async {
     try {
-      final dataStr = DateFormat('yyyy-MM-dd').format(data);
+      // Prepara os parâmetros
+      final Map<String, dynamic> params = {
+        'p_terminal_id': _terminalSelecionadoId!,
+        'p_produto_id': produtoId,
+      };
+      
+      // Adiciona empresa_id APENAS se existir
+      if (_empresaId != null && _empresaId!.isNotEmpty) {
+        params['p_empresa_id'] = _empresaId;
+      }
       
       final response = await _supabase.rpc(
-        'calcular_estoque_inicial_produto',
-        params: {
-          'p_produto_id': produtoId,
-          'p_data': dataStr,
-        },
+        'estoque_geral',
+        params: params,
       );
 
-      final num saldo = (response ?? 0) as num;
-      return saldo.toDouble();
+      // A função retorna JSONB com estoque_inicial e debug
+      if (response is Map<String, dynamic>) {
+        final num saldo = response['estoque_inicial'] as num? ?? 0;
+        return saldo.toDouble();
+      }
+
+      return 0.0;
       
     } catch (e) {
-      debugPrint('❌ Erro ao buscar saldo inicial do produto $produtoId para data $data: $e');
+      debugPrint('❌ Erro ao buscar saldo inicial do produto $produtoId: $e');
       return 0.0;
     }
   }
@@ -400,12 +454,8 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
     DateTime dataFinal,
   ) async {
     try {
-      final usuario = UsuarioAtual.instance;
-      final empresaId = usuario?.empresaId;
-      
-      // Se não tiver empresaId, retorna 0
-      if (empresaId == null || empresaId.isEmpty) {
-        debugPrint('⚠️ empresaId não disponível para buscar trânsito');
+      // Se não tiver empresaId, NÃO busca trânsito (pois não sabe qual empresa)
+      if (_empresaId == null || _empresaId!.isEmpty) {
         return 0.0;
       }
       
@@ -421,7 +471,7 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
           ''')
           .eq('produto_id', produtoId)
           .eq('tipo_op', 'transf')
-          .eq('empresa_id', empresaId)
+          .eq('empresa_id', _empresaId!)
           .gte('data_mov', '$dataInicioStr 00:00:00')
           .lte('data_mov', '$dataFimStr 23:59:59');
 
@@ -533,22 +583,25 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
         final nomeProduto = produtoData['nome']?.toString() ?? 'Produto Desconhecido';
         final posicao = int.tryParse(produtoData['posicao']?.toString() ?? '0') ?? 0;
         
-        // Buscar saldo inicial (data inicial, não incluindo o dia)
-        final saldoInicial = await _buscarSaldoInicialProduto(produtoId, _dataInicial);
+        // Buscar saldo inicial usando a função estoque_geral
+        final saldoInicial = await _buscarSaldoInicialProduto(produtoId);
         
-        // Buscar movimentações no período (incluindo o dia final)
+        // Buscar movimentações no período
         final movimentacoes = await _buscarMovimentacoesProduto(
           produtoId,
           _dataInicial,
           _dataFinal,
         );
         
-        // Buscar trânsito no período
-        final transito = await _buscarTransitoProduto(
-          produtoId,
-          _dataInicial,
-          _dataFinal,
-        );
+        // Buscar trânsito no período (só se tiver empresaId)
+        double transito = 0.0;
+        if (_empresaId != null && _empresaId!.isNotEmpty) {
+          transito = await _buscarTransitoProduto(
+            produtoId,
+            _dataInicial,
+            _dataFinal,
+          );
+        }
         
         produtosEstoque.add(EstoqueProduto(
           nome: nomeProduto,
@@ -1101,7 +1154,7 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
                 const SizedBox(width: 12),
                 // Dropdown de Unidade de Medida
                 Container(
-                  height: 36, // Mesma altura aproximada dos campos de data
+                  height: 36,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
                     color: Colors.white,
@@ -1110,7 +1163,7 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      isDense: true, // Reduz o padding interno do dropdown
+                      isDense: true,
                       value: _unidadeMedida,
                       icon: const Icon(Icons.tune, size: 16, color: Color(0xFF0D47A1)),
                       style: const TextStyle(

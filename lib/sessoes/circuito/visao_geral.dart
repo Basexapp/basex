@@ -32,6 +32,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   String _tipoOpSelecionada = 'Todos';
   final TextEditingController _searchCtrl = TextEditingController();
 
+  // Se true, o usuário está vinculado a uma empresa e a página vira somente leitura
+  bool _somenteLeitura = false;
+
   List<String> _empresas = ['Todas'];
   static const List<String> _tiposOp = ['Todos', 'Carga', 'Descarga'];
 
@@ -69,6 +72,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
   @override
   void initState() {
     super.initState();
+    // Se o usuário estiver vinculado a uma empresa (empresaId != null),
+    // habilitamos o modo somente leitura.
+    _somenteLeitura = UsuarioAtual.instance?.empresaId != null;
     _carregarDados();
   }
 
@@ -287,8 +293,14 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
       }
 
       // Filtro de Empresa
-      if (_empresaSelecionada != 'Todas' && v.empresa != _empresaSelecionada) {
-        return false;
+      if (_empresaSelecionada != 'Todas') {
+        // Comparar tanto com o campo `v.empresa` (cliente) quanto com
+        // `empresas.nome_dois` (armazenado em `v.vendedor` quando disponível).
+        final bool empresaMatch = v.empresa == _empresaSelecionada;
+        final bool empresasNomeDoisMatch = v.vendedor == _empresaSelecionada;
+        if (!empresaMatch && !empresasNomeDoisMatch) {
+          return false;
+        }
       }
 
       // Filtro de Tipo Op
@@ -489,7 +501,16 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               _buildInfoRow('Placa:', v.placaCompleta),
               _buildInfoRow('Motorista:', v.motorista),
               _buildInfoRow('Transportadora:', v.transportadora),
-              _buildInfoRow('Empresa:', v.empresa),
+              _buildInfoRowWidget(
+                'Cliente:',
+                UsuarioAtual.instance?.empresaId != null
+                    ? const Icon(
+                        Icons.lock,
+                        size: 16,
+                        color: Color(0xFF263238),
+                      )
+                    : Text(v.empresa),
+              ),
               _buildInfoRow('Operação:', operacaoTexto),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 4),
@@ -566,7 +587,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: () => _atualizarStatus(v, '2'),
+                    onPressed: _somenteLeitura ? null : () => _atualizarStatus(v, '2'),
                     icon: const Icon(Icons.queue, size: 18),
                     label: const Text(
                       'ENVIAR PARA FILA',
@@ -587,7 +608,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: () => _atualizarStatus(v, '3'),
+                    onPressed: _somenteLeitura ? null : () => _atualizarStatus(v, '3'),
                     icon: const Icon(Icons.play_arrow, size: 18),
                     label: const Text(
                       'ENVIAR PARA OPERAÇÃO',
@@ -607,7 +628,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: OutlinedButton.icon(
-                    onPressed: () => _atualizarStatus(v, '1'),
+                    onPressed: _somenteLeitura ? null : () => _atualizarStatus(v, '1'),
                     icon: const Icon(Icons.exit_to_app, size: 18),
                     label: const Text(
                       'SAIR DA FILA',
@@ -630,7 +651,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
-                    onPressed: () => _abrirCertificadoApuracao(v),
+                      onPressed: _somenteLeitura ? null : () => _abrirCertificadoApuracao(v),
                     icon: Icon(
                       certificadoEmitido
                           ? Icons.check_circle_outline
@@ -658,8 +679,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   SizedBox(
                     width: double.infinity,
                     height: 40,
-                    child: ElevatedButton.icon(
-                      onPressed: () => _liberarVeiculo(v),
+                      child: ElevatedButton.icon(
+                      onPressed: _somenteLeitura ? null : () => _liberarVeiculo(v),
                       icon: const Icon(Icons.local_shipping_outlined, size: 18),
                       label: const Text(
                         'LIBERAR VEÍCULO',
@@ -680,9 +701,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                   width: double.infinity,
                   height: 40,
                   child: OutlinedButton.icon(
-                    onPressed: certificadoEmitido
-                        ? null
-                        : () => _confirmarCancelamentoOperacao(v),
+                    onPressed: (_somenteLeitura || certificadoEmitido)
+                      ? null
+                      : () => _confirmarCancelamentoOperacao(v),
                     icon: const Icon(Icons.cancel_outlined, size: 18),
                     label: const Text(
                       'CANCELAR OPERAÇÃO',
@@ -1047,6 +1068,37 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     );
   }
 
+  Widget _buildInfoRowWidget(String label, Widget valueWidget) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: DefaultTextStyle(
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+                color: Color(0xFF263238),
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: valueWidget,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Color _obterCorProduto(String nomeProduto) {
     final Map<String, Color> mapeamentoExato = {
       'G. Comum': const Color(0xFFFF6B35),
@@ -1212,6 +1264,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             child: TextField(
               controller: _searchCtrl,
               onChanged: (val) => setState(() => _filtroBusca = val),
+              enabled: true,
               style: TextStyle(
                 color: _isDarkMode ? Colors.black : textColor,
                 fontSize: 13,
@@ -1248,9 +1301,9 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
             IconButton(
               icon: Icon(Icons.close, size: 16, color: subTextColor),
               onPressed: () {
-                _searchCtrl.clear();
-                setState(() => _filtroBusca = '');
-              },
+                  _searchCtrl.clear();
+                  setState(() => _filtroBusca = '');
+                },
             ),
           const Spacer(),
         ],
@@ -1264,7 +1317,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
     required List<String> items,
     required Color textColor,
     required Color subTextColor,
-    required ValueChanged<String?> onChanged,
+    ValueChanged<String?>? onChanged,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1339,7 +1392,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
               size: 20,
             ),
             tooltip: 'Atualizar dados',
-            onPressed: _carregarDados,
+            onPressed: _somenteLeitura ? null : _carregarDados,
           ),
           const SizedBox(width: 8),
           Row(
@@ -1357,7 +1410,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                 child: Switch(
                   value: _isDarkMode,
                   activeThumbColor: const Color(0xFF2196F3),
-                  onChanged: (val) => setState(() => _isDarkMode = val),
+                  onChanged: _somenteLeitura ? null : (val) => setState(() => _isDarkMode = val),
                 ),
               ),
             ],
@@ -1560,8 +1613,8 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                       trackOutlineColor: WidgetStateProperty.all(
                         Colors.transparent,
                       ),
-                      onChanged: (val) =>
-                          setState(() => _mostrarFilaCarga = val),
+                      // Sempre permitir alternar entre fila de carga/descarga
+                      onChanged: (val) => setState(() => _mostrarFilaCarga = val),
                     ),
                   ),
                 ),
@@ -1907,9 +1960,7 @@ class _VisaoGeralCircuitoPageState extends State<VisaoGeralCircuitoPage> {
                         fit: BoxFit.scaleDown,
                         child: Text(
                           v.placaLinha1,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: coluna.cor,
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 8.5,
                             fontFamily: 'monospace',
