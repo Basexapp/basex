@@ -462,7 +462,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                             BoxShadow(
                                               color: const Color(
                                                 0xFF3366FF,
-                                              ).withValues(alpha: 51),
+                                              ).withOpacity(0.2),
                                               blurRadius: 8,
                                               offset: const Offset(0, 2),
                                             ),
@@ -767,7 +767,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFF222B45)
-                                            .withValues(alpha: 230),
+                                            .withOpacity(0.9),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       textStyle: const TextStyle(
@@ -915,7 +915,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFBFC8E6).withValues(alpha: 20),
+            color: const Color(0xFFBFC8E6).withOpacity(0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -1230,7 +1230,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
     Color activeColor = activeBlue;
     Color textColor = isSelected ? Colors.white : const Color(0xFF8F9BB3);
 
-    Color hoverColor = activeBlue.withValues(alpha: 26);
+    Color hoverColor = activeBlue.withOpacity(0.1);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -1242,7 +1242,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
         boxShadow: isSelected
             ? [
                 BoxShadow(
-                  color: activeBlue.withValues(alpha: 77),
+                  color: activeBlue.withOpacity(0.3),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -1282,7 +1282,7 @@ class TankIllustration extends StatefulWidget {
   final double scale;
 
   const TankIllustration({
-    super.key,
+    Key? key,
     required this.percentual,
     required this.lastroPercentual,
     required this.estoqueAtual,
@@ -1291,7 +1291,7 @@ class TankIllustration extends StatefulWidget {
     required this.espacoLivre,
     this.hideDetails = false,
     this.scale = 1.0,
-  });
+  }) : super(key: key);
 
   @override
   State<TankIllustration> createState() => _TankIllustrationState();
@@ -1472,8 +1472,8 @@ class TankPainter extends CustomPainter {
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
           colors: [
-            liquidColor.withValues(alpha: 230),
-            liquidColor.withValues(alpha: 179),
+            liquidColor.withOpacity(0.9),
+            liquidColor.withOpacity(0.7),
             liquidColor,
           ],
         ).createShader(liquidRect);
@@ -1482,7 +1482,7 @@ class TankPainter extends CustomPainter {
 
       // Linha superior do líquido
       final surfacePaint = Paint()
-        ..color = Colors.white.withValues(alpha: 77)
+        ..color = Colors.white.withOpacity(0.3)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5 * scale;
       canvas.drawLine(
@@ -1599,7 +1599,7 @@ class TankPainter extends CustomPainter {
     );
 
     final linePaint = Paint()
-      ..color = _getLiquidColor(percentual).withValues(alpha: 128)
+      ..color = _getLiquidColor(percentual).withOpacity(0.5)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
@@ -2196,7 +2196,7 @@ class _SelecaoTipoVisualizacaoEstoqueBottomSheetState
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 26),
+                    color: Colors.black.withOpacity(0.1),
                     blurRadius: 10,
                     offset: const Offset(0, -5),
                   ),
@@ -2231,7 +2231,7 @@ class _SelecaoTipoVisualizacaoEstoqueBottomSheetState
                         ),
                         borderRadius: BorderRadius.circular(8),
                         color: _tipoDataEspecifica
-                            ? const Color(0xFF0D47A1).withValues(alpha: 13)
+                            ? const Color(0xFF0D47A1).withOpacity(0.05)
                             : Colors.white,
                       ),
                       child: Row(
@@ -2287,7 +2287,7 @@ class _SelecaoTipoVisualizacaoEstoqueBottomSheetState
                         ),
                         borderRadius: BorderRadius.circular(8),
                         color: _tipoMensal
-                            ? const Color(0xFF0D47A1).withValues(alpha: 13)
+                            ? const Color(0xFF0D47A1).withOpacity(0.05)
                             : Colors.white,
                       ),
                       child: Row(
