@@ -37,6 +37,7 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
   String _mensagemErro = '';
 
   String? _terminalId;
+  String? _produtoId;
   bool _carregandoTerminal = true;
 
   List<Map<String, dynamic>> _movs = [];
@@ -143,11 +144,18 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
         'fn_estoque_inicial_mes_tanque',
         params: {
           'p_tanque_id': widget.tanqueId,
+          'p_terminal_id': _terminalId,
+          'p_produto_id': _produtoId,
           'p_data': dataStr,
         },
       );
 
-      final num saldo = (response['estoque_inicial'] ?? 0) as num;
+      num saldo = 0;
+      if (response is Map) {
+        saldo = (response['estoque_inicial'] ?? 0) as num;
+      } else {
+        saldo = (response ?? 0) as num;
+      }
 
       _estoqueInicial = {
         'amb': saldo,
@@ -163,12 +171,18 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
     try {
       final resp = await _supabase
           .from('tanques')
-          .select('produtos (nome)')
+          .select('id_produto, produtos (id, nome)')
           .eq('id', widget.tanqueId)
           .maybeSingle();
 
       if (resp != null) {
+        _produtoId = resp['id_produto']?.toString();
+
         final produtoObj = resp['produtos'];
+        if (_produtoId == null && produtoObj is Map && produtoObj['id'] != null) {
+          _produtoId = produtoObj['id'].toString();
+        }
+
         if (produtoObj is Map && produtoObj['nome'] != null) {
           _produtoNome = produtoObj['nome'].toString();
         } else if (resp['nome'] != null) {
@@ -274,8 +288,8 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
     });
 
     try {
-      await _carregarEstoqueInicialDoBanco();
       await _carregarProdutoDoTanque();
+      await _carregarEstoqueInicialDoBanco();
       await _calcularTotais();
 
       final dados = await _supabase
