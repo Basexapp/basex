@@ -164,16 +164,32 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
         double estoqueInicial = 0.0;
 
         try {
+          final params = {'p_tanque_id': id, 'p_data': dataStr};
+          debugPrint('[RPC-CALL] saldo_inicial_estoque_tanques_geral params=$params mostrarPrevisto=$_mostrarPrevisto');
           final rpc = await supabase.rpc(
             'saldo_inicial_estoque_tanques_geral',
-            params: {'p_tanque_id': id, 'p_data': dataStr},
+            params: params,
           );
 
-          if (rpc is Map) {
-            estoqueInicial = (rpc['estoque_inicial'] ?? 0).toDouble();
-          } else {
-            estoqueInicial = (rpc ?? 0).toDouble();
-          }
+            // Robust parsing: RPC can return Map, List, num or string
+            if (rpc is Map && rpc.containsKey('estoque_inicial')) {
+              estoqueInicial = (rpc['estoque_inicial'] ?? 0).toDouble();
+            } else if (rpc is List && rpc.isNotEmpty) {
+              final first = rpc.first;
+              if (first is Map && first.containsKey('estoque_inicial')) {
+                estoqueInicial = (first['estoque_inicial'] ?? 0).toDouble();
+              } else if (first is num) {
+                estoqueInicial = first.toDouble();
+              } else {
+                estoqueInicial = double.tryParse(first.toString()) ?? 0.0;
+              }
+            } else if (rpc is num) {
+              estoqueInicial = rpc.toDouble();
+            } else {
+              estoqueInicial = double.tryParse(rpc.toString()) ?? 0.0;
+            }
+
+            debugPrint('[RPC-ESTOQUE-INICIAL] tanque=$id rpc=${rpc.runtimeType} value=$rpc estoqueInicial=$estoqueInicial');
         } catch (e) {
           estoqueInicial = 0.0;
         }
@@ -181,20 +197,53 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
         double estoqueAtual = estoqueInicial;
 
         try {
-          final movs = await supabase
-              .from('movimentacoes_tanque')
-              .select('entrada_vinte, saida_vinte')
-              .eq('tanque_id', id)
-              .gte('data_mov', '$dataStr 00:00:00')
-              .lte('data_mov', '$dataStr 23:59:59');
+          // Log tanque raw data for debugging
+          debugPrint('[TANQUE-DATA] id=$id referencia=${t['referencia']} capacidade=${t['capacidade']} produtos=${t['produtos']}');
 
-          for (final m in List<Map<String, dynamic>>.from(movs)) {
-            final entrada = (m['entrada_vinte'] ?? 0) as num;
-            final saida = (m['saida_vinte'] ?? 0) as num;
-            estoqueAtual += (entrada - saida).toDouble();
+          if (!_mostrarPrevisto) {
+            // comportamento original: considera entradas/saídas por vinte
+            final movs = await supabase
+                .from('movimentacoes_tanque')
+                .select('entrada_vinte, saida_vinte')
+                .eq('tanque_id', id)
+                .gte('data_mov', '$dataStr 00:00:00')
+                .lte('data_mov', '$dataStr 23:59:59');
+
+            double totalEntrada = 0.0;
+            double totalSaidaVinte = 0.0;
+
+            for (final m in List<Map<String, dynamic>>.from(movs)) {
+              final entrada = (m['entrada_vinte'] ?? 0) as num;
+              final saida = (m['saida_vinte'] ?? 0) as num;
+              totalEntrada += entrada.toDouble();
+              totalSaidaVinte += saida.toDouble();
+              estoqueAtual += (entrada - saida).toDouble();
+            }
+
+            debugPrint('[ESTOQUE-ATUAL] tanque=$id estoqueInicial=$estoqueInicial totalEntrada=$totalEntrada totalSaidaVinte=$totalSaidaVinte estoqueCalculado=$estoqueAtual');
+          } else {
+            // previsto: mostrar estoque inicial menos saídas ambiente do dia
+            final movs = await supabase
+                .from('movimentacoes_tanque')
+                .select('saida_amb')
+                .eq('tanque_id', id)
+                .gte('data_mov', '$dataStr 00:00:00')
+                .lte('data_mov', '$dataStr 23:59:59');
+
+            double totalSaidaAmb = 0.0;
+            for (final m in List<Map<String, dynamic>>.from(movs)) {
+              final saidaAmb = (m['saida_amb'] ?? 0) as num;
+              totalSaidaAmb += saidaAmb.toDouble();
+            }
+
+            debugPrint('[ESTOQUE-PREVISTO] tanque=$id estoqueInicial=$estoqueInicial totalSaidaAmb=$totalSaidaAmb');
+
+            estoqueAtual = estoqueInicial - totalSaidaAmb;
+            debugPrint('[ESTOQUE-PREVISTO] tanque=$id estoquePrevisto=$estoqueAtual');
           }
         } catch (e) {
           // mantém estoqueAtual = estoqueInicial em caso de erro
+          debugPrint('[ESTOQUE-ERROR] tanque=$id error=$e');
         }
 
         final detalhes = [
@@ -629,8 +678,10 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                       setState(() => _hoverSwitchOption = 'previsto'),
                   onExit: (_) => setState(() => _hoverSwitchOption = null),
                   child: GestureDetector(
-                    onTap: () =>
-                        setState(() => _mostrarPrevisto = !_mostrarPrevisto),
+                    onTap: () async {
+                      setState(() => _mostrarPrevisto = !_mostrarPrevisto);
+                      await _carregarDadosTanques();
+                    },
                     child: Container(
                       width: 170,
                       padding: const EdgeInsets.all(2),
@@ -959,11 +1010,12 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                     MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _mostrarPrevisto = !_mostrarPrevisto;
-                          });
-                        },
+                          onTap: () async {
+                            setState(() {
+                              _mostrarPrevisto = !_mostrarPrevisto;
+                            });
+                            await _carregarDadosTanques();
+                          },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 4,
@@ -983,10 +1035,11 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                   ),
                                   onExit: (_) =>
                                       setState(() => _hoverSwitchOption = null),
-                                  child: GestureDetector(
-                                    onTap: () => setState(
-                                      () => _mostrarPrevisto = false,
-                                    ),
+                                    child: GestureDetector(
+                                    onTap: () async {
+                                      setState(() => _mostrarPrevisto = false);
+                                      await _carregarDadosTanques();
+                                    },
                                     child: _buildSwitchOption(
                                       "Nível atual",
                                       !_mostrarPrevisto,
@@ -1003,8 +1056,10 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                   onExit: (_) =>
                                       setState(() => _hoverSwitchOption = null),
                                   child: GestureDetector(
-                                    onTap: () =>
-                                        setState(() => _mostrarPrevisto = true),
+                                    onTap: () async {
+                                        setState(() => _mostrarPrevisto = true);
+                                        await _carregarDadosTanques();
+                                    },
                                     child: _buildSwitchOption(
                                       "Previsto",
                                       _mostrarPrevisto,

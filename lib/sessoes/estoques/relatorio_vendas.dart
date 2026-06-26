@@ -5,9 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RelatorioVendasPage extends StatefulWidget {
-  final String? filialId;
   final String? terminalId;
-  final String nomeFilial;
+  final String nomeTerminal;
   final String? empresaId;
   final DateTime dataInicial;
   final DateTime dataFinal;
@@ -16,9 +15,8 @@ class RelatorioVendasPage extends StatefulWidget {
 
   const RelatorioVendasPage({
     super.key,
-    this.filialId,
     this.terminalId,
-    required this.nomeFilial,
+    required this.nomeTerminal,
     this.empresaId,
     required this.dataInicial,
     required this.dataFinal,
@@ -35,7 +33,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
   List<Map<String, dynamic>> _vendas = [];
   List<Map<String, dynamic>> _vendasOrdenadas = [];
   String? _empresaId;
-  String? _filialIdUsar;
+  String? _terminalIdUsar;
   bool _carregando = true;
   bool _erro = false;
   String _mensagemErro = '';
@@ -137,47 +135,20 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
     // Print dos parâmetros recebidos
 
     try {
-      // Resolver filial e empresa a partir dos parâmetros recebidos.
-      // A tabela terminais NÃO possui filial_id / empresa_id.
-      // A relação é inversa: filiais possui terminal_id_1 e terminal_id_2.
-      if (widget.filialId != null && widget.filialId!.isNotEmpty) {
-        // Filial já conhecida (selecionada pelo usuário no filtro)
-        _filialIdUsar = widget.filialId;
-
-        if (widget.empresaId != null && widget.empresaId!.isNotEmpty) {
-          _empresaId = widget.empresaId;
-        } else {
-          // Buscar empresa_id pela filial (necessário para nível 4 sem empresa_id)
-          final filialData = await _supabase
-              .from('filiais')
-              .select('empresa_id')
-              .eq('id', _filialIdUsar!)
-              .maybeSingle();
-          _empresaId = filialData?['empresa_id']?.toString();
-        }
-      } else if (widget.terminalId != null) {
-        // Sem filial explícita – descobrir pela filial que possui este terminal
-        final filialData = await _supabase
-            .from('filiais')
-            .select('id, empresa_id')
-            .or('terminal_id_1.eq.${widget.terminalId!},terminal_id_2.eq.${widget.terminalId!}')
-            .maybeSingle();
-
-        if (filialData != null) {
-          _filialIdUsar = filialData['id']?.toString();
-          _empresaId = filialData['empresa_id']?.toString();
-        } else {
-          debugPrint('❌ Filial associada ao terminal não encontrada');
-          throw Exception('Filial associada ao terminal não encontrada');
-        }
-      } else {
-        debugPrint('❌ Não foi possível identificar a filial - nenhum parâmetro válido');
-        throw Exception('Não foi possível identificar a filial');
+      if (widget.terminalId != null && widget.terminalId!.isNotEmpty) {
+        _terminalIdUsar = widget.terminalId;
       }
 
-      if (_filialIdUsar == null || _filialIdUsar!.isEmpty) {
-        debugPrint('❌ _filialIdUsar está nulo ou vazio');
-        throw Exception('Não foi possível identificar a filial');
+      if (widget.empresaId != null && widget.empresaId!.isNotEmpty) {
+        _empresaId = widget.empresaId;
+      } else if (_terminalIdUsar != null && _terminalIdUsar!.isNotEmpty) {
+        final relacaoTerminal = await _supabase
+            .from('relacoes_terminais')
+            .select('empresa_id')
+            .eq('terminal_id', _terminalIdUsar!)
+            .maybeSingle();
+
+        _empresaId = relacaoTerminal?['empresa_id']?.toString();
       }
 
       if (_empresaId == null || _empresaId!.isEmpty) {
@@ -240,7 +211,6 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
             saida_amb,
             saida_vinte
           ''')
-          .or('filial_id.eq.$_filialIdUsar,filial_destino_id.eq.$_filialIdUsar,filial_origem_id.eq.$_filialIdUsar')
           .eq('empresa_id', _empresaId!)
           .lte('data_mov', diaAnteriorStr);
 
@@ -291,7 +261,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
   // FUNÇÃO: Normalização de venda
   Map<String, dynamic> _normalizarVenda(
     Map<String, dynamic> mov,
-    String filialId,
+    String contextoId,
   ) {
     // Inicializar acumuladores
     num entradaAmb = 0;
@@ -300,19 +270,19 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
     num saidaVinte = 0;
 
     final tipoOp = mov['tipo_op']?.toString() ?? '';
-    final filialDestinoId = mov['filial_destino_id']?.toString();
-    final filialOrigemId = mov['filial_origem_id']?.toString();
+    final destinoId = mov['filial_destino_id']?.toString();
+    final origemId = mov['filial_origem_id']?.toString();
     final tipoMovDest = mov['tipo_mov_dest']?.toString();
     final tipoMovOrig = mov['tipo_mov_orig']?.toString();
 
     // Regras por tipo de operação
     switch (tipoOp) {
       case 'transf':
-        if (filialDestinoId == filialId && tipoMovDest == 'entrada') {
+        if (destinoId == contextoId && tipoMovDest == 'entrada') {
           // ENTRADA por transferência
           entradaAmb += (mov['entrada_amb'] ?? 0) as num;
           entradaVinte += (mov['entrada_vinte'] ?? 0) as num;
-        } else if (filialOrigemId == filialId && tipoMovOrig == 'saida') {
+        } else if (origemId == contextoId && tipoMovOrig == 'saida') {
           // SAÍDA por transferência
           saidaAmb += (mov['saida_amb'] ?? 0) as num;
           saidaVinte += (mov['saida_vinte'] ?? 0) as num;
@@ -368,7 +338,6 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
               nome
             )
           ''')
-          .or('filial_id.eq.$_filialIdUsar,filial_destino_id.eq.$_filialIdUsar,filial_origem_id.eq.$_filialIdUsar')
           .eq('empresa_id', _empresaId!);
 
       // FILTRO DE DATA: usar dataInicial e dataFinal
@@ -398,28 +367,28 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
       // EXECUTAR QUERY
       final dados = await query.order('data_mov', ascending: true);
 
-      // Coletar IDs de filiais destino de transferências e buscar nomes em lote
-      final Set<String> filialDestinoIds = {};
+      // Coletar IDs de destinos de transferências e buscar nomes em lote
+      final Set<String> destinosIds = {};
       for (var mov in dados) {
         if ((mov['tipo_op']?.toString() ?? '') == 'transf' && mov['filial_destino_id'] != null) {
-          filialDestinoIds.add(mov['filial_destino_id'].toString());
+          destinosIds.add(mov['filial_destino_id'].toString());
         }
       }
 
-      final Map<String, String> filialNomes = {};
-      if (filialDestinoIds.isNotEmpty) {
+      final Map<String, String> nomesDestino = {};
+      if (destinosIds.isNotEmpty) {
         try {
-            final orExpr = filialDestinoIds.map((id) => 'id.eq.$id').join(',');
+            final orExpr = destinosIds.map((id) => 'id.eq.$id').join(',');
             final filiaisRes = await _supabase
               .from('filiais')
               .select('id, nome_dois')
               .or(orExpr);
 
           for (var f in filiaisRes) {
-            filialNomes[f['id'].toString()] = f['nome_dois']?.toString() ?? '';
+            nomesDestino[f['id'].toString()] = f['nome_dois']?.toString() ?? '';
           }
         } catch (e) {
-          debugPrint('Erro ao buscar nomes das filiais destino: $e');
+          debugPrint('Erro ao buscar nomes dos destinos: $e');
         }
       }
 
@@ -437,7 +406,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
       for (var mov in dados) {
         final normalizado = _normalizarVenda(
           mov,
-          _filialIdUsar!,
+          _terminalIdUsar ?? widget.terminalId ?? '',
         );
 
         final produto = mov['produtos'] as Map<String, dynamic>?;
@@ -458,7 +427,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
               return mov['cliente']?.toString() ?? '';
             } else if (tipoOpMov == 'transf') {
               final fd = mov['filial_destino_id']?.toString();
-              return filialNomes[fd] ?? fd ?? '';
+              return nomesDestino[fd] ?? fd ?? '';
             }
             return mov['cliente']?.toString() ?? mov['filial_destino_id']?.toString() ?? '';
           })(),
@@ -582,13 +551,13 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
       );
 
       final requestData = {
-        'filialId': _filialIdUsar,
-        'terminalId': widget.terminalId,
-        'nomeFilial': widget.nomeFilial,
-        'empresaId': widget.empresaId,
-        'dataInicial': widget.dataInicial.toIso8601String(),
-        'dataFinal': widget.dataFinal.toIso8601String(),
-        'produtoFiltro': widget.produtoFiltro,
+        'produto_id': widget.produtoFiltro,
+        'empresa_id': widget.empresaId,
+        'terminal_id': widget.terminalId,
+        'data': {
+          'inicial': widget.dataInicial.toIso8601String(),
+          'final': widget.dataFinal.toIso8601String(),
+        },
         'tipoRelatorio': widget.tipoRelatorio,
         'estoqueInicial': _estoqueInicial,
         'estoqueFinal': _estoqueFinal,
@@ -613,7 +582,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
       );
       final url = html.Url.createObjectUrlFromBlob(blob);
       
-      final nomeFormatado = widget.nomeFilial
+      final nomeFormatado = widget.nomeTerminal
           .replaceAll(' ', '_')
           .replaceAll(RegExp(r'[^\w_]'), '');
       
@@ -808,7 +777,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Relatório de Vendas – ${widget.nomeFilial}',
+              'Relatório de Vendas – ${widget.nomeTerminal}',
               style: const TextStyle(
                 fontWeight: FontWeight.w600,
               ),

@@ -4,18 +4,16 @@ import '../../login_page.dart';
 import 'relatorio_vendas.dart';
 
 class FiltroVendasPage extends StatefulWidget {
-  final String? filialId;
   final String? terminalId;
-  final String nomeFilial;
+  final String nomeTerminal;
   final String? empresaId;
   final String? empresaNome;
   final VoidCallback onVoltar;
 
   const FiltroVendasPage({
     super.key,
-    this.filialId,
     this.terminalId,
-    required this.nomeFilial,
+    required this.nomeTerminal,
     this.empresaId,
     this.empresaNome,
     required this.onVoltar,
@@ -30,84 +28,218 @@ class _FiltroVendasPageState extends State<FiltroVendasPage> {
   DateTime _dataInicial = DateTime(DateTime.now().year, DateTime.now().month, 1);
   DateTime _dataFinal = DateTime.now();
   String? _produtoSelecionado;
-  String? _filialSelecionadaId;
-  String? _filialSelecionadaNome;
+  String? _terminalSelecionadoId;
+  String? _terminalSelecionadoNome;
+  String? _empresaSelecionadaId;
+  String? _empresaSelecionadaNome;
   String _tipoRelatorio = 'sintetico';
   List<Map<String, dynamic>> _produtosDisponiveis = [];
-  List<Map<String, dynamic>> _filiaisDisponiveis = [];
+  List<Map<String, dynamic>> _terminaisDisponiveis = [];
+  List<Map<String, dynamic>> _empresasDisponiveis = [];
   bool _carregandoProdutos = false;
-  bool _carregandoFiliais = false;
+  bool _carregandoTerminais = false;
+  bool _carregandoEmpresas = false;
+  bool _terminalVinculado = false;
+  bool _empresaVinculada = false;
   bool _carregando = false;
 
   @override
   void initState() {
     super.initState();
     final usuario = UsuarioAtual.instance;
-    // Inicializar filial a partir do usuário logado (filial_id é opcional para todos os níveis)
-    _filialSelecionadaId = usuario?.filialId ?? '';
 
-    _carregarFiliaisDisponiveis();
+    // Verificar se usuário tem terminal vinculado no login
+    if (usuario?.terminalId != null && usuario!.terminalId!.isNotEmpty) {
+      _terminalVinculado = true;
+      _terminalSelecionadoId = usuario.terminalId;
+      _terminalSelecionadoNome = usuario.terminalNome ?? 'Terminal vinculado';
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _carregarEmpresasPorTerminal(_terminalSelecionadoId!);
+      });
+    }
+
+    // Verificar se usuário tem empresa vinculada no login
+    if (usuario?.empresaId != null && usuario!.empresaId!.isNotEmpty) {
+      _empresaVinculada = true;
+      _empresaSelecionadaId = usuario.empresaId;
+      _empresaSelecionadaNome = usuario.empresaNome ?? 'Empresa vinculada';
+      _empresasDisponiveis = [
+        {'id': _empresaSelecionadaId!, 'nome': _empresaSelecionadaNome!},
+      ];
+    } else {
+      _empresaVinculada = false;
+      _empresaSelecionadaId = '';
+      _empresaSelecionadaNome = null;
+      _empresasDisponiveis = [];
+    }
+
+    _carregarTerminaisDisponiveis();
     _carregarProdutosDisponiveis();
   }
 
-  Future<void> _carregarFiliaisDisponiveis() async {
-    setState(() => _carregandoFiliais = true);
+  Future<void> _carregarEmpresasPorTerminal(String terminalId) async {
+    setState(() {
+      _carregandoEmpresas = true;
+    });
 
     try {
-      // Buscar TODAS as filiais sem filtro de empresa_id (nível 4 precisa ver todas)
-      final dados = await _supabase
-          .from('filiais')
-          .select('id, nome, nome_dois')
-          .order('nome');
+      final usuario = UsuarioAtual.instance;
+      if (usuario == null) return;
 
-      final List<Map<String, dynamic>> filiais = [];
-      for (var filial in dados) {
-        final nome = filial['nome_dois'] ?? filial['nome'] ?? '';
-        filiais.add({
-          'id': filial['id'].toString(),
-          'nome': nome.toString(),
+      if (_empresaVinculada) {
+        setState(() {
+          _empresasDisponiveis = [
+            {'id': _empresaSelecionadaId!, 'nome': _empresaSelecionadaNome!},
+          ];
         });
+        return;
+      }
+
+      final response = await _supabase
+          .from('relacoes_terminais')
+          .select('''
+            empresa_id,
+            empresas!inner (
+              id,
+              nome_dois
+            )
+          ''')
+          .eq('terminal_id', terminalId);
+
+      List<Map<String, dynamic>> empresas = [];
+      empresas.add({'id': '', 'nome': '<selecione>'});
+
+      final Map<String, String> empresasUnicas = {};
+
+      for (var item in response) {
+        final empData = item['empresas'] as Map<String, dynamic>?;
+        if (empData != null) {
+          final id = empData['id']?.toString();
+          final nome = empData['nome_dois']?.toString() ?? 'Empresa sem nome';
+          if (id != null && !empresasUnicas.containsKey(id)) {
+            empresasUnicas[id] = nome;
+            empresas.add({'id': id, 'nome': nome});
+          }
+        }
       }
 
       setState(() {
-        _filiaisDisponiveis = [
-          {'id': '', 'nome': '<selecione>'}
-        ];
-        _filiaisDisponiveis.addAll(filiais);
+        _empresasDisponiveis = empresas;
 
-        // Se o usuário tem filial_id pré-selecionada, capturar o nome correspondente
-        if (_filialSelecionadaId != null && _filialSelecionadaId!.isNotEmpty) {
-          final filialEncontrada = filiais.firstWhere(
-            (f) => f['id'] == _filialSelecionadaId,
-            orElse: () => {'id': '', 'nome': ''},
-          );
-          if (filialEncontrada['id']!.isNotEmpty) {
-            _filialSelecionadaNome = filialEncontrada['nome'];
-          } else {
-            // filial_id do usuário não encontrada na lista, resetar
-            _filialSelecionadaId = '';
-            _filialSelecionadaNome = null;
-          }
+        if (empresas.length == 2) {
+          _empresaSelecionadaId = empresas[1]['id'];
+          _empresaSelecionadaNome = empresas[1]['nome'];
         } else {
-          // Usuário não possui filial: pré-selecionar a primeira filial disponível (mantendo editável)
-          if (filiais.isNotEmpty) {
-            _filialSelecionadaId = filiais.first['id'];
-            _filialSelecionadaNome = filiais.first['nome'];
-          } else {
-            _filialSelecionadaId = '';
-            _filialSelecionadaNome = null;
-          }
+          _empresaSelecionadaId = '';
+          _empresaSelecionadaNome = null;
         }
       });
     } catch (e) {
-      debugPrint('❌ Erro ao carregar filiais: $e');
+      debugPrint('❌ Erro ao carregar empresas por terminal: $e');
       setState(() {
-        _filiaisDisponiveis = [
-          {'id': '', 'nome': '<selecione>'}
+        _empresasDisponiveis = [
+          {'id': '', 'nome': '<erro ao carregar empresas>'},
         ];
+        _empresaSelecionadaId = '';
+        _empresaSelecionadaNome = null;
       });
     } finally {
-      setState(() => _carregandoFiliais = false);
+      setState(() => _carregandoEmpresas = false);
+    }
+  }
+
+  Future<void> _carregarTerminaisDisponiveis() async {
+    if (_terminalVinculado) {
+      setState(() {
+        _terminaisDisponiveis = [
+          {'id': _terminalSelecionadoId!, 'nome': _terminalSelecionadoNome!},
+        ];
+      });
+      return;
+    }
+
+    setState(() => _carregandoTerminais = true);
+
+    try {
+      final usuario = UsuarioAtual.instance;
+      if (usuario == null) {
+        setState(() {
+          _terminaisDisponiveis = [
+            {'id': '', 'nome': '<usuário não logado>'},
+          ];
+        });
+        return;
+      }
+
+      String? empresaId = usuario.empresaId;
+      if (empresaId == null || empresaId.isEmpty) {
+        empresaId = widget.empresaId;
+      }
+
+      if (empresaId == null || empresaId.isEmpty) {
+        setState(() {
+          _terminaisDisponiveis = [
+            {'id': '', 'nome': '<empresa não identificada>'},
+          ];
+        });
+        return;
+      }
+
+      final relacoes = await _supabase
+          .from('relacoes_terminais')
+          .select('''
+            terminal_id,
+            terminais!inner (
+              id,
+              nome
+            )
+          ''')
+          .eq('empresa_id', empresaId);
+
+      final Map<String, Map<String, dynamic>> terminaisUnicos = {};
+
+      for (var relacao in relacoes) {
+        if (relacao['terminais'] != null) {
+          final terminal = relacao['terminais'] as Map<String, dynamic>;
+          final terminalId = terminal['id']?.toString();
+
+          if (terminalId != null && !terminaisUnicos.containsKey(terminalId)) {
+            terminaisUnicos[terminalId] = {
+              'id': terminalId,
+              'nome': terminal['nome']?.toString() ?? 'Terminal sem nome',
+            };
+          }
+        }
+      }
+
+      List<Map<String, dynamic>> terminais = terminaisUnicos.values.toList()
+        ..sort((a, b) => (a['nome'] ?? '').compareTo(b['nome'] ?? ''));
+
+      final List<Map<String, dynamic>> listaFinal = [];
+      listaFinal.add({'id': '', 'nome': '<selecione>'});
+      listaFinal.addAll(terminais);
+
+      setState(() {
+        _terminaisDisponiveis = listaFinal;
+        if (terminais.length == 1) {
+          _terminalSelecionadoId = terminais.first['id'];
+          _terminalSelecionadoNome = terminais.first['nome'];
+        } else {
+          _terminalSelecionadoId = '';
+          _terminalSelecionadoNome = null;
+        }
+      });
+    } catch (e) {
+      debugPrint('❌ Erro ao carregar terminais: $e');
+      setState(() {
+        _terminaisDisponiveis = [
+          {'id': '', 'nome': '<erro ao carregar terminais>'},
+        ];
+        _terminalSelecionadoId = '';
+      });
+    } finally {
+      setState(() => _carregandoTerminais = false);
     }
   }
 
@@ -649,18 +781,19 @@ class _FiltroVendasPageState extends State<FiltroVendasPage> {
       return;
     }
 
-    final String? filialToPass = (_filialSelecionadaId != null && _filialSelecionadaId!.isNotEmpty)
-        ? _filialSelecionadaId
+    final String? terminalToPass = (_terminalSelecionadoId != null && _terminalSelecionadoId!.isNotEmpty)
+        ? _terminalSelecionadoId
         : null;
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => RelatorioVendasPage(
-          filialId: filialToPass,
-          terminalId: widget.terminalId,
-          nomeFilial: _filialSelecionadaNome ?? 'Filial não selecionada',
-          empresaId: widget.empresaId,
+          terminalId: terminalToPass,
+          nomeTerminal: _terminalSelecionadoNome ?? 'Terminal não selecionado',
+          empresaId: (_empresaSelecionadaId != null && _empresaSelecionadaId!.isNotEmpty)
+              ? _empresaSelecionadaId
+              : widget.empresaId,
           dataInicial: _dataInicial,
           dataFinal: _dataFinal,
           produtoFiltro: _produtoSelecionado,
@@ -699,7 +832,7 @@ class _FiltroVendasPageState extends State<FiltroVendasPage> {
               ),
             ),
             Text(
-              widget.nomeFilial,
+              widget.nomeTerminal,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.normal,
@@ -789,13 +922,13 @@ class _FiltroVendasPageState extends State<FiltroVendasPage> {
           Row(
             children: [
               // Campo Mês de Referência ou Data Específica
-              // Campo Filial
+              // Campo Terminal
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Filial',
+                      'Terminal',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -803,7 +936,7 @@ class _FiltroVendasPageState extends State<FiltroVendasPage> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    if (_carregandoFiliais)
+                    if (_carregandoTerminais)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
@@ -831,35 +964,186 @@ class _FiltroVendasPageState extends State<FiltroVendasPage> {
                         ),
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
-                            value: _filialSelecionadaId,
+                            value: _terminalSelecionadoId,
                             isExpanded: true,
-                            itemHeight: 50, // Define a altura dos itens e do botão proporcionalmente
+                            itemHeight: 50,
+                            icon: const Icon(Icons.arrow_drop_down, size: 20),
+                            style: const TextStyle(fontSize: 13, color: Colors.black),
+                            onChanged: _terminalVinculado
+                                ? null
+                                : (String? novoValor) async {
+                                    setState(() {
+                                      _terminalSelecionadoId = novoValor;
+                                      if (novoValor != null && novoValor.isNotEmpty) {
+                                        final terminal = _terminaisDisponiveis.firstWhere(
+                                          (t) => t['id'] == novoValor,
+                                          orElse: () => {'id': '', 'nome': ''},
+                                        );
+                                        _terminalSelecionadoNome = terminal['nome'];
+                                      } else {
+                                        _terminalSelecionadoNome = null;
+                                      }
+                                      _empresaSelecionadaId = '';
+                                      _empresaSelecionadaNome = null;
+                                      _empresasDisponiveis = [];
+                                    });
+
+                                    if (novoValor != null && novoValor.isNotEmpty) {
+                                      await _carregarEmpresasPorTerminal(novoValor);
+                                    }
+                                  },
+                            items: _terminaisDisponiveis.map<DropdownMenuItem<String>>((terminal) {
+                              return DropdownMenuItem<String>(
+                                value: terminal['id']!,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text(
+                                    terminal['nome']!,
+                                    style: TextStyle(
+                                      color: terminal['id']!.isEmpty
+                                          ? Colors.grey.shade600
+                                          : Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              // Campo Empresa
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Empresa',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0D47A1),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (_empresaVinculada)
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade50,
+                          border: Border.all(color: Colors.grey.shade400, width: 1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _empresaSelecionadaId,
+                            isExpanded: true,
+                            itemHeight: 50,
+                            icon: const SizedBox.shrink(),
+                            style: const TextStyle(fontSize: 13, color: Colors.black),
+                            onChanged: null,
+                            items: _empresasDisponiveis.map<DropdownMenuItem<String>>((empresa) {
+                              return DropdownMenuItem<String>(
+                                value: empresa['id']!,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: Text(
+                                    empresa['nome']!,
+                                    style: const TextStyle(color: Colors.black),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      )
+                    else if (_carregandoEmpresas)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: Colors.grey.shade400, width: 1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Center(
+                          child: SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: const Color(0xFF0D47A1),
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (_terminalSelecionadoId == null || _terminalSelecionadoId!.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          border: Border.all(color: Colors.grey.shade400, width: 1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Selecione um terminal primeiro',
+                          style: TextStyle(fontSize: 13, color: Colors.black54),
+                        ),
+                      )
+                    else if (_empresasDisponiveis.isEmpty ||
+                        (_empresasDisponiveis.length == 1 && _empresasDisponiveis.first['id'] == ''))
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          border: Border.all(color: Colors.grey.shade400, width: 1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'Nenhuma empresa disponível',
+                          style: TextStyle(fontSize: 13, color: Colors.black54),
+                        ),
+                      )
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(color: Colors.grey.shade400, width: 1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _empresaSelecionadaId,
+                            isExpanded: true,
+                            itemHeight: 50,
                             icon: const Icon(Icons.arrow_drop_down, size: 20),
                             style: const TextStyle(fontSize: 13, color: Colors.black),
                             onChanged: (String? novoValor) {
                               setState(() {
-                                _filialSelecionadaId = novoValor;
-                                // Capturar o nome da filial selecionada
+                                _empresaSelecionadaId = novoValor;
                                 if (novoValor != null && novoValor.isNotEmpty) {
-                                  final filial = _filiaisDisponiveis.firstWhere(
-                                    (f) => f['id'] == novoValor,
+                                  final empresa = _empresasDisponiveis.firstWhere(
+                                    (e) => e['id'] == novoValor,
                                     orElse: () => {'id': '', 'nome': ''},
                                   );
-                                  _filialSelecionadaNome = filial['nome'];
+                                  _empresaSelecionadaNome = empresa['nome'];
                                 } else {
-                                  _filialSelecionadaNome = null;
+                                  _empresaSelecionadaNome = null;
                                 }
                               });
                             },
-                            items: _filiaisDisponiveis.map<DropdownMenuItem<String>>((filial) {
+                            items: _empresasDisponiveis.map<DropdownMenuItem<String>>((empresa) {
                               return DropdownMenuItem<String>(
-                                value: filial['id']!,
+                                value: empresa['id']!,
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 12),
                                   child: Text(
-                                    filial['nome']!,
+                                    empresa['nome']!,
                                     style: TextStyle(
-                                      color: filial['id']!.isEmpty
+                                      color: empresa['id']!.isEmpty
                                           ? Colors.grey.shade600
                                           : Colors.black,
                                     ),
@@ -1135,15 +1419,14 @@ class _FiltroVendasPageState extends State<FiltroVendasPage> {
             children: [
               _buildItemResumo(
                 icon: Icons.store,
-                label: widget.terminalId != null ? 'Terminal' : 'Filial',
-                value: _filialSelecionadaNome ?? 'Não selecionada',
+                label: 'Terminal',
+                value: _terminalSelecionadoNome ?? 'Não selecionado',
               ),
-              if (widget.empresaNome != null)
-                _buildItemResumo(
-                  icon: Icons.business,
-                  label: 'Empresa',
-                  value: widget.empresaNome!,
-                ),
+              _buildItemResumo(
+                icon: Icons.business,
+                label: 'Empresa',
+                value: _empresaSelecionadaNome ?? widget.empresaNome ?? 'Não selecionada',
+              ),
               _buildItemResumo(
                 icon: Icons.calendar_today,
                 label: 'Período',

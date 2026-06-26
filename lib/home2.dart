@@ -2646,9 +2646,8 @@ class _HomePageCardsState extends State<HomePageCards>
     if (sessaoAtual == 'Vendas') {
       if (_mostrarFiltroMovimentacoes) {
         return FiltroVendasPage(
-          filialId: _filialParaFiltroId,
           terminalId: _terminalParaFiltroId,
-          nomeFilial: _filialParaFiltroNome ?? _terminalParaFiltroNome ?? '',
+          nomeTerminal: _terminalParaFiltroNome ?? _filialParaFiltroNome ?? '',
           empresaId: _empresaParaFiltroId,
           empresaNome: _empresaParaFiltroNome,
           onVoltar: () {
