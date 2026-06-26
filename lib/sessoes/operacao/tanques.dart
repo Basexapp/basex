@@ -68,7 +68,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
 
     final refOriginal = _tanqueEditando!['referencia']?.toString() ?? '';
     final capOriginal = _formatarMilhar(_tanqueEditando!['capacidade']);
-    final prodOriginal = _tanqueEditando!['id_produto']?.toString();
+    final prodOriginal = _tanqueEditando!['produto_id']?.toString();
     final statusOriginal = _tanqueEditando!['status']?.toString();
     final lastroOriginal = _formatarMilhar(_tanqueEditando!['lastro']);
 
@@ -208,7 +208,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
             capacidade,
             lastro,
             status,
-            id_produto,
+            produto_id,
             tipo_abastecimento,
             produtos (nome),
             terminais!inner (nome)
@@ -228,7 +228,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           'capacidade': tanque['capacidade']?.toString() ?? '0',
           'lastro': tanque['lastro']?.toString(),
           'status': tanque['status']?.toString() ?? 'Em operação',
-          'id_produto': tanque['id_produto'],
+          'produto_id': tanque['produto_id'],
           'tipo_abastecimento': tanque['tipo_abastecimento'],
           'terminal_nome': tanque['terminais']?['nome']?.toString() ?? nomeTerminal,
         });
@@ -270,7 +270,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         _capacidadeController.clear();
       }
       
-      _produtoSelecionado = tanque['id_produto']?.toString();
+      _produtoSelecionado = tanque['produto_id']?.toString();
       _statusSelecionado = tanque['status'];
       _lastroController.text = _formatarMilhar(tanque['lastro']);
       
@@ -913,7 +913,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
 
       if (_tanqueEditando != null) {
         final tanqueId = _tanqueEditando!['id'];
-        final produtoOriginal = _tanqueEditando!['id_produto']?.toString();
+        final produtoOriginal = _tanqueEditando!['produto_id']?.toString();
         final produtoNovo = _produtoSelecionado?.toString();
         final produtoAlterado = produtoOriginal != produtoNovo;
 
@@ -1024,7 +1024,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         'capacidade': capacidadeTexto.replaceAll('.', ''),
         'lastro': lastroValor,
         'status': _statusSelecionado,
-        'id_produto': _produtoSelecionado,
+        'produto_id': _produtoSelecionado,
         'tipo_abastecimento': tipoAbastecimento.isEmpty ? null : tipoAbastecimento,
         'terminal_id': idTerminal,
       };

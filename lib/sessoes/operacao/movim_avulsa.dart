@@ -38,10 +38,19 @@ class _MovimentacaoAvulsaDialogState extends State<MovimentacaoAvulsaDialog> {
   String _tipoMovimento = 'Entrada';
   bool _carregando = false;
 
+  // Produto e Tanque para exibição "[produto] - [tanque]"
+  String? _produtoNome;
+  String? _tanqueReferencia;
+  bool _carregandoProdutoTanque = false;
+  String? _produtoId;
+
   @override
   void initState() {
     super.initState();
     _atualizarDataController();
+    // Atualiza estado do botão Salvar quando campos mudam
+    _descricaoController.addListener(_atualizarEstadoSalvar);
+    _quantidadeController.addListener(_atualizarEstadoSalvar);
     // Inicializa seleção de empresa com base no usuário logado
     final usuario = UsuarioAtual.instance;
     if (usuario?.empresaId != null && usuario!.empresaId!.isNotEmpty) {
@@ -57,7 +66,56 @@ class _MovimentacaoAvulsaDialogState extends State<MovimentacaoAvulsaDialog> {
     if (usuario?.terminalId != null && usuario!.terminalId!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _carregarEmpresasPorTerminal(usuario.terminalId!);
+        _carregarProdutoETanque();
       });
+    }
+  }
+
+  void _atualizarEstadoSalvar() {
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _descricaoController.removeListener(_atualizarEstadoSalvar);
+    _quantidadeController.removeListener(_atualizarEstadoSalvar);
+    _dataController.dispose();
+    _descricaoController.dispose();
+    _quantidadeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _carregarProdutoETanque() async {
+    setState(() => _carregandoProdutoTanque = true);
+    try {
+      final supabase = Supabase.instance.client;
+
+      final tanqueResp = await supabase
+          .from('tanques')
+          .select('id, referencia, produto_id')
+          .eq('id', widget.tanqueId)
+          .maybeSingle();
+
+      if (tanqueResp != null) {
+        _tanqueReferencia = tanqueResp['referencia']?.toString();
+        final produtoId = tanqueResp['produto_id']?.toString();
+        _produtoId = produtoId;
+        if (produtoId != null && produtoId.isNotEmpty) {
+          final produtoResp = await supabase
+              .from('produtos')
+              .select('id, nome')
+              .eq('id', produtoId)
+              .maybeSingle();
+          if (produtoResp != null) {
+            _produtoNome = produtoResp['nome']?.toString();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar produto/tanque: $e');
+    } finally {
+      if (mounted) setState(() => _carregandoProdutoTanque = false);
     }
   }
 
@@ -183,6 +241,8 @@ class _MovimentacaoAvulsaDialogState extends State<MovimentacaoAvulsaDialog> {
 
       await supabase.from('movimentacoes_tanque').insert({
         'tanque_id': widget.tanqueId,
+        'produto_id': _produtoId,
+        'empresa_id': _empresaSelecionadaId,
         'data_mov': _dataSelecionada.toIso8601String(),
         'descricao': descricao,
         'tipo_mov': _tipoMovimento,
@@ -253,6 +313,25 @@ class _MovimentacaoAvulsaDialogState extends State<MovimentacaoAvulsaDialog> {
               ),
               const SizedBox(height: 12),
 
+              // Linha exibindo [produto] - [tanque]
+              _carregandoProdutoTanque
+                  ? const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
+                      child: SizedBox(
+                        height: 16,
+                        child: Center(
+                          child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                        ),
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        '${_produtoNome ?? '-'} - ${_tanqueReferencia ?? '-'}',
+                        style: const TextStyle(fontSize: 15, color: Colors.red),
+                      ),
+                    ),
+
               // Dropdown de Empresas vinculadas ao terminal do usuário
               const Text(
                 'Empresa',
@@ -320,8 +399,7 @@ class _MovimentacaoAvulsaDialogState extends State<MovimentacaoAvulsaDialog> {
                     ),
                   ),
                 ),
-
-              const SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
               // Seletor de Tipo (Entrada/Saída)
               Row(
@@ -483,9 +561,10 @@ class _MovimentacaoAvulsaDialogState extends State<MovimentacaoAvulsaDialog> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: (_carregando ||
-                              _descricaoController.text.trim().isEmpty ||
-                              _quantidadeController.text.trim().isEmpty)
+                        onPressed: (_carregando ||
+                            _quantidadeController.text.trim().isEmpty ||
+                            _empresaSelecionadaId == null ||
+                            _empresaSelecionadaId!.isEmpty)
                           ? null
                           : _salvar,
                       style: ElevatedButton.styleFrom(

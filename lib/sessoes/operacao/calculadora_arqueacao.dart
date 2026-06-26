@@ -131,9 +131,9 @@ class _CalculadoraArqueacaoDialogState
 
       final tabelaArqueacao = terminalResp?['tabela_arqueacao']?.toString();
 
-      final resposta = await supabase
+        final resposta = await supabase
           .from('tanques')
-          .select('id, referencia, id_produto, produtos(nome)')
+          .select('id, referencia, produto_id, produtos(nome)')
           .eq('terminal_id', terminalId)
           .order('referencia', ascending: true);
 
@@ -143,7 +143,7 @@ class _CalculadoraArqueacaoDialogState
           'id': t['id']?.toString() ?? '',
           'referencia': t['referencia']?.toString() ?? '',
           'produto': (t['produtos'] as Map?)?['nome']?.toString() ?? '',
-          'id_produto': t['id_produto']?.toString() ?? '',
+          'produto_id': t['produto_id']?.toString() ?? '',
         });
       }
 

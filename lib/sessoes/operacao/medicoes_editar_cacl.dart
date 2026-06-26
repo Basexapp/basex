@@ -135,7 +135,7 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
               id,
               referencia,
               capacidade,
-              id_produto,
+              produto_id,
               produtos (nome)
             )
           ''')
@@ -166,7 +166,7 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
           'id': tanque['id'],
           'numero': tanque['referencia']?.toString() ?? '',
           'produto': tanque['produtos']?['nome']?.toString() ?? cacl['produto']?.toString() ?? '',
-          'id_produto': tanque['id_produto']?.toString(),
+          'produto_id': tanque['produto_id']?.toString(),
           'capacidade': _formatarCapacidade(tanque['capacidade']),
         };
         
@@ -184,7 +184,7 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
                 id,
                 referencia,
                 capacidade,
-                id_produto,
+                produto_id,
                 produtos (nome)
               ''')
               .eq('id', tanqueId)
@@ -195,7 +195,7 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
               'id': tanqueInfo['id'],
               'numero': tanqueInfo['referencia']?.toString() ?? '',
               'produto': tanqueInfo['produtos']?['nome']?.toString() ?? cacl['produto']?.toString() ?? '',
-              'id_produto': tanqueInfo['id_produto']?.toString(),
+              'produto_id': tanqueInfo['produto_id']?.toString(),
               'capacidade': _formatarCapacidade(tanqueInfo['capacidade']),
             };
             
@@ -557,7 +557,7 @@ class _EditarCaclPageState extends State<EditarCaclPage> {
       'data': _dataController.text,
       'base': _nomeFilial ?? _caclData['base'] ?? 'POLO DE COMBUSTÍVEL',
       'produto': _tanqueInfo['produto'] ?? _caclData['produto'] ?? '',
-      'produto_id': _caclData['produto_id'] ?? _tanqueInfo['id_produto'],
+      'produto_id': _caclData['produto_id'] ?? _tanqueInfo['produto_id'],
       'tanque': _tanqueInfo['numero'] ?? '',
       'responsavel': UsuarioAtual.instance?.nome ?? 'Usuário',
       'medicoes': dadosMedicoes,

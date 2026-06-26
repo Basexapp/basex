@@ -742,7 +742,7 @@ class _NovaTransferenciaDialogState extends State<NovaTransferenciaDialog> {
             .from('tanques')
             .select('id')
             .eq('terminal_id', terminalDestId!)
-            .eq('id_produto', _produtoId!)
+            .eq('produto_id', _produtoId!)
             .limit(1);
         
         if (tanquesDestino.isEmpty) {

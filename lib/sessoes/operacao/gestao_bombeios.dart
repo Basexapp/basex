@@ -156,7 +156,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         qtd_faturada,
         tanques!bombeios_tanque_id_fkey (
           referencia,
-          id_produto,
+          produto_id,
           produtos (
             nome
           )
@@ -309,9 +309,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
 
   Future<void> _carregarTanquesPorTerminal(String terminalId) async {
     try {
-      final List<dynamic> data = await _supabase
+        final List<dynamic> data = await _supabase
           .from('tanques')
-          .select('id, referencia, id_produto, produtos(id, nome)')
+          .select('id, referencia, produto_id, produtos(id, nome)')
           .eq('terminal_id', terminalId);
 
       final List<Map<String, dynamic>> tanquesList = List<Map<String, dynamic>>.from(data);

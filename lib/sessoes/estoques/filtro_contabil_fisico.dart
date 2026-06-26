@@ -139,14 +139,14 @@ class _FiltroContabilFisicoPageState extends State<FiltroContabilFisicoPage> {
       final response = await _supabase
           .from('tanques')
           .select('''
-            id_produto,
+            produto_id,
             produtos!inner (
               id,
               nome
             )
           ''')
           .eq('terminal_id', widget.terminalId!)
-          .not('id_produto', 'is', null);
+          .not('produto_id', 'is', null);
       
       final Map<String, Map<String, dynamic>> produtosUnicos = {};
       for (var tanque in response) {

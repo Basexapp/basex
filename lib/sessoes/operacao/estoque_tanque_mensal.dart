@@ -169,14 +169,14 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
 
   Future<void> _carregarProdutoDoTanque() async {
     try {
-      final resp = await _supabase
+        final resp = await _supabase
           .from('tanques')
-          .select('id_produto, produtos (id, nome)')
+          .select('produto_id, produtos (id, nome)')
           .eq('id', widget.tanqueId)
           .maybeSingle();
 
       if (resp != null) {
-        _produtoId = resp['id_produto']?.toString();
+        _produtoId = resp['produto_id']?.toString();
 
         final produtoObj = resp['produtos'];
         if (_produtoId == null && produtoObj is Map && produtoObj['id'] != null) {

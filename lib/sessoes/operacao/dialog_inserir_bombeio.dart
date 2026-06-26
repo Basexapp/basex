@@ -283,9 +283,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   Future<void> _fetchTanques() async {
     if (terminalId == null) return;
     try {
-      final List<dynamic> data = await Supabase.instance.client
+        final List<dynamic> data = await Supabase.instance.client
           .from('tanques')
-          .select('id, referencia, id_produto, produtos(nome)')
+          .select('id, referencia, produto_id, produtos(nome)')
           .eq('terminal_id', terminalId as Object)
           .eq('tipo_abastecimento', 'exa');
 

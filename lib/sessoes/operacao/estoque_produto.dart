@@ -206,13 +206,13 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
             saida_vinte,
             tanques!inner (
               id,
-              id_produto,
+              produto_id,
               terminais!inner (
                 id
               )
             )
           ''')
-          .eq('tanques.id_produto', widget.produtoId)
+          .eq('tanques.produto_id', widget.produtoId)
           .eq('tanques.terminais.id', terminalId)
           .gte('data_mov', dataInicio)
           .lte('data_mov', dataFim);
@@ -232,14 +232,14 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
             produtos:produto_id (nome),
             tanques!inner (
               id,
-              id_produto,
+              produto_id,
               terminais!inner (
                 id
               )
             )
           ''')
           .eq('tipo', 'movimentacao')
-          .eq('tanques.id_produto', widget.produtoId)
+          .eq('tanques.produto_id', widget.produtoId)
           .eq('tanques.terminais.id', terminalId)
           .gte('data', dataInicio.split(' ')[0])
           .lte('data', dataFim.split(' ')[0]);

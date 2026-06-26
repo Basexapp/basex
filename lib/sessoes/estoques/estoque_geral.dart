@@ -399,10 +399,10 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
             saida_vinte,
             descricao,
             tanques!inner (
-              id_produto
+              produto_id
             )
           ''')
-          .eq('tanques.id_produto', produtoId)
+          .eq('tanques.produto_id', produtoId)
           .eq('tanques.terminal_id', _terminalSelecionadoId!)
           .gte('data_mov', '$dataInicioStr 00:00:00')
           .lte('data_mov', '$dataFimStr 23:59:59');
@@ -511,7 +511,7 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
             id,
             referencia,
             capacidade,
-            id_produto,
+            produto_id,
             status,
             terminal_id
           ''')
@@ -529,7 +529,7 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
       // Coletar IDs dos produtos únicos
       final Set<String> produtosIds = {};
       for (final tanque in tanques) {
-        final produtoId = tanque['id_produto'];
+        final produtoId = tanque['produto_id'];
         if (produtoId != null) {
           produtosIds.add(produtoId.toString());
         }
@@ -559,7 +559,7 @@ class _EstoqueGeralPageState extends State<EstoqueGeralPage> {
       final Map<String, double> capacidadePorProduto = {};
 
       for (final tanque in tanques) {
-        final produtoId = tanque['id_produto']?.toString();
+        final produtoId = tanque['produto_id']?.toString();
         if (produtoId == null) continue;
 
         final capacidade = (tanque['capacidade'] as num?)?.toDouble() ?? 0.0;

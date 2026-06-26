@@ -759,8 +759,8 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                       });
                                     },
                                     child: Tooltip(
-                                      message:
-                                          'Estoque total: ${_formatarValor(tanque.estoqueAtual)}\nEstoque disponível: ${_formatarValor(tanque.estoqueAtual - tanque.lastro)}\n───────────────\nCapacidade total: ${_formatarValor(tanque.capacidadeTotal)}\nEspaço disponível: ${_formatarValor(tanque.capacidadeTotal - tanque.estoqueAtual)}',
+                                        message:
+                                          'Estoque total: ${_formatarValor(tanque.estoqueAtual)}\nEstoque disponível: ${_formatarValor((tanque.estoqueAtual - tanque.lastro).clamp(0, tanque.capacidadeTotal))}\n───────────────\nCapacidade total: ${_formatarValor(tanque.capacidadeTotal)}\nEspaço disponível: ${_formatarValor((tanque.capacidadeTotal - tanque.estoqueAtual).clamp(0, tanque.capacidadeTotal))}',
                                       preferBelow: false,
                                       verticalOffset:
                                           (dynamicBaseHeight / 2) + 30,

@@ -360,7 +360,7 @@ class _ResultadosPageState extends State<ResultadosPage> {
           .select('''
             id,
             referencia,
-            id_produto,
+            produto_id,
             produtos (
               id,
               nome
@@ -376,7 +376,7 @@ class _ResultadosPageState extends State<ResultadosPage> {
           'id': tanque['id'].toString(),
           'referencia': tanque['referencia'].toString(),
           'produto_nome': produto != null ? produto['nome'].toString() : 'Sem Produto',
-          'produto_id': tanque['id_produto']?.toString(),
+          'produto_id': tanque['produto_id']?.toString(),
         });
       }
       

@@ -293,15 +293,15 @@ class _FiltroEstoqueProdutoPageState extends State<FiltroEstoqueProdutoPage> {
       final response = await _supabase
           .from('tanques')
           .select('''
-            id_produto,
-            produtos!tanques_id_produto_fkey (
+            produto_id,
+            produtos!tanques_produto_id_fkey (
               id,
               nome,
               nome_dois
             )
           ''')
           .eq('terminal_id', terminalId)
-          .not('id_produto', 'is', null); // Ignorar tanques sem produto
+          .not('produto_id', 'is', null); // Ignorar tanques sem produto
 
       // Usar um Map para evitar produtos duplicados
       final Map<String, Map<String, dynamic>> produtosUnicos = {};

@@ -1407,12 +1407,12 @@ class _CalcPageState extends State<CalcPage> {
       try {
         final tanqueData = await supabase
             .from('tanques')
-            .select('id_produto, referencia')
+            .select('produto_id, referencia')
             .eq('id', tanqueId)
             .maybeSingle();
 
         if (tanqueData != null) {
-          produtoId = tanqueData['id_produto']?.toString();
+          produtoId = tanqueData['produto_id']?.toString();
         }
       } catch (e) {
         return;
@@ -1535,11 +1535,11 @@ class _CalcPageState extends State<CalcPage> {
 
       final tanqueData = await supabase
           .from('tanques')
-          .select('id_produto')
+          .select('produto_id')
           .eq('id', tanqueId)
           .maybeSingle();
 
-      final produtoId = tanqueData?['id_produto']?.toString();
+      final produtoId = tanqueData?['produto_id']?.toString();
       if (produtoId == null || produtoId.isEmpty) {
         return;
       }
