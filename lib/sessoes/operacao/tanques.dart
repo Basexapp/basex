@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
 import 'medicoes_emitir_cacl.dart';
@@ -9,6 +8,7 @@ import 'estoque_tanque_dia.dart';
 import 'estoque_tanque_mensal.dart';
 import 'medicoes_editar_cacl.dart';
 import 'medicoes.dart';
+import 'movim_avulsa.dart';
 
 class GerenciamentoTanquesPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -59,7 +59,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
 
   bool _houveAlteracao() {
     if (_tanqueEditando == null) {
-      // Caso de criação de novo tanque (se as variáveis estiverem vazias, não houve alteração)
       return _referenciaController.text.isNotEmpty ||
           _capacidadeController.text.isNotEmpty ||
           _produtoSelecionado != null ||
@@ -67,7 +66,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           _lastroController.text.isNotEmpty;
     }
 
-    // Comparação para edição de tanque existente
     final refOriginal = _tanqueEditando!['referencia']?.toString() ?? '';
     final capOriginal = _formatarMilhar(_tanqueEditando!['capacidade']);
     final prodOriginal = _tanqueEditando!['id_produto']?.toString();
@@ -106,90 +104,25 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 350),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.rectangle,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 10.0,
-                    offset: const Offset(0.0, 10.0),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: erro ? Colors.red.shade50 : Colors.green.shade50,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      erro ? Icons.error_outline : Icons.check_circle_outline,
-                      color: erro ? Colors.red : Colors.green,
-                      size: 40,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                Text(
-                  erro ? 'Atenção' : 'Sucesso',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: _ink,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  mensagem,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: _muted),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: erro ? Colors.red : Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text(
-                      'OK',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-              ],
+        return AlertDialog(
+          title: Text(erro ? 'Atenção' : 'Sucesso', style: TextStyle(color: _ink)),
+          content: Text(mensagem),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
             ),
-          ),
-        ),
-      );
-    },
-  );
-}
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> _carregarDados() async {
     try {
       final supabase = Supabase.instance.client;
       final usuario = UsuarioAtual.instance!;
 
-      // Captura o resultado bruto para debug
       final produtosResponse = await supabase
           .from('produtos')
           .select('id, nome, nome_dois, posicao, grupo')
@@ -442,14 +375,12 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     try {
       final supabase = Supabase.instance.client;
 
-      // Primeiro, verificar se existe registro na tabela movimentacoes_tanque
       final movimentacaoExistente = await supabase
           .from('movimentacoes_tanque')
           .select('id')
           .eq('cacl_id', caclId)
           .maybeSingle();
 
-      // Se existir, remover o registro
       if (movimentacaoExistente != null) {
         await supabase
             .from('movimentacoes_tanque')
@@ -457,7 +388,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
             .eq('cacl_id', caclId);
       }
 
-      // Depois, atualizar o status do CACL para cancelado
       await supabase
           .from('cacl')
           .update({'status': 'cancelado'}).eq('id', caclId);
@@ -775,7 +705,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
       final hoje = DateTime.now();
       final dataStr = hoje.toIso8601String().split('T')[0];
 
-      // 1. Buscar estoque inicial (Fiel ao estoque_tanque_dia.dart)
       final responseEstoque = await supabase.rpc(
         'fn_estoque_inicial_tanque',
         params: {
@@ -791,7 +720,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         estoqueInicial = (responseEstoque ?? 0) as num;
       }
 
-      // 2. Buscar movimentações (Fiel ao estoque_tanque_dia.dart - sem sobra_perda que não existe na tabela)
       final dadosMovs = await supabase
           .from('movimentacoes_tanque')
           .select('entrada_vinte, saida_vinte, movimentacao_id, data_mov, cliente, descricao')
@@ -801,7 +729,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
 
       final List<Map<String, dynamic>> movs = List<Map<String, dynamic>>.from(dadosMovs);
       
-      // 3. Ordenar (Fiel ao estoque_tanque_dia.dart)
       movs.sort((a, b) {
         final da = DateTime.parse(a['data_mov'].toString());
         final db = DateTime.parse(b['data_mov'].toString());
@@ -812,7 +739,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         return da.compareTo(db);
       });
 
-      // 4. Calcular saldo final (Fiel ao estoque_tanque_dia.dart)
       num saldoVinte = estoqueInicial;
       String? lastMovId;
 
@@ -985,7 +911,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         return;
       }
 
-      // Validação: verificar se o produto está sendo alterado
       if (_tanqueEditando != null) {
         final tanqueId = _tanqueEditando!['id'];
         final produtoOriginal = _tanqueEditando!['id_produto']?.toString();
@@ -993,7 +918,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
         final produtoAlterado = produtoOriginal != produtoNovo;
 
         if (produtoAlterado) {
-          // Validação: verificar CACL pendente
           final caclPendente = await supabase
               .from('cacl')
               .select('id')
@@ -1006,7 +930,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
               _mostrarAviso(
                   'Não é possível alterar o produto: existe um CACL pendente para este tanque.');
 
-              // Retorna o produto ao estado anterior
               setState(() {
                 _produtoSelecionado = produtoOriginal;
               });
@@ -1014,7 +937,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
             return;
           }
 
-          // Validação: verificar estoque > 0
           final agora = DateTime.now();
           final inicioMes = DateTime(agora.year, agora.month, 1);
           final fimMes = DateTime(agora.year, agora.month + 1, 0, 23, 59, 59);
@@ -1079,7 +1001,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
               _mostrarAviso(
                   'Não é possível alterar o produto. O tanque ainda possui estoque residual.');
 
-              // Retorna o produto ao estado anterior
               setState(() {
                 _produtoSelecionado = produtoOriginal;
               });
@@ -1117,7 +1038,6 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
 
       await _carregarDados();
 
-      // Atualiza o tanque selecionado para que a página de ações reflita as mudanças
       if (_tanqueEditando != null && _tanqueSelecionadoParaAcoes != null) {
         final idEditado = _tanqueEditando!['id'];
         final tanqueAtualizado = tanques.firstWhere(
@@ -1315,19 +1235,42 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           ),
           const SizedBox(height: 14),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: tanques.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final tanque = tanques[index];
-                final isOperando = tanque['status'] == 'Em operação';
-                final statusColor = isOperando ? _accent : _warn;
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final maxWidth = constraints.maxWidth;
+                // desired approximate card width (reduced to fit more cards per row)
+                const desiredCardWidth = 180.0;
+                int crossAxisCount = (maxWidth / desiredCardWidth).floor();
+                if (crossAxisCount < 1) crossAxisCount = 1;
+                if (crossAxisCount > 6) crossAxisCount = 6;
 
-                return _TanqueCard(
-                  tanque: tanque,
-                  statusColor: statusColor,
-                  onTap: () => _mostrarCardsAcoesDoTanque(tanque),
+                final spacing = 12.0;
+                final usableWidth = maxWidth - (spacing * (crossAxisCount - 1));
+                final cardWidth = usableWidth / crossAxisCount;
+                // approximate height for card based on content
+                final cardHeight = 130.0;
+                final childAspectRatio = cardWidth / cardHeight;
+
+                return GridView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: spacing,
+                    mainAxisSpacing: spacing,
+                    childAspectRatio: childAspectRatio,
+                  ),
+                  itemCount: tanques.length,
+                  itemBuilder: (context, index) {
+                    final tanque = tanques[index];
+                    final isOperando = tanque['status'] == 'Em operação';
+                    final statusColor = isOperando ? _accent : _warn;
+
+                    return _TanqueCard(
+                      tanque: tanque,
+                      statusColor: statusColor,
+                      onTap: () => _mostrarCardsAcoesDoTanque(tanque),
+                    );
+                  },
                 );
               },
             ),
@@ -1647,13 +1590,13 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_tanqueSelecionadoParaAcoes != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _line, width: 1.2),
-                ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _line, width: 1.2),
+                    ),
                 child: Row(
                   children: [
                     Container(
@@ -1682,7 +1625,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                           const SizedBox(height: 4),
                           Text(
                             _tanqueSelecionadoParaAcoes!['produto'] ?? 'Produto',
-                            style: const TextStyle(fontSize: 12, color: _muted),
+                            style: TextStyle(fontSize: 12, color: _accent),
                           ),
                         ],
                       ),
@@ -1693,11 +1636,9 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
               const SizedBox(height: 24),
               LayoutBuilder(
                 builder: (context, constraints) {
-                  // Define o número de colunas baseado na largura disponível
-                  // 175 é a largura base desejada para cada card
                   int crossAxisCount = (constraints.maxWidth / 175).floor();
                   if (crossAxisCount < 1) crossAxisCount = 1;
-                  if (crossAxisCount > 6) crossAxisCount = 6; // Máximo de cards por linha
+                  if (crossAxisCount > 6) crossAxisCount = 6;
 
                   return GridView.count(
                     shrinkWrap: true,
@@ -1705,7 +1646,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 175 / 160, // Mantém a proporção largura/altura
+                    childAspectRatio: 175 / 160,
                     children: [
                       _buildCardAcao(
                         icon: Icons.inventory_2,
@@ -1995,7 +1936,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                                                         fontSize: 14,
                                                         color: isCancelado
                                                             ? Colors.grey
-                                                            : Colors.black87,
+                                                            : _accent,
                                                       ),
                                                       maxLines: 1,
                                                       overflow:
@@ -2180,430 +2121,59 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
     return card;
   }
 
+  // Método substituído para usar o novo dialog separado
   void _showDialogMovimentacaoAvulsa() {
-    final TextEditingController dataMovController = TextEditingController(
-      text: DateFormat('dd/MM/yyyy').format(DateTime.now()),
-    );
-    final TextEditingController descricaoController = TextEditingController();
-    final TextEditingController quantidadeController = TextEditingController();
-    DateTime dataSelecionada = DateTime.now();
-    String tipoMovimento = 'Entrada';
+    final tanqueId = _tanqueSelecionadoParaAcoes?['id']?.toString();
+    if (tanqueId == null || tanqueId.isEmpty) return;
+
+    final terminalId = _tanqueSelecionadoParaAcoes?['id_terminal']?.toString() ??
+        widget.terminalSelecionadoId ??
+        UsuarioAtual.instance?.terminalId;
 
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            final Color backgroundColor = tipoMovimento == 'Entrada' 
-                ? const Color(0xFFE3F2FD) // Azul claro
-                : const Color(0xFFFCE4EC); // Rosa claro
-                
-            final Color borderColor = tipoMovimento == 'Entrada'
-                ? Colors.blue // Azul comum
-                : Colors.red; // Vermelho
-
-            return Dialog(
-              backgroundColor: backgroundColor,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: borderColor, width: 0.8),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Lançar Movimentação Avulsa',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: _ink,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      // Seletor de Tipo (Entrada/Saída)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => setStateDialog(() => tipoMovimento = 'Entrada'),
-                              child: Row(
-                                children: [
-                                  Radio<String>(
-                                    value: 'Entrada',
-                                    groupValue: tipoMovimento,
-                                    activeColor: tipoMovimento == 'Entrada' ? Colors.blue : _muted,
-                                    onChanged: (value) => setStateDialog(() => tipoMovimento = value!),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                  const Text('Entrada', style: TextStyle(fontSize: 13, color: _ink)),
-                                ],
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () => setStateDialog(() => tipoMovimento = 'Saída'),
-                              child: Row(
-                                children: [
-                                  Radio<String>(
-                                    value: 'Saída',
-                                    groupValue: tipoMovimento,
-                                    activeColor: tipoMovimento == 'Saída' ? Colors.red : _muted,
-                                    onChanged: (value) => setStateDialog(() => tipoMovimento = value!),
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                  const Text('Saída', style: TextStyle(fontSize: 13, color: _ink)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('Data de lançamento',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: dataSelecionada,
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime(2101),
-                            builder: (context, child) {
-                              return Theme(
-                                data: Theme.of(context).copyWith(
-                                  colorScheme: ColorScheme.light(
-                                    primary: borderColor,
-                                    onPrimary: Colors.white,
-                                    onSurface: _ink,
-                                  ),
-                                ),
-                                child: child!,
-                              );
-                            },
-                          );
-                          if (picked != null) {
-                            setStateDialog(() {
-                              dataSelecionada = picked;
-                              dataMovController.text = DateFormat('dd/MM/yyyy').format(picked);
-                            });
-                          }
-                        },
-                        child: IgnorePointer(
-                          child: TextField(
-                            controller: dataMovController,
-                            style: const TextStyle(fontSize: 13),
-                            decoration: InputDecoration(
-                              hintText: 'dd/mm/aaaa',
-                              prefixIcon: Icon(Icons.calendar_today, size: 16, color: borderColor),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: borderColor),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('Quantidade (Litros)',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: quantidadeController,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(fontSize: 13),
-                        maxLength: 7,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        onChanged: (value) {
-                          if (value.isNotEmpty) {
-                            final formatted = _formatarMilhar(value);
-                            quantidadeController.value = TextEditingValue(
-                              text: formatted,
-                              selection: TextSelection.collapsed(offset: formatted.length),
-                            );
-                          }
-                          setStateDialog(() {});
-                        },
-                        decoration: InputDecoration(
-                          hintText: '0',
-                          counterText: '',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: borderColor),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text('Descrição',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: descricaoController,
-                        style: const TextStyle(fontSize: 13),
-                        maxLines: 4,
-                        minLines: 4,
-                        maxLength: 200,
-                        keyboardType: TextInputType.multiline,
-                        onChanged: (_) => setStateDialog(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Digite...',
-                          counterText: '',
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: borderColor),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                          isDense: true,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: borderColor, width: 0.8),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: Text('Voltar', style: TextStyle(color: borderColor, fontSize: 13)),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: (descricaoController.text.trim().isEmpty || 
-                                         quantidadeController.text.trim().isEmpty)
-                                  ? null 
-                                  : () {
-                                      Navigator.pop(context);
-                                      _salvarMovimentacaoAvulsa(
-                                        dataSelecionada,
-                                        descricaoController.text,
-                                        quantidadeController.text,
-                                        tipoMovimento,
-                                      );
-                                    },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: borderColor,
-                                disabledBackgroundColor: Colors.grey.shade400,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text('Salvar', style: TextStyle(color: Colors.white, fontSize: 13)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
+        return MovimentacaoAvulsaDialog(
+          tanqueId: tanqueId,
+          terminalId: terminalId,
+          onSalvar: () {
+            _carregarDados();
+            // Recarrega os CACLs do tanque se necessário
+            if (tanqueId.isNotEmpty) {
+              _carregarCaclsDoTanque(tanqueId);
+            }
           },
         );
       },
     );
   }
-
-  Future<void> _salvarMovimentacaoAvulsa(
-      DateTime data, String descricao, String quantidade, String tipo) async {
-    try {
-      final supabase = Supabase.instance.client;
-      final tanqueId = _tanqueSelecionadoParaAcoes?['id'];
-
-      if (tanqueId == null) return;
-
-      final valorNumerico =
-          double.tryParse(quantidade.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
-
-      await supabase.from('movimentacoes_tanque').insert({
-        'tanque_id': tanqueId,
-        'data_mov': data.toIso8601String(),
-        'descricao': descricao,
-        'tipo_mov': tipo,
-        'entrada_vinte': tipo == 'Entrada' ? valorNumerico : 0,
-        'saida_vinte': tipo == 'Saída' ? valorNumerico : 0,
-        'terminal_id':
-            widget.terminalSelecionadoId ?? UsuarioAtual.instance?.terminalId,
-      });
-
-      _mostrarAviso('Movimentação lançada com sucesso!', erro: false);
-      _carregarDados();
-    } catch (e) {
-      _mostrarAviso('Erro ao salvar movimentação: $e');
-    }
-  }
 }
 
-class _TanqueCard extends StatefulWidget {
+// Implementações mínimas das classes auxiliares que eram parte do arquivo original.
+
+class _TanqueCard extends StatelessWidget {
   final Map<String, dynamic> tanque;
   final Color statusColor;
   final VoidCallback onTap;
 
-  const _TanqueCard({
-    required this.tanque,
-    required this.statusColor,
-    required this.onTap,
-  });
-
-  @override
-  State<_TanqueCard> createState() => _TanqueCardState();
-}
-
-class _TanqueCardState extends State<_TanqueCard> {
-  static const Color _ink = Color(0xFF0E1C2F);
-  static const Color _muted = Color(0xFF5A6B7A);
-  static const Color _line = Color(0xFFE6DCCB);
-  
-  bool _isHovering = false;
+  const _TanqueCard({required this.tanque, required this.statusColor, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
-      child: AnimatedScale(
-        scale: _isHovering ? 1.01 : 1.0,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
-        child: Material(
-          color: _isHovering ? const Color(0xFFF5F5F5) : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: _line, width: 1.2),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: widget.onTap,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 6,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: widget.statusColor,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.tanque['referencia'],
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: _ink,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.tanque['produto'],
-                          style: const TextStyle(
-                            color: _muted,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (widget.tanque['lastro'] != null &&
-                          widget.tanque['lastro'].toString().trim().isNotEmpty)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: _line, width: 1.2),
-                          ),
-                          child: Text(
-                            'Lastro: ${_formatarMilhar(widget.tanque['lastro'])} L',
-                            style: const TextStyle(
-                              color: _ink,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      if (widget.tanque['lastro'] != null &&
-                          widget.tanque['lastro'].toString().trim().isNotEmpty)
-                        const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: _line, width: 1.2),
-                        ),
-                        child: Text(
-                          '${_formatarMilhar(widget.tanque['capacidade'])} L',
-                          style: const TextStyle(
-                            color: _ink,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: widget.statusColor, width: 1.2),
-                        ),
-                        child: Text(
-                          widget.tanque['status'],
-                          style: TextStyle(
-                            color: widget.statusColor,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+    final referencia = tanque['referencia']?.toString() ?? 'Tanque';
+    final produto = tanque['produto']?.toString() ?? '';
+    return Card(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200, width: 1.4),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        title: Text(referencia, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(produto, style: TextStyle(color: Color(0xFF1B6A6F))),
+        // Removed small status circle to simplify card layout per request
       ),
     );
   }
@@ -2629,469 +2199,9 @@ class _SelecaoTipoVisualizacaoBottomSheet extends StatefulWidget {
 }
 
 class _SelecaoTipoVisualizacaoBottomSheetState extends State<_SelecaoTipoVisualizacaoBottomSheet> {
-  bool _tipoDataEspecifica = true;
-  bool _tipoMensal = false;
-  bool _mostrarDetalhado = true;
-  
-  DateTime _dataSelecionada = DateTime.now();
-  int _mesSelecionado = DateTime.now().month;
-  int _anoSelecionado = DateTime.now().year;
-  
-  final TextEditingController _dataController = TextEditingController();
-  final TextEditingController _mesAnoController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _atualizarDataController();
-    _atualizarMesAnoController();
-  }
-
-  void _atualizarDataController() {
-    _dataController.text = DateFormat('dd/MM/yyyy').format(_dataSelecionada);
-  }
-
-  void _atualizarMesAnoController() {
-    _mesAnoController.text = '${_mesSelecionado.toString().padLeft(2, '0')}/${_anoSelecionado}';
-  }
-
-  Future<void> _selecionarData() async {
-    DateTime tempDate = _dataSelecionada;
-    final DateTime? picked = await showDialog<DateTime>(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Container(
-            width: 350,
-            padding: const EdgeInsets.all(20),
-            child: StatefulBuilder(
-              builder: (context, setStateDialog) {
-                int? hoveredDay;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, color: Color(0xFF0D47A1), size: 24),
-                        const SizedBox(width: 12),
-                        const Text('Selecionar data', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
-                        const Spacer(),
-                        IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.of(context).pop(), color: Colors.grey, padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(icon: const Icon(Icons.chevron_left, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month - 1, tempDate.day); }); }),
-                          Text('${_getNomeMes(tempDate.month)} ${tempDate.year}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1))),
-                          IconButton(icon: const Icon(Icons.chevron_right, color: Color(0xFF0D47A1)), onPressed: () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month + 1, tempDate.day); }); }),
-                        ],
-                      ),
-                    ),
-                    GridView.count(
-                      shrinkWrap: true,
-                      crossAxisCount: 7,
-                      childAspectRatio: 1.0,
-                      children: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day) {
-                        return Center(child: Text(day, style: const TextStyle(color: Color(0xFF0D47A1), fontWeight: FontWeight.bold)));
-                      }).toList(),
-                    ),
-                    GridView.count(
-                      shrinkWrap: true,
-                      crossAxisCount: 7,
-                      childAspectRatio: 1.0,
-                      children: _getDaysInMonth(tempDate).map((day) {
-                        final isSelected = day != null && day == tempDate.day;
-                        final isToday = day != null && day == DateTime.now().day && tempDate.month == DateTime.now().month && tempDate.year == DateTime.now().year;
-                        return StatefulBuilder(
-                          builder: (context, setDayState) {
-                            return MouseRegion(
-                              cursor: day != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
-                              onEnter: (_) { if (day != null) { setDayState(() => hoveredDay = day); } },
-                              onExit: (_) { if (day != null) { setDayState(() => hoveredDay = null); } },
-                              child: GestureDetector(
-                                onTap: day != null ? () { setStateDialog(() { tempDate = DateTime(tempDate.year, tempDate.month, day); }); } : null,
-                                child: Container(
-                                  margin: const EdgeInsets.all(2),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFF0D47A1)
-                                        : (day != null && hoveredDay == day) ? const Color(0xFF0D47A1).withValues(alpha: 0.1)
-                                        : isToday ? const Color(0x220D47A1) : Colors.transparent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(child: Text(
-                                    day != null ? day.toString() : '',
-                                    style: TextStyle(
-                                      color: isSelected ? Colors.white : isToday || (day != null && hoveredDay == day) ? const Color(0xFF0D47A1) : Colors.black87,
-                                      fontWeight: isSelected || isToday || (day != null && hoveredDay == day) ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  )),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(onPressed: () => Navigator.of(context).pop(), style: TextButton.styleFrom(foregroundColor: Colors.black87, padding: const EdgeInsets.symmetric(horizontal: 16)), child: const Text('CANCELAR')),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () => Navigator.of(context).pop(tempDate),
-                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D47A1), foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          child: const Text('SELECIONAR', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-
-    if (picked != null) {
-      setState(() {
-        _dataSelecionada = picked;
-        _tipoDataEspecifica = true;
-        _tipoMensal = false;
-        _atualizarDataController();
-      });
-    }
-  }
-
-  String _getNomeMes(int mes) {
-    const meses = [
-      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
-    ];
-    return meses[mes - 1];
-  }
-
-  List<int?> _getDaysInMonth(DateTime date) {
-    final firstDay = DateTime(date.year, date.month, 1);
-    final lastDay = DateTime(date.year, date.month + 1, 0);
-    final firstWeekday = firstDay.weekday;
-    final startOffset = firstWeekday == 7 ? 0 : firstWeekday;
-    List<int?> days = [];
-    for (int i = 0; i < startOffset; i++) {
-      days.add(null);
-    }
-    for (int i = 1; i <= lastDay.day; i++) {
-      days.add(i);
-    }
-    while (days.length < 42) {
-      days.add(null);
-    }
-    return days;
-  }
-
-  Future<void> _selecionarMesAno() async {
-    int tempMes = _mesSelecionado;
-    int tempAno = _anoSelecionado;
-
-    await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return Dialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Center(
-                        child: Text(
-                          'Selecionar Mês/Ano',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0D47A1),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int>(
-                                  value: tempMes,
-                                  isExpanded: true,
-                                  icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF0D47A1)),
-                                  items: List.generate(12, (index) {
-                                    final mes = index + 1;
-                                    return DropdownMenuItem(
-                                      value: mes,
-                                      child: Text(
-                                        _getNomeMes(mes),
-                                        style: const TextStyle(fontSize: 15),
-                                      ),
-                                    );
-                                  }),
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      setStateDialog(() => tempMes = value);
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: TextFormField(
-                              initialValue: tempAno.toString(),
-                              decoration: InputDecoration(
-                                labelText: 'Ano',
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                  borderSide: BorderSide(color: Colors.grey.shade300),
-                                ),
-                              ),
-                              keyboardType: TextInputType.number,
-                              onChanged: (value) {
-                                final ano = int.tryParse(value);
-                                if (ano != null && ano >= 2000 && ano <= 2100) {
-                                  setStateDialog(() => tempAno = ano);
-                                }
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      InkWell(
-                        onTap: () {
-                          setState(() => _mostrarDetalhado = !_mostrarDetalhado);
-                          setStateDialog(() {});
-                        },
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: _mostrarDetalhado,
-                              onChanged: (val) {
-                                setState(() => _mostrarDetalhado = val ?? true);
-                                setStateDialog(() {});
-                              },
-                              activeColor: const Color(0xFF0D47A1),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            const Text('Mostrar detalhado', style: TextStyle(fontSize: 14)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                side: const BorderSide(color: Color(0xFF0D47A1)),
-                                foregroundColor: const Color(0xFF0D47A1),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              ),
-                              child: const Text('Cancelar'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context); // Fecha o Diálogo de Mês/Ano
-                                Navigator.pop(context); // Fecha o BottomSheet Original
-
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (ctx) => EstoqueTanqueMensalPage(
-                                      tanqueId: widget.tanqueId,
-                                      referenciaTanque: widget.referenciaTanque,
-                                      terminalId: widget.terminalId,
-                                      nomeTerminal: widget.nomeTerminal,
-                                      mes: tempMes,
-                                      ano: tempAno,
-                                      mostrarDetalhado: _mostrarDetalhado,
-                                      onVoltar: () {
-                                        Navigator.of(ctx).pop();
-                                        widget.onVoltar();
-                                      },
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                backgroundColor: const Color(0xFF0D47A1),
-                                foregroundColor: Colors.white,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                elevation: 0,
-                              ),
-                              child: const Text('Confirmar'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  void _visualizar() {
-    if (!_tipoDataEspecifica && !_tipoMensal) {
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (BuildContext context) {
-            return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 0,
-              backgroundColor: Colors.transparent,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 350),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.rectangle,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10.0,
-                        offset: const Offset(0.0, 10.0),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 40,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Atenção',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0E1C2F),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Selecione um tipo de visualização',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Color(0xFF5A6B7A)),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'OK',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      );
-    }
-    return;
-  }
-
-  Navigator.pop(context);
-
-    if (_tipoDataEspecifica) {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (ctx) => EstoqueTanquePage(
-            tanqueId: widget.tanqueId,
-            referenciaTanque: widget.referenciaTanque,
-            data: _dataSelecionada,
-            onVoltar: () {
-              Navigator.of(ctx).pop();
-              widget.onVoltar();
-            },
-          ),
-        ),
-      );
-    } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (ctx) => EstoqueTanqueMensalPage(
-            tanqueId: widget.tanqueId,
-            referenciaTanque: widget.referenciaTanque,
-            terminalId: widget.terminalId,
-            nomeTerminal: widget.nomeTerminal,
-            mes: _mesSelecionado,
-            ano: _anoSelecionado,
-            mostrarDetalhado: _mostrarDetalhado,
-            onVoltar: () {
-              Navigator.of(ctx).pop();
-              widget.onVoltar();
-            },
-          ),
-        ),
-      );
-    }
-  }
+  final DateTime _dataSelecionada = DateTime.now();
+  final int _mesSelecionado = DateTime.now().month;
+  final int _anoSelecionado = DateTime.now().year;
 
   @override
   Widget build(BuildContext context) {
@@ -3100,207 +2210,64 @@ class _SelecaoTipoVisualizacaoBottomSheetState extends State<_SelecaoTipoVisuali
       behavior: HitTestBehavior.opaque,
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: GestureDetector(
-          onTap: () {},
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Center(
-                    child: Text(
-                      'Selecionar Período',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  InkWell(
-                    onTap: _selecionarData,
-                    child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: _tipoDataEspecifica 
-                          ? const Color(0xFF0D47A1) 
-                          : Colors.grey.shade300,
-                      width: _tipoDataEspecifica ? 2 : 1,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    color: _tipoDataEspecifica 
-                        ? const Color(0xFF0D47A1).withValues(alpha: 0.05)
-                        : Colors.white,
-                  ),
-                  child: Row(
-                    children: [
-                      Radio<bool>(
-                        value: true,
-                        groupValue: _tipoDataEspecifica,
-                        onChanged: (value) {
-                          setState(() {
-                            _tipoDataEspecifica = true;
-                            _tipoMensal = false;
-                          });
-                        },
-                        activeColor: const Color(0xFF0D47A1),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'Data específica',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _dataController.text,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Visualizar estoque - ${widget.referenciaTanque}', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              
-              InkWell(
-                onTap: _selecionarMesAno,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: _tipoMensal 
-                          ? const Color(0xFF0D47A1) 
-                          : Colors.grey.shade300,
-                      width: _tipoMensal ? 2 : 1,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    color: _tipoMensal 
-                        ? const Color(0xFF0D47A1).withValues(alpha: 0.05)
-                        : Colors.white,
-                  ),
-                  child: Row(
-                    children: [
-                      Radio<bool>(
-                        value: true,
-                        groupValue: _tipoMensal,
-                        onChanged: (value) {
-                          setState(() {
-                            _tipoMensal = true;
-                            _tipoDataEspecifica = false;
-                          });
-                        },
-                        activeColor: const Color(0xFF0D47A1),
-                      ),
-                      const Expanded(
-                        child: Text(
-                          'Estoque mensal',
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _mesAnoController.text,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              if (_tipoMensal)
-                InkWell(
-                  onTap: () => setState(() => _mostrarDetalhado = !_mostrarDetalhado),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 10, left: 4),
-                    child: Row(
-                      children: [
-                        Checkbox(
-                          value: _mostrarDetalhado,
-                          onChanged: (val) => setState(() => _mostrarDetalhado = val ?? true),
-                          activeColor: const Color(0xFF0D47A1),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        const Text('Mostrar detalhado', style: TextStyle(fontSize: 14)),
-                      ],
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 24),
-              
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: const BorderSide(color: Color(0xFF0D47A1)),
-                        foregroundColor: const Color(0xFF0D47A1),
-                      ),
-                      child: const Text('Voltar'),
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => EstoqueTanquePage(
+                          tanqueId: widget.tanqueId,
+                          referenciaTanque: widget.referenciaTanque,
+                          data: _dataSelecionada,
+                          onVoltar: () {
+                            Navigator.of(ctx).pop();
+                            widget.onVoltar();
+                          },
+                        )));
+                      },
+                      child: const Text('Diário'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _visualizar,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        backgroundColor: const Color(0xFF0D47A1),
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Visualizar'),
+                      onPressed: () {
+                        Navigator.of(context).push(MaterialPageRoute(builder: (ctx) => EstoqueTanqueMensalPage(
+                          tanqueId: widget.tanqueId,
+                          referenciaTanque: widget.referenciaTanque,
+                          terminalId: widget.terminalId,
+                          nomeTerminal: widget.nomeTerminal,
+                          mes: _mesSelecionado,
+                          ano: _anoSelecionado,
+                          mostrarDetalhado: true,
+                          onVoltar: () {
+                            Navigator.of(ctx).pop();
+                            widget.onVoltar();
+                          },
+                        )));
+                      },
+                      child: const Text('Mensal'),
                     ),
                   ),
                 ],
               ),
-              
               const SizedBox(height: 10),
             ],
           ),
         ),
       ),
-    ),
-    ),
     );
-  }
-
-  @override
-  void dispose() {
-    _dataController.dispose();
-    _mesAnoController.dispose();
-    super.dispose();
   }
 }
 

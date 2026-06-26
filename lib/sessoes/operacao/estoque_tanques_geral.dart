@@ -1282,7 +1282,7 @@ class TankIllustration extends StatefulWidget {
   final double scale;
 
   const TankIllustration({
-    Key? key,
+    super.key,
     required this.percentual,
     required this.lastroPercentual,
     required this.estoqueAtual,
@@ -1291,7 +1291,7 @@ class TankIllustration extends StatefulWidget {
     required this.espacoLivre,
     this.hideDetails = false,
     this.scale = 1.0,
-  }) : super(key: key);
+  });
 
   @override
   State<TankIllustration> createState() => _TankIllustrationState();

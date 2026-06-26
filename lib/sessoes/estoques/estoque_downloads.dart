@@ -5,9 +5,9 @@ class DownloadsPage extends StatefulWidget {
   final VoidCallback onVoltar;
 
   const DownloadsPage({
-    Key? key,
+    super.key,
     required this.onVoltar,
-  }) : super(key: key);
+  });
 
   @override
   State<DownloadsPage> createState() => _DownloadsPageState();
