@@ -128,7 +128,11 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
     } catch (_) {}
   }
 
-  Future<void> _carregarDadosTanques() async {
+  Future<void> _carregarDadosTanques({bool preserveSelection = false}) async {
+    final String? prevSelectedTanqueId = (preserveSelection && tanqueSelecionadoIndex >= 0 && tanqueSelecionadoIndex < tanques.length)
+        ? tanques[tanqueSelecionadoIndex].id
+        : null;
+
     setState(() => _carregando = true);
 
     if (widget.terminalSelecionadoId == null) {
@@ -231,7 +235,9 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
               totalEntradaAmb += entradaA.toDouble();
               totalSaidaAmb += saidaA.toDouble();
             }
-          } catch (e) {
+          } catch (e, stackTrace) {
+            debugPrint('❌ Erro ao somar movimentações do tanque $id: $e');
+            debugPrint('📚 Stack: $stackTrace');
           }
 
           // Totais calculados (logging removido)
@@ -240,10 +246,13 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
             // Modo atual: considera entradas/saídas por vinte
             estoqueAtual += (totalEntradaVinte - totalSaidaVinte);
           } else {
-            // Modo previsto: não considerar 'saida_vinte', mas sim 'saida_amb'
-            estoqueAtual = estoqueInicial - totalSaidaAmb;
+            // Modo previsto: considera entradas/saídas por ambiente (AMB)
+            // Usa tanto entrada_amb quanto saida_amb
+            estoqueAtual += (totalEntradaAmb - totalSaidaAmb);
           }
-        } catch (e) {
+        } catch (e, stackTrace) {
+          debugPrint('❌ Erro ao calcular estoque do tanque $id: $e');
+          debugPrint('📚 Stack: $stackTrace');
           // mantém estoqueAtual = estoqueInicial em caso de erro
         }
 
@@ -269,9 +278,30 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
         );
       }
 
+      // Decide qual índice selecionar após recarregar
+      int selectedIndexToSet = -1;
+      if (preserveSelection) {
+        if (prevSelectedTanqueId != null) {
+          final found = lista.indexWhere((d) => d.id == prevSelectedTanqueId);
+          if (found >= 0) {
+            selectedIndexToSet = found;
+          } else if (tanqueSelecionadoIndex >= 0 && tanqueSelecionadoIndex < lista.length) {
+            selectedIndexToSet = tanqueSelecionadoIndex;
+          } else {
+            selectedIndexToSet = -1;
+          }
+        } else if (tanqueSelecionadoIndex >= 0 && tanqueSelecionadoIndex < lista.length) {
+          selectedIndexToSet = tanqueSelecionadoIndex;
+        } else {
+          selectedIndexToSet = -1;
+        }
+      } else {
+        selectedIndexToSet = -1; // padrão: mostrar todos
+      }
+
       setState(() {
         tanques = lista;
-        tanqueSelecionadoIndex = -1; // Começa por padrão em "Todos"
+        tanqueSelecionadoIndex = selectedIndexToSet;
         _carregando = false;
       });
     } catch (e) {
@@ -398,13 +428,13 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                               height: 70,
                               width: 110,
                               child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                curve: Curves.easeOut,
-                                alignment: Alignment.center,
-                                transform:
-                                    _hoverIndex == -1 && tanqueSelecionadoIndex != -1
-                                    ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
-                                    : Matrix4.identity(),
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeOut,
+                              alignment: Alignment.center,
+                              transform:
+                                _hoverIndex == -1 && tanqueSelecionadoIndex != -1
+                                ? Matrix4.diagonal3Values(1.0, 1.08, 1.0)
+                                : Matrix4.identity(),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 6,
@@ -486,7 +516,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                   curve: Curves.easeOut,
                                   alignment: Alignment.center, // Centraliza o conteúdo internally
                                   transform: isHovered && !isSelected
-                                      ? (Matrix4.identity()..scale(1.0, 1.08, 1.0))
+                                      ? Matrix4.diagonal3Values(1.0, 1.08, 1.0)
                                       : Matrix4.identity(),
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8, // Reduzido o padding horizontal para favorecer o texto
@@ -1015,7 +1045,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                             setState(() {
                               _mostrarPrevisto = !_mostrarPrevisto;
                             });
-                            await _carregarDadosTanques();
+                            await _carregarDadosTanques(preserveSelection: true);
                           },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -1039,7 +1069,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                     child: GestureDetector(
                                     onTap: () async {
                                       setState(() => _mostrarPrevisto = false);
-                                      await _carregarDadosTanques();
+                                      await _carregarDadosTanques(preserveSelection: true);
                                     },
                                     child: _buildSwitchOption(
                                       "Nível atual",
@@ -1058,8 +1088,8 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                       setState(() => _hoverSwitchOption = null),
                                   child: GestureDetector(
                                     onTap: () async {
-                                        setState(() => _mostrarPrevisto = true);
-                                        await _carregarDadosTanques();
+                                      setState(() => _mostrarPrevisto = true);
+                                      await _carregarDadosTanques(preserveSelection: true);
                                     },
                                     child: _buildSwitchOption(
                                       "Previsto",

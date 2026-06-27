@@ -617,8 +617,8 @@ class _ListarCaclsPageState extends State<ListarCaclsPage> with WidgetsBindingOb
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 180),
                                   curve: Curves.easeOut,
-                                  transform: _hoverIndex == index
-                                      ? (Matrix4.identity()..scale(1.01))
+                                    transform: _hoverIndex == index
+                                      ? Matrix4.diagonal3Values(1.01, 1.01, 1.0)
                                       : Matrix4.identity(),
                                   decoration: BoxDecoration(
                                     color: _hoverIndex == index

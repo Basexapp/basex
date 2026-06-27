@@ -1852,8 +1852,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
                                       const Duration(milliseconds: 180),
                                   curve: Curves.easeOut,
                                   transform: _hoverCaclIndex == index
-                                      ? (Matrix4.identity()
-                                        ..scale(1.01, 1.01))
+                                      ? Matrix4.diagonal3Values(1.01, 1.01, 1.0)
                                       : Matrix4.identity(),
                                   decoration: BoxDecoration(
                                     color: _hoverCaclIndex == index
