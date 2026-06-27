@@ -165,7 +165,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
 
         try {
           final params = {'p_tanque_id': id, 'p_data': dataStr};
-          debugPrint('[RPC-CALL] saldo_inicial_estoque_tanques_geral params=$params mostrarPrevisto=$_mostrarPrevisto');
           final rpc = await supabase.rpc(
             'saldo_inicial_estoque_tanques_geral',
             params: params,
@@ -189,7 +188,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
               estoqueInicial = double.tryParse(rpc.toString()) ?? 0.0;
             }
 
-            debugPrint('[RPC-ESTOQUE-INICIAL] tanque=$id rpc=${rpc.runtimeType} value=$rpc estoqueInicial=$estoqueInicial');
+            
         } catch (e) {
           estoqueInicial = 0.0;
         }
@@ -198,52 +197,54 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
 
         try {
           // Log tanque raw data for debugging
-          debugPrint('[TANQUE-DATA] id=$id referencia=${t['referencia']} capacidade=${t['capacidade']} produtos=${t['produtos']}');
+
+          // Busca todas as colunas relevantes de movimentações e calcula
+          // conforme o modo atual (Atual vs Previsto).
+          final movs = await supabase
+              .from('movimentacoes_tanque')
+              .select('entrada_vinte, saida_vinte, entrada_amb, saida_amb')
+              .eq('tanque_id', id)
+              .gte('data_mov', '$dataStr 00:00:00')
+              .lte('data_mov', '$dataStr 23:59:59');
+
+          // Helper local para converter valores robustamente
+          num parseNum(dynamic v) {
+            if (v == null) return 0;
+            if (v is num) return v;
+            return num.tryParse(v.toString()) ?? 0;
+          }
+
+          double totalEntradaVinte = 0.0;
+          double totalSaidaVinte = 0.0;
+          double totalEntradaAmb = 0.0;
+          double totalSaidaAmb = 0.0;
+
+          try {
+            for (final m in List<Map<String, dynamic>>.from(movs)) {
+              final entradaV = parseNum(m['entrada_vinte']);
+              final saidaV = parseNum(m['saida_vinte']);
+              final entradaA = parseNum(m['entrada_amb']);
+              final saidaA = parseNum(m['saida_amb']);
+
+              totalEntradaVinte += entradaV.toDouble();
+              totalSaidaVinte += saidaV.toDouble();
+              totalEntradaAmb += entradaA.toDouble();
+              totalSaidaAmb += saidaA.toDouble();
+            }
+          } catch (e) {
+          }
+
+          // Totais calculados (logging removido)
 
           if (!_mostrarPrevisto) {
-            // comportamento original: considera entradas/saídas por vinte
-            final movs = await supabase
-                .from('movimentacoes_tanque')
-                .select('entrada_vinte, saida_vinte')
-                .eq('tanque_id', id)
-                .gte('data_mov', '$dataStr 00:00:00')
-                .lte('data_mov', '$dataStr 23:59:59');
-
-            double totalEntrada = 0.0;
-            double totalSaidaVinte = 0.0;
-
-            for (final m in List<Map<String, dynamic>>.from(movs)) {
-              final entrada = (m['entrada_vinte'] ?? 0) as num;
-              final saida = (m['saida_vinte'] ?? 0) as num;
-              totalEntrada += entrada.toDouble();
-              totalSaidaVinte += saida.toDouble();
-              estoqueAtual += (entrada - saida).toDouble();
-            }
-
-            debugPrint('[ESTOQUE-ATUAL] tanque=$id estoqueInicial=$estoqueInicial totalEntrada=$totalEntrada totalSaidaVinte=$totalSaidaVinte estoqueCalculado=$estoqueAtual');
+            // Modo atual: considera entradas/saídas por vinte
+            estoqueAtual += (totalEntradaVinte - totalSaidaVinte);
           } else {
-            // previsto: mostrar estoque inicial menos saídas ambiente do dia
-            final movs = await supabase
-                .from('movimentacoes_tanque')
-                .select('saida_amb')
-                .eq('tanque_id', id)
-                .gte('data_mov', '$dataStr 00:00:00')
-                .lte('data_mov', '$dataStr 23:59:59');
-
-            double totalSaidaAmb = 0.0;
-            for (final m in List<Map<String, dynamic>>.from(movs)) {
-              final saidaAmb = (m['saida_amb'] ?? 0) as num;
-              totalSaidaAmb += saidaAmb.toDouble();
-            }
-
-            debugPrint('[ESTOQUE-PREVISTO] tanque=$id estoqueInicial=$estoqueInicial totalSaidaAmb=$totalSaidaAmb');
-
+            // Modo previsto: não considerar 'saida_vinte', mas sim 'saida_amb'
             estoqueAtual = estoqueInicial - totalSaidaAmb;
-            debugPrint('[ESTOQUE-PREVISTO] tanque=$id estoquePrevisto=$estoqueAtual');
           }
         } catch (e) {
           // mantém estoqueAtual = estoqueInicial em caso de erro
-          debugPrint('[ESTOQUE-ERROR] tanque=$id error=$e');
         }
 
         final detalhes = [

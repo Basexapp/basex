@@ -1796,7 +1796,7 @@ class _EmitirCertificadoPageState extends State<EmitirCertificadoPage> {
     final supabase = Supabase.instance.client;
     
     try {
-      print('🔍 DEBUG _buscarDensidade20C:');
+      
       print('   > Entrada: Temp=$temperaturaAmostra, Dens=$densidadeObservada, Produto=$produtoNome');
 
       if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) {
@@ -2000,7 +2000,7 @@ String temperaturaFormatada = temperaturaAmostra
     final supabase = Supabase.instance.client;
 
     try {
-      print('🔍 DEBUG _buscarFCV:');
+      
       print('   > Entrada: TempTanque=$temperaturaTanque, Dens20C=$densidade20C, Produto=$produtoNome');
 
       if (temperaturaTanque.isEmpty ||

@@ -886,14 +886,13 @@ class _HomePageCardsState extends State<HomePageCards>
       } else if (nivelUsuario == 4) {
         // Nível 4: empresas que operam no terminal do usuário
         final terminalId = usuario?.terminalId ?? '';
-        debugPrint('🔍 [Nível 4] terminalId=$terminalId');
         if (terminalId.isNotEmpty) {
           final relacoes = await supabase
               .from('relacoes_terminais')
               .select('empresa_id')
               .eq('terminal_id', terminalId);
 
-          debugPrint('🔍 [Nível 4] relacoes_terminais retornou ${relacoes.length} registros');
+          
 
           final empresasIds = relacoes
               .map((r) => r['empresa_id']?.toString())
@@ -902,7 +901,7 @@ class _HomePageCardsState extends State<HomePageCards>
               .toSet()
               .toList();
 
-          debugPrint('🔍 [Nível 4] empresasIds=$empresasIds');
+          
 
           if (empresasIds.isNotEmpty) {
             final result = await supabase
@@ -2441,7 +2440,6 @@ class _HomePageCardsState extends State<HomePageCards>
             String? pesquisa,
           }) {
             // Futura implementação da página de resultado
-            debugPrint('Consultar bombeios: $terminalId, $dataInicial - $dataFinal, $produtoId, $produtoNome, $pesquisa');
           },
           onVoltar: () {
             setState(() {
@@ -3468,7 +3466,7 @@ class _HomePageCardsState extends State<HomePageCards>
         _navegarParaCardRelatorios(tipo);
         break;
       default:
-        debugPrint('Sessão pai não reconhecida: $sessaoPai');
+        
     }
   }
 
@@ -3739,7 +3737,6 @@ class _HomePageCardsState extends State<HomePageCards>
         break;
 
       default:
-        debugPrint('Tipo de card de estoques não reconhecido: $tipo');
         break;
     }
   }

@@ -429,7 +429,6 @@ class _CalculadoraArqueacaoDialogState
           .order('densid_obs');
       
       if (registros.isEmpty) {
-        debugPrint('Tabela Alcoométrica: Nenhum registro para temperatura $tempNum');
         return null;
       }
       
