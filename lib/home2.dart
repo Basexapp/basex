@@ -1554,17 +1554,16 @@ class _HomePageCardsState extends State<HomePageCards>
                       ),
                     ],
                   ),
-                  if (selectedIndex == 0 || selectedIndex == -1)
-                    Center(
-                      child: Text(
-                        _formatarDataAtual(),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          color: Color(0xFF0D47A1),
-                          fontWeight: FontWeight.bold,
-                        ),
+                  Center(
+                    child: Text(
+                      _formatarDataAtual(),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        color: Color(0xFF0D47A1),
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                  ),
                 ],
               ),
             ),

@@ -615,7 +615,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         'terminal_id': terminalId,
         'empresa_id': empresaId,
         'tanque_id': _selectedTanque!['id'],
-        'num_controle': _bombeioLocal?['num_controle'],
         'data': dataIso.isNotEmpty ? dataIso : null,
         'horario': horarioIso.isNotEmpty ? horarioIso : null,
         'medicao_inicial_id': _medicaoInicialSalva?['id'],

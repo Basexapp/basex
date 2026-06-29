@@ -212,7 +212,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                 children: [
                   // --- MEDIÇÕES ---
                   const Text(
-                    'MEDIÇÕES DO BOMBEIO',
+                    'Medições',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,

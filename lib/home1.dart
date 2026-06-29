@@ -1618,20 +1618,19 @@ class _HomePageState extends State<HomePage>
                       ),
                     ],
                   ),
-                  if (selectedIndex == 0 || selectedIndex == -1)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: Center(
-                        child: Text(
-                          _formatarDataAtual(),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            color: Color(0xFF0D47A1),
-                            fontWeight: FontWeight.bold,
-                          ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 20),
+                    child: Center(
+                      child: Text(
+                        _formatarDataAtual(),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          color: Color(0xFF0D47A1),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
+                  ),
                 ],
               ),
             ),

@@ -390,7 +390,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
       ''').eq('id', id).maybeSingle();
 
       if (resp == null) return;
-      final item = resp as Map<String, dynamic>;
+      final item = resp;
       final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
       final tanques = tanquesArr is List ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null) : tanquesArr;
       final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
