@@ -321,7 +321,7 @@ class _LoginPageState extends State<LoginPage> {
           Positioned(
             top: 80,
             left: 80,
-            child: Image.asset('assets/logo-login.png'),
+            child: Image.asset('assets/logo-top-login.png'),
           ),
           Center(
             child: ClipRRect(
@@ -520,7 +520,7 @@ class _LoginPageState extends State<LoginPage> {
                         fontWeight: FontWeight.w400,
                       ),
                       children: [
-                        const TextSpan(text: 'Base X'),
+                        const TextSpan(text: 'base-x'),
                         WidgetSpan(
                           child: Transform.translate(
                             offset: const Offset(0, -5),

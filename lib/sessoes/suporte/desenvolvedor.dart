@@ -117,7 +117,7 @@ class DesenvolvedorPageState extends State<DesenvolvedorPage>
                           'Faça perguntas, peça melhorias, traga problemas.\n'
                           'Escreva do seu jeito, traga ideias mal formadas,\n'
                           'liberte sua mente.\n\n'
-                          'A equipe Base X agradece sua contribuição.',
+                          'A equipe Base-X agradece sua contribuição.',
                           fontSize: 20,
                         ),
                         const SizedBox(height: 32),
@@ -517,7 +517,7 @@ class EnviarSugestaoPageState extends State<EnviarSugestaoPage> {
               const SizedBox(height: 16),
               const Text(
                 'Sua mensagem foi salva e será analisada com atenção.\n\n'
-                'A equipe Base X agradece sua contribuição!',
+                'A equipe Base-X agradece sua contribuição!',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 16,

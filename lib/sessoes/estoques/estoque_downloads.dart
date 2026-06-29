@@ -79,7 +79,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
         {
           'id': '3',
           'nome': 'Manual do Sistema',
-          'descricao': 'Guia completo de utilização do Base X',
+          'descricao': 'Guia completo de utilização do Base-X',
           'tamanho': '5.2 MB',
           'tipo': 'pdf',
           'data': DateTime.now().subtract(const Duration(days: 10)),

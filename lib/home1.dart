@@ -1429,13 +1429,13 @@ class _HomePageState extends State<HomePage>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(left: 10, top: 15),
+                        padding: const EdgeInsets.only(left: 10, top: 5),
                         child: InkWell(
                           onTap: _resetarTodasFlags,
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: Image.asset(
-                              'assets/basex-top-home.png',
+                              'assets/logo-top-home4.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -1835,7 +1835,7 @@ class _HomePageState extends State<HomePage>
                         letterSpacing: 0.3,
                       ),
                       children: [
-                        const TextSpan(text: 'Base X'),
+                        const TextSpan(text: 'base-x'),
                         WidgetSpan(
                           child: Transform.translate(
                             offset: const Offset(0, -4),
@@ -3864,7 +3864,7 @@ class _HomePageState extends State<HomePage>
       decoration: const BoxDecoration(
         color: Colors.white,
         image: DecorationImage(
-          image: AssetImage('assets/home-fundo.png'),
+          image: AssetImage('assets/home-fundo2.png'),
           alignment: Alignment.center,
           scale: 1.0, // Mantém o tamanho original
           opacity: 0.1, // Transparência para a imagem de fundo

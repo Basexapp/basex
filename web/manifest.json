@@ -1,6 +1,6 @@
 {
-    "name": "Base X",
-    "short_name": "basex",
+    "name": "Base-X",
+    "short_name": "Base-X",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

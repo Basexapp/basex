@@ -392,7 +392,7 @@ class CertificadoPDF {
                     pw.Divider(height: 0.5, color: PdfColors.grey400),
                     pw.SizedBox(height: 4),
                     pw.Text(
-                      'Base X - Sistema de Gestão de Terminais - $data $hora',
+                      'Base-X - Sistema de Gestão de Terminais - $data $hora',
                       style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
                       textAlign: pw.TextAlign.center,
                     ),

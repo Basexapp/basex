@@ -1371,7 +1371,7 @@ class _HomePageCardsState extends State<HomePageCards>
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: Image.asset(
-                              'assets/logo_top_home3.png',
+                              'assets/logo_top_home4.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -1718,7 +1718,7 @@ class _HomePageCardsState extends State<HomePageCards>
                         letterSpacing: 0.3,
                       ),
                       children: [
-                        const TextSpan(text: 'Base X'),
+                        const TextSpan(text: 'base-x'),
                         WidgetSpan(
                           child: Transform.translate(
                             offset: const Offset(0, -4),
