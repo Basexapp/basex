@@ -32,7 +32,7 @@ class DialogInserirBombeio extends StatefulWidget {
   final Map<String, dynamic>? bombeio;
   const DialogInserirBombeio({super.key, this.bombeio});
 
-  static Future<void> show(
+  static Future<Map<String, dynamic>?> show(
     BuildContext context, {
     Map<String, dynamic>? bombeio,
   }) {
@@ -63,16 +63,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   Map<String, dynamic>? _selectedTanque;
   String _produtoNome = '';
   final TextEditingController _produtoCtrl = TextEditingController();
-
-  final List<String> _distribuidorasFixas = [
-    'Zema',
-    'Raízen',
-    'Sim Distr.',
-    'Larco Distr.',
-  ];
-
-  late final Map<String, bool> selecionadas;
-  late final Map<String, TextEditingController> controllers;
+  // Distribuidoras carregadas do banco (empresa.id + empresas.nome_dois)
+  List<Map<String, dynamic>> _distribuidoras = [];
+  Map<String, bool> selecionadas = {};
+  Map<String, TextEditingController> controllers = {};
   final TextEditingController dataCtrl = TextEditingController();
   final TextEditingController horarioCtrl = TextEditingController();
   final TextEditingController _qtdFaturadaCtrl = TextEditingController();
@@ -105,13 +99,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
     // 3. Pelo menos 1 distribuidora com volume > 0
     bool temVolumeSolicitado = false;
-    for (var d in _distribuidorasFixas) {
-      if (selecionadas[d]!) {
-        final double val =
-            double.tryParse(
-              controllers[d]!.text.replaceAll('.', '').replaceAll(',', '.'),
-            ) ??
-            0;
+    for (var d in _distribuidoras) {
+      final nome = d['nome']?.toString() ?? '';
+      if (selecionadas[nome] == true) {
+        final double val = double.tryParse((controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.')) ?? 0;
         if (val > 0) {
           temVolumeSolicitado = true;
           break;
@@ -160,10 +151,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       empresaId = user!.empresaId;
       empresaNome = user!.empresaNome;
     }
-    selecionadas = {for (var d in _distribuidorasFixas) d: false};
-    controllers = {
-      for (var d in _distribuidorasFixas) d: TextEditingController(),
-    };
 
     if (_bombeioLocal != null) {
       final b = _bombeioLocal!;
@@ -184,27 +171,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       _medicaoFinalSalva = b['medicao_final'];
       _atualizarCalculos();
 
-      final vsol = b['volumes_solicitados'];
-      if (vsol != null && vsol is Map) {
-        vsol.forEach((key, value) {
-          if (_distribuidorasFixas.contains(key)) {
-            selecionadas[key] = true;
-            controllers[key]!.text = _fmt.format((value as num).toDouble());
-          }
-        });
-      }
-
-      if (b['participantes'] != null && b['participantes'] is List) {
-        for (var p in b['participantes']) {
-          final nome = p['nome'];
-          final sol = p['solicitado'];
-          if (_distribuidorasFixas.contains(nome)) {
-            selecionadas[nome] = true;
-            controllers[nome]!.text = _fmt.format(sol.toInt());
-          }
-        }
-      }
-
       if (b['qtd_faturada'] != null) {
         _qtdFaturadaCtrl.text = _fmt.format((b['qtd_faturada'] as num).toInt());
         _initialQtdFaturadaEmpty = false;
@@ -213,23 +179,15 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       if (_medicaoInicialSalva != null && _medicaoFinalSalva != null) {
         _initialBothMedicoesExist = true;
       }
+    }
 
-      // Calcula o total inicial a partir do que foi carregado nos campos da UI
-      double totalInicialCalc = 0;
-      for (var d in _distribuidorasFixas) {
-        if (selecionadas[d]!) {
-          final text = controllers[d]!.text
-              .replaceAll('.', '')
-              .replaceAll(',', '.');
-          totalInicialCalc += double.tryParse(text) ?? 0;
-        }
-      }
-      _totalVolumesNoInicio = totalInicialCalc;
-
-      _atualizarCalculos();
+    // Se não há data preenchida (novo bombeio ou sem data), preenche com a data atual
+    if (dataCtrl.text.isEmpty) {
+      dataCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
     }
 
     _fetchTanques();
+    _fetchDistribuidoras();
     _qtdFaturadaCtrl.addListener(_atualizarCalculos);
     _dataFocusNode.addListener(() {
       if (!_dataFocusNode.hasFocus) {
@@ -326,6 +284,87 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
   }
 
+  Future<void> _fetchDistribuidoras() async {
+    if (terminalId == null) return;
+    try {
+      final List<dynamic> data = await Supabase.instance.client
+          .from('relacoes_terminais')
+          .select('empresa_id, empresas(id, nome_dois, nome, nome_abrev)')
+          .eq('terminal_id', terminalId as Object);
+
+      final Map<String, Map<String, dynamic>> empresasMap = {};
+      for (var r in data) {
+        var emp = r['empresas'];
+        if (emp is List) emp = emp.isNotEmpty ? emp[0] : null;
+        if (emp != null) {
+          final id = (emp['id'] ?? r['empresa_id']).toString();
+          final nome = emp['nome_dois'] ?? emp['nome'] ?? emp['nome_abrev'] ?? id;
+          empresasMap[id] = {'id': id, 'nome': nome};
+        } else if (r['empresa_id'] != null) {
+          final id = r['empresa_id'].toString();
+          empresasMap[id] = {'id': id, 'nome': id};
+        }
+      }
+
+      final List<Map<String, dynamic>> list = empresasMap.values.toList()
+        ..sort((a, b) => (a['nome'] ?? '').toString().compareTo((b['nome'] ?? '').toString()));
+
+      setState(() {
+        _distribuidoras = list;
+        // Inicializa seleções e controllers para cada distribuidora (chave pelo nome)
+        selecionadas = {for (var e in _distribuidoras) (e['nome'] as String): false};
+        controllers = {for (var e in _distribuidoras) (e['nome'] as String): TextEditingController()};
+      });
+
+      // Se abriu com um bombeio existente, aplica volumes/participantes carregados
+      if (_bombeioLocal != null) {
+        final b = _bombeioLocal!;
+        final vsol = b['volumes_solicitados'];
+        if (vsol != null && vsol is Map) {
+          vsol.forEach((key, value) {
+            final String keyStr = key?.toString() ?? '';
+            final int idx = _distribuidoras.indexWhere((d) => (d['id']?.toString() == keyStr) || (d['nome']?.toString() == keyStr));
+            if (idx != -1) {
+              final nome = _distribuidoras[idx]['nome'] as String;
+              selecionadas[nome] = true;
+              controllers[nome]!.text = _fmt.format((value as num).toDouble());
+            }
+          });
+        }
+
+        if (b['participantes'] != null && b['participantes'] is List) {
+          for (var p in b['participantes']) {
+            final nomeRaw = p['nome']?.toString() ?? '';
+            final solicit = p['solicitado'];
+            final int idx = _distribuidoras.indexWhere((d) => (d['id']?.toString() == nomeRaw) || (d['nome']?.toString() == nomeRaw));
+            if (idx != -1) {
+              final nome = _distribuidoras[idx]['nome'] as String;
+              selecionadas[nome] = true;
+              controllers[nome]!.text = _fmt.format((solicit as num).toInt());
+            }
+          }
+        }
+
+        // Calcula o total inicial a partir do que foi carregado nos campos da UI
+        double totalInicialCalc = 0;
+        for (var e in _distribuidoras) {
+          final nome = e['nome'] as String;
+          if (selecionadas[nome] == true) {
+            final text = (controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.');
+            totalInicialCalc += double.tryParse(text) ?? 0;
+          }
+        }
+        setState(() {
+          _totalVolumesNoInicio = totalInicialCalc;
+        });
+
+        _atualizarCalculos();
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar distribuidoras: $e');
+    }
+  }
+
   Future<void> _excluirMedicao(Map<String, dynamic> medicao, bool isFinal) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -416,14 +455,18 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Medição excluída com sucesso!')),
+        await _showStyledDialog(
+          title: 'Medição excluída',
+          message: 'Medição excluída com sucesso!',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao excluir medição: $e'), backgroundColor: Colors.red),
+        await _showStyledDialog(
+          title: 'Erro',
+          message: 'Erro ao excluir medição: $e',
+          headerColor: Colors.red,
+          icon: Icons.error,
         );
       }
     }
@@ -523,10 +566,12 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     bool showMessage = true,
   }) async {
     if (_selectedTanque == null || dataCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preencha os campos obrigatórios (Data e Tanque)'),
-        ),
+      await _showStyledDialog(
+        title: 'Campos obrigatórios',
+        message: 'Preencha os campos obrigatórios (Data e Tanque)',
+        headerColor: Colors.red,
+        icon: Icons.error,
+        barrierDismissible: true,
       );
       return;
     }
@@ -549,14 +594,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       // Coletar volumes solicitados
       final Map<String, double> volumes = {};
       double total = 0;
-      for (var d in _distribuidorasFixas) {
-        if (selecionadas[d]!) {
-          final val =
-              double.tryParse(
-                controllers[d]!.text.replaceAll('.', '').replaceAll(',', '.'),
-              ) ??
-              0;
-          volumes[d] = val;
+      for (var d in _distribuidoras) {
+        final nome = d['nome']?.toString() ?? '';
+        if (selecionadas[nome] == true) {
+          final val = double.tryParse((controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+          volumes[nome] = val;
           total += val;
         }
       }
@@ -608,27 +650,218 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       _totalVolumesNoInicio = total;
 
       if (mounted) {
-        if (fecharDialog) {
-          Navigator.pop(context);
-        }
-        if (showMessage) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Bombeio salvo com sucesso!'),
-              backgroundColor: Colors.green,
+        // Quando pediram para exibir mensagem e não fechar o diálogo,
+        // mantemos o comportamento existente (mostrando um diálogo de confirmação).
+        if (showMessage && !fecharDialog) {
+          // Mostra o diálogo já existente para "Salvar quantidades"
+          await showDialog<void>(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+              ),
+              child: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF0D47A1),
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.check_circle, color: Colors.white, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'Bombeio salvo',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        'Quantidades salvas!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade800,
+                          height: 1.4,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                        border: Border(
+                          top: BorderSide(color: Colors.grey.shade300, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 150,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF0D47A1),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              child: const Text(
+                                'OK',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           );
+        }
+
+        // Se o diálogo precisa ser fechado, retornamos um resultado ao chamador
+        // indicando se devemos abrir a tela de detalhes (o chamador fará a navegação
+        // usando o contexto correto).
+        if (fecharDialog) {
+          final bool abrirDetalhes = _bombeioLocal != null &&
+              _bombeioLocal!['medicao_inicial_id'] != null &&
+              _bombeioLocal!['medicao_final_id'] != null &&
+              _bombeioLocal!['qtd_faturada'] != null;
+
+          Navigator.pop(context, {
+            'abrirDetalhes': abrirDetalhes,
+            'id': _bombeioLocal != null ? _bombeioLocal!['id'] : null,
+          });
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Erro ao salvar bombeio: $e')));
+        await _showStyledDialog(
+          title: 'Erro ao salvar bombeio',
+          message: 'Erro ao salvar bombeio: $e',
+          headerColor: Colors.red,
+          icon: Icons.error,
+        );
       }
     } finally {
       if (mounted) setState(() => salvando = false);
     }
+  }
+
+  Future<void> _showStyledDialog({
+    required String title,
+    required String message,
+    Color headerColor = const Color(0xFF0D47A1),
+    IconData icon = Icons.check_circle,
+    bool barrierDismissible = true,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: headerColor, width: 1),
+        ),
+        child: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: headerColor,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(icon, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  message,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade800,
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                  border: Border(
+                    top: BorderSide(color: Colors.grey.shade300, width: 1),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 150,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: headerColor,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: const Text(
+                          'OK',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _validarData(String v) {
@@ -800,11 +1033,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   @override
   Widget build(BuildContext context) {
     double totalGeral = 0;
-    for (var d in _distribuidorasFixas) {
-      if (selecionadas[d]!) {
-        final text = controllers[d]!.text
-            .replaceAll('.', '')
-            .replaceAll(',', '.');
+    for (var d in _distribuidoras) {
+      final nome = d['nome']?.toString() ?? '';
+      if (selecionadas[nome] == true) {
+        final text = (controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.');
         totalGeral += double.tryParse(text) ?? 0;
       }
     }
@@ -851,11 +1083,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       onTap: _temMedicoes
                           ? null
                           : () {
-                              dataCtrl.clear();
-                              setState(() {
-                                valorAntigoData = '';
-                                dataInvalida = false;
-                              });
+                              // Preserve existing content so the user can edit it.
+                              // Initialize the previous-value tracker to current text
+                              // so the masking logic behaves correctly while editing.
+                              valorAntigoData = dataCtrl.text;
                             },
                       onChanged: (v) {
                         String formatado = _aplicarMascaraData(
@@ -1012,11 +1243,12 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: _distribuidorasFixas.map((d) {
-                  final bool isSelected = selecionadas[d]!;
+                children: _distribuidoras.map((d) {
+                  final String nome = d['nome']?.toString() ?? '';
+                  final bool isSelected = selecionadas[nome] == true;
                   return FilterChip(
                     label: Text(
-                      d,
+                      nome,
                       style: TextStyle(
                         fontSize: 13,
                         color: isSelected ? Colors.white : Colors.black87,
@@ -1029,7 +1261,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         ? null
                         : (val) {
                             setState(() {
-                              selecionadas[d] = val;
+                              selecionadas[nome] = val;
                             });
                           },
                   );
@@ -1054,15 +1286,16 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          ..._distribuidorasFixas
-                              .where((d) => selecionadas[d]!)
+                          ..._distribuidoras
+                              .where((d) => selecionadas[d['nome']] == true)
                               .map((d) {
+                                final String nome = d['nome']?.toString() ?? '';
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: SizedBox(
                                     width: 200,
                                     child: TextField(
-                                      controller: controllers[d],
+                                      controller: controllers[nome],
                                       keyboardType: TextInputType.number,
                                       readOnly: _temMedicoes,
                                       onChanged: (_) => setState(() {}),
@@ -1072,7 +1305,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                         ThousandSeparatorInputFormatter(),
                                       ],
                                       decoration: InputDecoration(
-                                        labelText: d,
+                                        labelText: nome,
                                         border: const OutlineInputBorder(),
                                         isDense: true,
                                         floatingLabelBehavior:
@@ -1110,19 +1343,14 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                               PieChartData(
                                 sectionsSpace: 2,
                                 centerSpaceRadius: 30,
-                                sections: _distribuidorasFixas
-                                    .where((d) => selecionadas[d]!)
+                                sections: _distribuidoras
+                                    .where((d) => selecionadas[d['nome']] == true)
                                     .map((d) {
-                                      final text = controllers[d]!.text
-                                          .replaceAll('.', '')
-                                          .replaceAll(',', '.');
-                                      final double val =
-                                          double.tryParse(text) ?? 0;
-                                      final double percent = totalGeral > 0
-                                          ? (val / totalGeral) * 100
-                                          : 0;
-                                      final int idx = _distribuidorasFixas
-                                          .indexOf(d);
+                                      final String nome = d['nome']?.toString() ?? '';
+                                      final text = (controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.');
+                                      final double val = double.tryParse(text) ?? 0;
+                                      final double percent = totalGeral > 0 ? (val / totalGeral) * 100 : 0;
+                                      final int idx = _distribuidoras.indexOf(d);
                                       final colors = [
                                         const Color(0xFF0D47A1),
                                         const Color(0xFFD32F2F),
@@ -1132,9 +1360,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                       return PieChartSectionData(
                                         color: colors[idx % colors.length],
                                         value: val > 0 ? val : 1,
-                                        title: val > 0
-                                            ? '${_fmt.format(val.toInt())}\n${percent.toStringAsFixed(0)}%'
-                                            : '',
+                                        title: val > 0 ? '${_fmt.format(val.toInt())}\n${percent.toStringAsFixed(0)}%' : '',
                                         radius: 60,
                                         titleStyle: const TextStyle(
                                           fontSize: 9,
@@ -1144,8 +1370,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                         ),
                                         titlePositionPercentageOffset: 0.55,
                                       );
-                                    })
-                                    .toList(),
+                                    }).toList(),
                               ),
                             ),
                           ),
@@ -1153,18 +1378,17 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                           Wrap(
                             spacing: 12,
                             runSpacing: 4,
-                            children: _distribuidorasFixas
-                                .where((d) => selecionadas[d]!)
+                            children: _distribuidoras
+                                .where((d) => selecionadas[d['nome']] == true)
                                 .map((d) {
-                                  final int idx = _distribuidorasFixas.indexOf(
-                                    d,
-                                  );
+                                  final int idx = _distribuidoras.indexOf(d);
                                   final colors = [
                                     const Color(0xFF0D47A1),
                                     const Color(0xFFD32F2F),
                                     const Color(0xFF388E3C),
                                     const Color(0xFFFBC02D),
                                   ];
+                                  final String nome = d['nome']?.toString() ?? '';
                                   return Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -1178,7 +1402,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                       ),
                                       const SizedBox(width: 4),
                                       Text(
-                                        d,
+                                        nome,
                                         style: const TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w500,
@@ -1186,8 +1410,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                       ),
                                     ],
                                   );
-                                })
-                                .toList(),
+                                }).toList(),
                           ),
                         ],
                       ),

@@ -350,6 +350,118 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     }
   }
 
+  Future<void> _abrirDetalhesPorId(dynamic id) async {
+    if (id == null) return;
+    try {
+      final resp = await _supabase.from('bombeios').select('''
+        id,
+        num_controle,
+        data,
+        horario,
+        medicao_inicial_id,
+        medicao_final_id,
+        volumes_solicitados,
+        total_bombeio,
+        tanque_id,
+        qtd_faturada,
+        tanques!bombeios_tanque_id_fkey (
+          referencia,
+          produto_id,
+          produtos (
+            nome
+          )
+        ),
+        medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
+        ),
+        medicao_final:medicoes!bombeios_medicao_final_id_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
+        )
+      ''').eq('id', id).maybeSingle();
+
+      if (resp == null) return;
+      final item = resp as Map<String, dynamic>;
+      final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
+      final tanques = tanquesArr is List ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null) : tanquesArr;
+      final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
+      final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
+
+      double totalSolicitado = 0;
+      List<Map<String, dynamic>> participantes = [];
+      final rawVols = item['volumes_solicitados'];
+      if (rawVols != null) {
+        if (rawVols is Map) {
+          rawVols.forEach((key, value) {
+            double sol = double.tryParse(value.toString()) ?? 0;
+            totalSolicitado += sol;
+            participantes.add({'nome': key?.toString() ?? '', 'solicitado': sol});
+          });
+        } else if (rawVols is List) {
+          for (var v in rawVols) {
+            if (v is Map) {
+              double sol = double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
+              participantes.add({'nome': v['nome'] ?? '', 'solicitado': sol});
+              totalSolicitado += sol;
+            }
+          }
+        }
+      }
+
+      final medFinalArr = item['medicao_final'];
+      final medFinal = medFinalArr is List ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null) : medFinalArr;
+      final hFinal = medFinal?['horario']?.toString().substring(0, 5) ?? '--:--';
+
+      final medIniArr = item['medicao_inicial'];
+      final medIni = medIniArr is List ? (medIniArr.isNotEmpty ? medIniArr[0] : null) : medIniArr;
+
+      double volAmbIni = double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Ini = double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbFin = double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Fin = double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
+
+      double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
+      double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
+
+      final Map<String, dynamic> bombeioParaDetalhes = {
+        'id': item['id'],
+        'tanque_id': item['tanque_id'],
+        'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
+        'produto': produto,
+        'tanque': tanqueNome,
+        'horario_inicial': item['horario']?.toString().substring(0, 5) ?? '--:--',
+        'horario_final': hFinal,
+        'numero_controle': item['num_controle'] ?? 'S/N',
+        'status': '',
+        'volume_total': double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
+        'volume_solicitado': totalSolicitado,
+        'participantes': participantes,
+        'recebido_amb': recebidoAmb,
+        'recebido_20': recebido20,
+        'qtd_faturada': item['qtd_faturada'],
+        'medicao_inicial': medIni,
+        'medicao_final': medFinal,
+      };
+
+      if (!mounted) return;
+      setState(() {
+        _bombeioSelecionado = bombeioParaDetalhes;
+        _mostrarRateio = true;
+      });
+    } catch (e) {
+      debugPrint('Erro ao abrir detalhes: $e');
+    }
+  }
+
   void _aplicarFiltrosLocal() {
     setState(() {
       registrosExibidos = _todosRegistros.where((item) {
@@ -424,8 +536,13 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
                       _mostrarRateio = true;
                     });
                   } else {
-                    await DialogInserirBombeio.show(context, bombeio: item);
-                    _carregarBombeios(resetPagina: true);
+                    final result = await DialogInserirBombeio.show(context, bombeio: item);
+                    if (result is Map<String, dynamic> && result['abrirDetalhes'] == true) {
+                      await _abrirDetalhesPorId(result['id']);
+                      await _carregarBombeios(resetPagina: true);
+                    } else {
+                      await _carregarBombeios(resetPagina: true);
+                    }
                   }
                 },
                 child: Container(
@@ -759,8 +876,13 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          await DialogInserirBombeio.show(context);
-          _carregarBombeios();
+          final result = await DialogInserirBombeio.show(context);
+          if (result is Map<String, dynamic> && result['abrirDetalhes'] == true) {
+            await _abrirDetalhesPorId(result['id']);
+            await _carregarBombeios();
+          } else {
+            await _carregarBombeios();
+          }
         },
         backgroundColor: const Color(0xFF0D47A1),
         tooltip: 'Novo Bombeio',

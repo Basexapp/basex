@@ -207,6 +207,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
             referencia,
             capacidade,
             lastro,
+            prioridade,
             status,
             produto_id,
             tipo_abastecimento,
@@ -227,6 +228,7 @@ class _GerenciamentoTanquesPageState extends State<GerenciamentoTanquesPage> {
           'produto': tanque['produtos']?['nome']?.toString() ?? 'PRODUTO NÃO INFORMADO',
           'capacidade': tanque['capacidade']?.toString() ?? '0',
           'lastro': tanque['lastro']?.toString(),
+          'prioridade': tanque['prioridade']?.toString(),
           'status': tanque['status']?.toString() ?? 'Em operação',
           'produto_id': tanque['produto_id'],
           'tipo_abastecimento': tanque['tipo_abastecimento'],
@@ -2162,17 +2164,67 @@ class _TanqueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final referencia = tanque['referencia']?.toString() ?? 'Tanque';
     final produto = tanque['produto']?.toString() ?? '';
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200, width: 1.4),
-      ),
-      child: ListTile(
-        onTap: onTap,
-        title: Text(referencia, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(produto, style: TextStyle(color: Color(0xFF1B6A6F))),
-        // Removed small status circle to simplify card layout per request
+    final capacidade = tanque['capacidade'];
+    final lastro = tanque['lastro'];
+    final prioridade = tanque['prioridade']?.toString();
+
+    String formatCapacidade() {
+      if (capacidade == null) return '-';
+      final f = _formatarMilhar(capacidade);
+      return f.isEmpty ? '-' : '$f L';
+    }
+
+    String formatLastro() {
+      if (lastro == null) return '-';
+      final f = _formatarMilhar(lastro);
+      return f.isEmpty ? '-' : '$f L';
+    }
+
+    final tooltipMsg =
+        'Referência: $referencia\n'
+        'Produto: $produto\n'
+        'Capacidade total: ${formatCapacidade()}\n'
+        'Lastro: ${formatLastro()}\n'
+        'Prioridade: ${prioridade ?? '-'}';
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: Tooltip(
+        message: tooltipMsg,
+        preferBelow: false,
+        verticalOffset: 62,
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF222B45).withOpacity(0.9),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: const TextStyle(color: Colors.white, fontSize: 12),
+        child: Card(
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade200, width: 1.4),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(referencia, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  Text(
+                    produto,
+                    style: const TextStyle(color: Color(0xFF1B6A6F)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

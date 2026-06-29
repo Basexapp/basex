@@ -351,8 +351,56 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
 
     // Validações básicas antes de salvar
     if (_horarioCtrl.text.isEmpty || _cmCtrl.text.isEmpty || _tempTanqueCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha os campos obrigatórios.'), backgroundColor: Colors.red),
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: const BorderSide(color: Color(0xFFB00020), width: 1),
+          ),
+          child: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFB00020),
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.error, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text('Erro', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white)),
+                    ],
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Text('Por favor, preencha os campos obrigatórios.', textAlign: TextAlign.center),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                    border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1)),
+                  ),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    SizedBox(
+                      width: 120,
+                      child: ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')),
+                    )
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        ),
       );
       return;
     }
@@ -418,14 +466,57 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Medição salva com sucesso!'), backgroundColor: Colors.green),
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          builder: (context) => Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+              side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+            ),
+            child: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0D47A1),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                    ),
+                    child: Row(children: const [Icon(Icons.check_circle, color: Colors.white), SizedBox(width: 8), Text('Medição salva', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))]),
+                  ),
+                  const Padding(padding: EdgeInsets.all(20), child: Text('Medição salva com sucesso!', textAlign: TextAlign.center)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)), border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [SizedBox(width: 120, child: ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')))]),
+                  ),
+                ],
+              ),
+            ),
+          ),
         );
         if (widget.onSaved != null) widget.onSaved!(savedMedicao);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erro ao salvar medição: $e'), backgroundColor: Colors.red),
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (context) => Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFFB00020), width: 1)),
+          child: SizedBox(
+            width: 380,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: const BoxDecoration(color: Color(0xFFB00020), borderRadius: BorderRadius.vertical(top: Radius.circular(9))), child: Row(children: const [Icon(Icons.error, color: Colors.white), SizedBox(width: 8), Text('Erro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))])),
+              Padding(padding: const EdgeInsets.all(20), child: Text('Erro ao salvar medição: $e', textAlign: TextAlign.center)),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)), border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [SizedBox(width: 120, child: ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')))])),
+            ]),
+          ),
+        ),
       );
     }
   }

@@ -77,7 +77,6 @@ class _HomePageCardsState extends State<HomePageCards>
     'Financeiro',
     'Jurídico',
     'Gestão de contratos',
-    'Gestão de Projetos',
     'Recursos Humanos',
     'Almoxerifado',
     'Manutenção e ativos',
@@ -199,7 +198,6 @@ class _HomePageCardsState extends State<HomePageCards>
     'Financeiro': const Color(0xFF009688), // Verde-água
     'Jurídico': const Color(0xFF3F51B5), // Índigo
     'Gestão de contratos': const Color(0xFF3949AB), // Azul escuro (perto do Jurídico)
-    'Gestão de Projetos': const Color(0xFFFF5722), // Laranja profundo
     'Recursos Humanos': const Color(0xFFE91E63), // Rosa
     'Almoxerifado': const Color(0xFF9E9E9E), // Cinza
     'Manutenção e ativos': const Color(0xFF455A64), // Cinza azulado
@@ -1818,7 +1816,6 @@ class _HomePageCardsState extends State<HomePageCards>
         return _buildSuportePage();
 
       case 'Jurídico':
-      case 'Gestão de Projetos':
       case 'Recursos Humanos':
       case 'Segurança & Compliance':
       case 'Manutenção e ativos':
@@ -2731,7 +2728,6 @@ class _HomePageCardsState extends State<HomePageCards>
 
     // Páginas indisponíveis
     if (sessaoAtual == 'Jurídico' ||
-        sessaoAtual == 'Gestão de Projetos' ||
         sessaoAtual == 'Recursos Humanos' ||
         sessaoAtual == 'Segurança & Compliance' ||
         sessaoAtual == 'Manutenção e ativos') {
@@ -4090,8 +4086,6 @@ class _HomePageCardsState extends State<HomePageCards>
         return Icons.gavel;
       case 'Gestão de contratos':
         return Icons.handshake;
-      case 'Gestão de Projetos':
-        return Icons.assignment;
       case 'Recursos Humanos':
         return Icons.people;
       case 'Almoxerifado':
@@ -4376,7 +4370,6 @@ class _HomePageCardsState extends State<HomePageCards>
     // Mapeia os nomes que precisam de quebra de linha
     final Map<String, String> quebras = {
       'Recursos Humanos': 'Recursos\nHumanos',
-      'Gestão de Projetos': 'Gestão de\nProjetos',
       'Suprimentos': 'Suprimentos',
       'Manutenção e ativos': 'Manutenção\ne ativos',
       'Segurança & Compliance': 'Segurança &\nCompliance',
