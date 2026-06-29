@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../login_page.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class DetalhesBombeioPage extends StatefulWidget {
@@ -18,6 +20,7 @@ class DetalhesBombeioPage extends StatefulWidget {
 
 class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
   final NumberFormat _fmt = NumberFormat.decimalPattern('pt_BR');
+  bool _rateioRealizado = false;
 
   String _formatarData(DateTime? data) => data == null
       ? '-'
@@ -30,6 +33,297 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
       return DateFormat('dd/MM/yyyy').format(dt);
     } catch (e) {
       return dataIso;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _verificarRateioExistente();
+  }
+
+  Future<void> _verificarRateioExistente() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final tanqueId = widget.bombeio['tanque_id']?.toString();
+      if (tanqueId == null || tanqueId.isEmpty) return;
+
+      // determina intervalo do dia da data do bombeio
+      DateTime dia;
+      if (widget.bombeio['data'] is DateTime) {
+        dia = widget.bombeio['data'] as DateTime;
+      } else {
+        dia = DateTime.tryParse(widget.bombeio['data']?.toString() ?? '') ?? DateTime.now();
+      }
+      final dataInicio = DateTime(dia.year, dia.month, dia.day);
+      final dataFim = DateTime(dia.year, dia.month, dia.day, 23, 59, 59);
+
+      final inicioIso = dataInicio.toIso8601String();
+      final fimIso = dataFim.toIso8601String();
+
+        final resp = await supabase
+          .from('movimentacoes_tanque')
+          .select('id')
+          .eq('tanque_id', tanqueId)
+          .gte('data_mov', inicioIso)
+          .lte('data_mov', fimIso)
+          .limit(1);
+
+        final exists = resp.isNotEmpty;
+      if (mounted) setState(() => _rateioRealizado = exists);
+    } catch (e) {
+      // falhar silent; não bloquear interface
+      debugPrint('Erro ao verificar rateio existente: $e');
+    }
+  }
+
+  Future<void> _showMessageDialog(String message, {String? title}) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+        ),
+        child: SizedBox(
+          width: 420,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title != null) ...[
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 65, 54, 49)),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                Text(
+                  message,
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      height: 40,
+                      width: 140,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        style: ButtonStyle(
+                          backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                            if (states.contains(WidgetState.hovered)) {
+                              return const Color.fromARGB(255, 65, 54, 49);
+                            }
+                            return Colors.black;
+                          }),
+                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
+                          shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                          side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFB341), width: 1.6)),
+                          elevation: WidgetStateProperty.all(1),
+                        ),
+                        child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showRateioAutomaticoDialog() async {
+    final confirmado = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+        ),
+        child: SizedBox(
+          width: 480,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text(
+                  'Concluir com rateio automático?',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: const Color.fromARGB(255, 65, 54, 49),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    SizedBox(
+                      height: 40,
+                      width: 140,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        style: ButtonStyle(
+                          backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                            if (states.contains(WidgetState.hovered)) {
+                              return const Color.fromARGB(255, 65, 54, 49);
+                            }
+                            return Colors.black;
+                          }),
+                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
+                          shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                          side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFB341), width: 1.6)),
+                          elevation: WidgetStateProperty.all(1),
+                        ),
+                        child: const Text(
+                          'Voltar',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      height: 40,
+                      width: 180,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        style: ButtonStyle(
+                          backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                            if (states.contains(WidgetState.hovered)) {
+                              return const Color.fromARGB(255, 65, 54, 49);
+                            }
+                            return Colors.black;
+                          }),
+                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
+                          shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                          side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFB341), width: 1.6)),
+                          elevation: WidgetStateProperty.all(1),
+                        ),
+                        child: const Text(
+                          'Sim, realizar rateio',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    if (confirmado == true) {
+      // Executa inserts na tabela movimentacoes_tanque para cada participante
+      try {
+        final supabase = Supabase.instance.client;
+
+        final tanqueId = widget.bombeio['tanque_id']?.toString();
+        if (tanqueId == null || tanqueId.isEmpty) {
+          throw Exception('tanque_id ausente no bombeio');
+        }
+
+        // Obter produto_id: pode estar presente em widget.bombeio['produto_id']
+        String? produtoId = widget.bombeio['produto_id']?.toString();
+        if (produtoId == null || produtoId.isEmpty) {
+          final tanq = await supabase.from('tanques').select('produto_id').eq('id', tanqueId).maybeSingle();
+          produtoId = tanq?['produto_id']?.toString();
+        }
+
+        final dataMov = widget.bombeio['data'] is DateTime
+            ? (widget.bombeio['data'] as DateTime).toIso8601String()
+            : (widget.bombeio['data']?.toString() ?? DateTime.now().toIso8601String());
+
+        final recebidoAmb = double.tryParse(widget.bombeio['recebido_amb']?.toString() ?? '0') ?? 0;
+        final recebido20 = double.tryParse(widget.bombeio['recebido_20']?.toString() ?? '0') ?? 0;
+
+        final participantes = (widget.bombeio['participantes'] is List)
+            ? List<Map<String, dynamic>>.from(widget.bombeio['participantes'])
+            : <Map<String, dynamic>>[];
+
+        double totalSolicitado = 0;
+        for (var p in participantes) {
+          totalSolicitado += double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
+        }
+
+        final usuario = UsuarioAtual.instance;
+        final terminalId = usuario?.terminalId;
+
+        final List<Map<String, dynamic>> inserts = [];
+
+        for (var p in participantes) {
+          final solicit = double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
+          final peso = totalSolicitado > 0 ? (solicit / totalSolicitado) : 0;
+          final entradaAmb = (recebidoAmb * peso).round();
+          final entradaVinte = (recebido20 * peso).round();
+
+          // Resolve empresa_id: se nome parecer UUID, usa direto; senão busca por nome
+          String? empresaId;
+          final nomeRaw = p['nome']?.toString() ?? '';
+          // Simpler UUID check: verifica comprimento 36 e hífens
+          final looksLikeUuid = nomeRaw.length == 36 && nomeRaw.contains('-');
+          if (looksLikeUuid) {
+            empresaId = nomeRaw;
+          } else if (nomeRaw.isNotEmpty) {
+            // tenta achar pela coluna nome, nome_dois ou nome_abrev
+            var emp = await supabase.from('empresas').select('id').eq('nome', nomeRaw).maybeSingle();
+            emp ??= await supabase.from('empresas').select('id').eq('nome_dois', nomeRaw).maybeSingle();
+            emp ??= await supabase.from('empresas').select('id').eq('nome_abrev', nomeRaw).maybeSingle();
+            empresaId = emp?['id']?.toString();
+          }
+
+          final row = {
+            'tanque_id': tanqueId,
+            if (produtoId != null) 'produto_id': produtoId,
+            'data_mov': dataMov,
+            'entrada_amb': entradaAmb,
+            'entrada_vinte': entradaVinte,
+            'descricao': 'Cota Bombeio',
+            'empresa_id': empresaId,
+            'tipo_mov': 'bombeio',
+            'terminal_id': terminalId,
+          };
+
+          inserts.add(row);
+        }
+
+        if (inserts.isNotEmpty) {
+          // realiza insert
+          await supabase.from('movimentacoes_tanque').insert(inserts);
+          // sucesso
+          if (mounted) {
+            setState(() => _rateioRealizado = true);
+            await _showMessageDialog('Rateio automático realizado');
+          }
+        } else {
+          if (mounted) {
+            await _showMessageDialog('Nenhum participante para inserir', title: 'Aviso');
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          await _showMessageDialog('Erro ao inserir rateio: $e', title: 'Erro');
+        }
+      }
     }
   }
 
@@ -520,7 +814,96 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                                   const Divider(height: 1),
                                 ],
                               );
-                            }).toList(),
+                            }),
+                            
+                            // Botões de rateio adicionados abaixo da tabela
+                            const SizedBox(height: 24),
+                            _rateioRealizado
+                                ? Center(
+                                    child: Container(
+                                      height: 40,
+                                      width: 200,
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFFFFB341), width: 1.6),
+                                      ),
+                                      child: const Text(
+                                        'Rateio realizado',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color.fromARGB(255, 65, 54, 49),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 200,
+                                        height: 40,
+                                        child: ElevatedButton(
+                                          onPressed: () => _showRateioAutomaticoDialog(),
+                                          style: ButtonStyle(
+                                            backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                              if (states.contains(WidgetState.hovered)) {
+                                                return const Color.fromARGB(255, 65, 54, 49);
+                                              }
+                                              return Colors.black;
+                                            }),
+                                            foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                                            padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
+                                            shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                                            side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFBD59), width: 1.6)),
+                                            elevation: WidgetStateProperty.all(1),
+                                          ),
+                                          child: const Text(
+                                            'RATEIO AUTOMÁTICO',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      SizedBox(
+                                        width: 200,
+                                        height: 40,
+                                        child: ElevatedButton(
+                                          onPressed: () async {
+                                            await _showMessageDialog('Rateio manual em desenvolvimento');
+                                          },
+                                          style: ButtonStyle(
+                                            backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                              if (states.contains(WidgetState.hovered)) {
+                                                return const Color.fromARGB(255, 65, 54, 49);
+                                              }
+                                              return Colors.black;
+                                            }),
+                                            foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                                            padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
+                                            shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                                            side: WidgetStateProperty.all(const BorderSide(color: Color.fromARGB(255, 255, 179, 65), width: 1.6)),
+                                            elevation: WidgetStateProperty.all(1),
+                                          ),
+                                          child: const Text(
+                                            'RATEIO MANUAL',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                            const SizedBox(height: 16),
                           ],
                         ),
                       ),
