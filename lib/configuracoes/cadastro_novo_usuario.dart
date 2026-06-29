@@ -226,7 +226,7 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                   MaterialPageRoute(builder: (_) => const LoginPage()),
                 );
               },
-              child: Image.asset('assets/logo-login.png'),
+              child: Image.asset('assets/logo-top-login.png'),
             ),
           ),
 

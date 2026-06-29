@@ -105,7 +105,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
           Positioned(
             top: 80,
             left: 80,
-            child: Image.asset('assets/logo-login.png'),
+            child: Image.asset('assets/logo-top-login.png'),
           ),
 
           // ===== Botão Voltar =====
