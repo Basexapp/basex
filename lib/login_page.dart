@@ -520,7 +520,7 @@ class _LoginPageState extends State<LoginPage> {
                         fontWeight: FontWeight.w400,
                       ),
                       children: [
-                        const TextSpan(text: 'base-x'),
+                        const TextSpan(text: 'Base-x'),
                         WidgetSpan(
                           child: Transform.translate(
                             offset: const Offset(0, -5),

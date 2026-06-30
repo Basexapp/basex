@@ -40,6 +40,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
   String? terminalId;
   String? empresaId;
   String? empresaNome;
+  bool _terminalVinculado = false;
+  String? terminalSelecionadoNome;
 
   DateTime? dataInicial;
   DateTime? dataFinal;
@@ -47,6 +49,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
   String? produtoSelecionado;
   String? produtoSelecionadoId;
   String? tanqueSelecionadoId;
+  String? statusSelecionado;
 
   // RECOLOCANDO AS VARIÁVEIS QUE FORAM REMOVIDAS ACIDENTALMENTE
   List<Map<String, dynamic>> produtosDisponiveis = [];
@@ -79,6 +82,11 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
       terminalId = user!.terminalId;
       empresaId = user!.empresaId;
       empresaNome = user!.empresaNome;
+      if (terminalId != null && terminalId!.isNotEmpty) {
+        _terminalVinculado = true;
+        terminalSelecionadoId = terminalId;
+        terminalSelecionadoNome = user!.terminalNome ?? 'Terminal vinculado';
+      }
     }
 
     _carregarDadosIniciais();
@@ -114,44 +122,105 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
   void _carregarDadosIniciais() async {
     setState(() => carregando = true);
     try {
-      if (user == null) return;
-      String? empresaId = user!.empresaId;
-      if (empresaId != null && empresaId.isNotEmpty) {
-        final relacoes = await _supabase
-            .from('relacoes_terminais')
-            .select('terminal_id, terminais(id, nome_dois)')
-            .eq('empresa_id', empresaId);
-
-        final Map<String, Map<String, dynamic>> terminaisUnicos = {};
-        for (var relacao in relacoes) {
-          final terminaisArr = relacao['terminais'];
-          final t = terminaisArr is List ? (terminaisArr.isNotEmpty ? terminaisArr[0] : null) : terminaisArr;
-          
-          if (t != null) {
-            terminaisUnicos[t['id']] = {
-              'id': t['id'],
-              'nome': t['nome_dois'] ?? 'Sem nome',
-            };
-          }
-        }
-
-        setState(() {
-          terminais = terminaisUnicos.values.toList()..sort((a, b) => (a['nome'] ?? '').compareTo(b['nome'] ?? ''));
-          if (user!.terminalId != null && user!.terminalId!.isNotEmpty) {
-            terminalSelecionadoId = user!.terminalId;
-          } else if (terminais.length == 1) {
-            terminalSelecionadoId = terminais[0]['id'];
-          }
-          if (terminalSelecionadoId != null) {
-            _carregarTanquesPorTerminal(terminalSelecionadoId!);
-          }
-        });
-      }
+      await _carregarTerminaisDisponiveis();
       await _carregarBombeios(resetPagina: true);
     } catch (e) {
       debugPrint('Erro: $e');
     } finally {
       setState(() => carregando = false);
+    }
+  }
+
+  Future<void> _carregarTerminaisDisponiveis() async {
+    if (_terminalVinculado && terminalSelecionadoId != null && terminalSelecionadoId!.isNotEmpty) {
+      setState(() {
+        terminais = [
+          {
+            'id': terminalSelecionadoId!,
+            'nome': terminalSelecionadoNome ?? 'Terminal vinculado',
+          }
+        ];
+      });
+      await _carregarTanquesPorTerminal(terminalSelecionadoId!);
+      return;
+    }
+
+    try {
+      final usuario = UsuarioAtual.instance;
+      if (usuario == null) {
+        setState(() {
+          terminais = [
+            {'id': '', 'nome': '<usuário não logado>'},
+          ];
+        });
+        return;
+      }
+
+      String? empresaIdLocal = usuario.empresaId;
+      if (empresaIdLocal == null || empresaIdLocal.isEmpty) {
+        empresaIdLocal = widget.empresaId;
+      }
+
+      if (empresaIdLocal == null || empresaIdLocal.isEmpty) {
+        setState(() {
+          terminais = [
+            {'id': '', 'nome': '<empresa não identificada>'},
+          ];
+        });
+        return;
+      }
+
+      final relacoes = await _supabase
+          .from('relacoes_terminais')
+          .select('''
+            terminal_id,
+            terminais!inner (
+              id,
+              nome
+            )
+          ''')
+          .eq('empresa_id', empresaIdLocal);
+
+      final Map<String, Map<String, dynamic>> terminaisUnicos = {};
+      for (var relacao in relacoes) {
+        if (relacao['terminais'] != null) {
+          final terminal = relacao['terminais'] as Map<String, dynamic>;
+          final terminalId = terminal['id']?.toString();
+
+          if (terminalId != null && !terminaisUnicos.containsKey(terminalId)) {
+            terminaisUnicos[terminalId] = {
+              'id': terminalId,
+              'nome': terminal['nome']?.toString() ?? 'Terminal sem nome',
+            };
+          }
+        }
+      }
+
+      List<Map<String, dynamic>> terminaisLista = terminaisUnicos.values.toList()
+        ..sort((a, b) => (a['nome'] ?? '').compareTo(b['nome'] ?? ''));
+
+      setState(() {
+        terminais = terminaisLista;
+        if (terminaisLista.length == 1) {
+          terminalSelecionadoId = terminaisLista[0]['id'];
+          terminalSelecionadoNome = terminaisLista[0]['nome'];
+        } else {
+          terminalSelecionadoId = null;
+          terminalSelecionadoNome = null;
+        }
+      });
+
+      if (terminalSelecionadoId != null && terminalSelecionadoId!.isNotEmpty) {
+        await _carregarTanquesPorTerminal(terminalSelecionadoId!);
+      }
+    } catch (e) {
+      debugPrint('Erro ao carregar terminais: $e');
+      setState(() {
+        terminais = [
+          {'id': '', 'nome': '<erro ao carregar terminais>'},
+        ];
+        terminalSelecionadoId = null;
+      });
     }
   }
 
@@ -201,9 +270,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
         )
       ''');
 
-      if (terminalSelecionadoId != null) {
+      if (terminalSelecionadoId != null && terminalSelecionadoId!.isNotEmpty) {
         query = query.eq('terminal_id', terminalSelecionadoId!);
-      } else if (terminalId != null) {
+      } else if (terminalId != null && terminalId!.isNotEmpty) {
         query = query.eq('terminal_id', terminalId!);
       }
       
@@ -337,10 +406,11 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
 
   Future<void> _carregarTanquesPorTerminal(String terminalId) async {
     try {
-        final List<dynamic> data = await _supabase
+      final List<dynamic> data = await _supabase
           .from('tanques')
-          .select('id, referencia, produto_id, produtos(id, nome)')
-          .eq('terminal_id', terminalId);
+          .select('id, referencia, produto_id, produtos(nome_dois, nome)')
+          .eq('terminal_id', terminalId)
+          .not('tipo_abastecimento', 'ilike', '%lct%');
 
       final List<Map<String, dynamic>> tanquesList = List<Map<String, dynamic>>.from(data);
 
@@ -355,26 +425,34 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
         return getNum(a['referencia'] ?? '').compareTo(getNum(b['referencia'] ?? ''));
       });
 
-      final Map<String, Map<String, dynamic>> produtosSet = {};
-      for (var t in tanquesList) {
-        final prodArr = t['produtos'];
-        final prod = prodArr is List ? (prodArr.isNotEmpty ? prodArr[0] : null) : prodArr;
-        
-        if (prod != null) {
-          produtosSet[prod['id'].toString()] = {
-            'id': prod['id'].toString(),
-            'nome': prod['nome'] ?? 'Sem nome',
-          };
-        }
+      final List<Map<String, dynamic>> produtosLista = [];
+      final List<dynamic> produtosData = await _supabase
+          .from('produtos')
+          .select('id, nome, nome_dois')
+          .eq('lista_exa', true)
+          .order('nome', ascending: true);
+
+      for (var produto in produtosData) {
+        final produtoId = produto['id']?.toString();
+        if (produtoId == null || produtoId.isEmpty) continue;
+
+        final nome = produto['nome_dois'] ?? produto['nome'] ?? 'Sem nome';
+        produtosLista.add({
+          'id': produtoId,
+          'nome': nome.toString(),
+        });
       }
 
       setState(() {
         tanquesDisponiveis = tanquesList;
-        produtosDisponiveis = produtosSet.values.toList()
-          ..sort((a, b) => (a['nome'] ?? '').compareTo(b['nome'] ?? ''));
+        produtosDisponiveis = produtosLista;
       });
     } catch (e) {
       debugPrint('Erro ao buscar tanques/produtos: $e');
+      setState(() {
+        tanquesDisponiveis = [];
+        produtosDisponiveis = [];
+      });
     }
   }
 
@@ -501,6 +579,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
         if (dataFinal != null && dt.isAfter(dataFinal!.add(const Duration(days: 1)))) return false;
         if (produtoSelecionado != null && item['produto'] != produtoSelecionado) return false;
         if (tanqueSelecionadoId != null && item['tanque_id'] != tanqueSelecionadoId) return false;
+        if (statusSelecionado != null && statusSelecionado!.isNotEmpty && item['status'] != statusSelecionado) return false;
         if (pesquisa.isNotEmpty) {
           final String dataStr = _formatarData(dt).toLowerCase();
           final String status = (item['status'] as String).toLowerCase();
@@ -630,15 +709,56 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
             const SizedBox(height: 12),
             Row(
               children: [
-                SizedBox(
-                  width: 150,
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: terminalSelecionadoId,
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
+                    decoration: InputDecoration(
+                      labelText: 'Terminal',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.business, size: 18),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      isDense: true,
+                      fillColor: (user?.terminalId != null) ? Colors.grey[200] : null,
+                      filled: (user?.terminalId != null),
+                    ),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Todos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
+                      ...terminais.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['nome'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)))),
+                    ],
+                    onChanged: (user?.terminalId != null)
+                        ? null
+                        : (val) async {
+                            setState(() {
+                              terminalSelecionadoId = val;
+                              produtoSelecionadoId = null;
+                              produtoSelecionado = null;
+                              tanqueSelecionadoId = null;
+                              if (val == null) {
+                                tanquesDisponiveis = [];
+                                produtosDisponiveis = [];
+                              }
+                            });
+                            if (val != null) {
+                              await _carregarTanquesPorTerminal(val);
+                            }
+                            _carregarBombeios(resetPagina: true);
+                          },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
                   child: DropdownButtonFormField<String>(
                     value: tanqueSelecionadoId,
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
                     decoration: const InputDecoration(labelText: 'Tanque', border: OutlineInputBorder(), prefixIcon: Icon(Icons.storage, size: 18), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), isDense: true),
                     isExpanded: true,
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Todos tanques', style: TextStyle(fontSize: 13))),
-                      ...tanquesDisponiveis.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['referencia'] ?? '', style: const TextStyle(fontSize: 13)))),
+                      const DropdownMenuItem(value: null, child: Text('Todos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
+                      ...tanquesDisponiveis.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['referencia'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)))) ,
                     ],
                     onChanged: (val) {
                       setState(() {
@@ -649,15 +769,16 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
                   ),
                 ),
                 const SizedBox(width: 8),
-                SizedBox(
-                  width: 250,
+                Expanded(
                   child: DropdownButtonFormField<String>(
                     value: produtoSelecionadoId,
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
                     decoration: const InputDecoration(labelText: 'Produto', border: OutlineInputBorder(), prefixIcon: Icon(Icons.local_gas_station, size: 18), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), isDense: true),
                     isExpanded: true,
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Todos os produtos', style: TextStyle(fontSize: 13))),
-                      ...produtosDisponiveis.map((p) => DropdownMenuItem(value: p['id'], child: Text(p['nome'] ?? '', style: const TextStyle(fontSize: 13)))),
+                      const DropdownMenuItem(value: null, child: Text('Todos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
+                      ...produtosDisponiveis.map((p) => DropdownMenuItem(value: p['id'], child: Text(p['nome'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)))),
                     ],
                     onChanged: (val) {
                       setState(() {
@@ -671,35 +792,27 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
                 const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButtonFormField<String>(
-                    value: terminalSelecionadoId,
-                    decoration: InputDecoration(
-                      labelText: 'Terminal',
-                      border: const OutlineInputBorder(),
-                      prefixIcon: const Icon(Icons.business, size: 18),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      isDense: true,
-                      fillColor: (user?.terminalId != null) ? Colors.grey[200] : null,
-                      filled: (user?.terminalId != null),
-                    ),
+                    value: statusSelecionado,
+                    dropdownColor: Colors.white,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.black),
+                    decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder(), prefixIcon: Icon(Icons.flag, size: 18), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8), isDense: true),
                     isExpanded: true,
                     items: [
-                      const DropdownMenuItem(value: null, child: Text('Todos os terminais', style: TextStyle(fontSize: 13))),
-                      ...terminais.map((t) => DropdownMenuItem(value: t['id'], child: Text(t['nome'] ?? '', style: const TextStyle(fontSize: 13)))),
+                      const DropdownMenuItem(value: null, child: Text('Todos', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
+                      ...const [
+                        'Definindo quantidades',
+                        'Em andamento',
+                        'Aguardando informações',
+                        'Aguardando rateio',
+                        'Finalizado com rateio',
+                      ].map((status) => DropdownMenuItem(value: status, child: Text(status, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)))),
                     ],
-                    onChanged: (user?.terminalId != null)
-                        ? null
-                        : (val) {
-                            setState(() {
-                              terminalSelecionadoId = val;
-                              produtoSelecionadoId = null;
-                              produtoSelecionado = null;
-                              tanqueSelecionadoId = null;
-                              if (val != null) {
-                                _carregarTanquesPorTerminal(val);
-                              }
-                            });
-                            _carregarBombeios(resetPagina: true);
-                          },
+                    onChanged: (val) {
+                      setState(() {
+                        statusSelecionado = val;
+                      });
+                      _aplicarFiltrosLocal();
+                    },
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -913,20 +1026,22 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
           Expanded(child: carregando ? const Center(child: CircularProgressIndicator(color: Color(0xFF0D47A1))) : _buildListaBombeios()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await DialogInserirBombeio.show(context);
-          if (result is Map<String, dynamic> && result['abrirDetalhes'] == true) {
-            await _abrirDetalhesPorId(result['id']);
-            await _carregarBombeios();
-          } else {
-            await _carregarBombeios();
-          }
-        },
-        backgroundColor: const Color(0xFF0D47A1),
-        tooltip: 'Novo Bombeio',
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      floatingActionButton: (user?.empresaId == null || user!.empresaId!.trim().isEmpty)
+          ? FloatingActionButton(
+              onPressed: () async {
+                final result = await DialogInserirBombeio.show(context);
+                if (result is Map<String, dynamic> && result['abrirDetalhes'] == true) {
+                  await _abrirDetalhesPorId(result['id']);
+                  await _carregarBombeios();
+                } else {
+                  await _carregarBombeios();
+                }
+              },
+              backgroundColor: const Color(0xFF0D47A1),
+              tooltip: 'Novo Bombeio',
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
     );
   }
 }
