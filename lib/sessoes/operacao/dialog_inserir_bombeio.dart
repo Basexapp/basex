@@ -89,6 +89,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
   bool get _temQuantidadesSalvas => _totalVolumesNoInicio > 0;
 
+  bool get _isReadOnly =>
+      user?.empresaId != null && user!.empresaId!.isNotEmpty;
+
   bool get _validarBasico {
     // 1. Data válida
     if (!_isDataValida(dataCtrl.text)) return false;
@@ -102,7 +105,13 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     for (var d in _distribuidoras) {
       final nome = d['nome']?.toString() ?? '';
       if (selecionadas[nome] == true) {
-        final double val = double.tryParse((controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+        final double val =
+            double.tryParse(
+              (controllers[nome]?.text ?? '')
+                  .replaceAll('.', '')
+                  .replaceAll(',', '.'),
+            ) ??
+            0;
         if (val > 0) {
           temVolumeSolicitado = true;
           break;
@@ -241,7 +250,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   Future<void> _fetchTanques() async {
     if (terminalId == null) return;
     try {
-        final List<dynamic> data = await Supabase.instance.client
+      final List<dynamic> data = await Supabase.instance.client
           .from('tanques')
           // traz também produtos.nome_dois para exibir na lista
           .select('id, referencia, produto_id, produtos(nome_dois, nome)')
@@ -304,7 +313,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         if (emp is List) emp = emp.isNotEmpty ? emp[0] : null;
         if (emp != null) {
           final id = (emp['id'] ?? r['empresa_id']).toString();
-          final nome = emp['nome_dois'] ?? emp['nome'] ?? emp['nome_abrev'] ?? id;
+          final nome =
+              emp['nome_dois'] ?? emp['nome'] ?? emp['nome_abrev'] ?? id;
           empresasMap[id] = {'id': id, 'nome': nome};
         } else if (r['empresa_id'] != null) {
           final id = r['empresa_id'].toString();
@@ -313,13 +323,22 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       }
 
       final List<Map<String, dynamic>> list = empresasMap.values.toList()
-        ..sort((a, b) => (a['nome'] ?? '').toString().compareTo((b['nome'] ?? '').toString()));
+        ..sort(
+          (a, b) => (a['nome'] ?? '').toString().compareTo(
+            (b['nome'] ?? '').toString(),
+          ),
+        );
 
       setState(() {
         _distribuidoras = list;
         // Inicializa seleções e controllers para cada distribuidora (chave pelo nome)
-        selecionadas = {for (var e in _distribuidoras) (e['nome'] as String): false};
-        controllers = {for (var e in _distribuidoras) (e['nome'] as String): TextEditingController()};
+        selecionadas = {
+          for (var e in _distribuidoras) (e['nome'] as String): false,
+        };
+        controllers = {
+          for (var e in _distribuidoras)
+            (e['nome'] as String): TextEditingController(),
+        };
       });
 
       // Se abriu com um bombeio existente, aplica volumes/participantes carregados
@@ -329,7 +348,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         if (vsol != null && vsol is Map) {
           vsol.forEach((key, value) {
             final String keyStr = key?.toString() ?? '';
-            final int idx = _distribuidoras.indexWhere((d) => (d['id']?.toString() == keyStr) || (d['nome']?.toString() == keyStr));
+            final int idx = _distribuidoras.indexWhere(
+              (d) =>
+                  (d['id']?.toString() == keyStr) ||
+                  (d['nome']?.toString() == keyStr),
+            );
             if (idx != -1) {
               final nome = _distribuidoras[idx]['nome'] as String;
               selecionadas[nome] = true;
@@ -342,7 +365,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
           for (var p in b['participantes']) {
             final nomeRaw = p['nome']?.toString() ?? '';
             final solicit = p['solicitado'];
-            final int idx = _distribuidoras.indexWhere((d) => (d['id']?.toString() == nomeRaw) || (d['nome']?.toString() == nomeRaw));
+            final int idx = _distribuidoras.indexWhere(
+              (d) =>
+                  (d['id']?.toString() == nomeRaw) ||
+                  (d['nome']?.toString() == nomeRaw),
+            );
             if (idx != -1) {
               final nome = _distribuidoras[idx]['nome'] as String;
               selecionadas[nome] = true;
@@ -356,7 +383,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         for (var e in _distribuidoras) {
           final nome = e['nome'] as String;
           if (selecionadas[nome] == true) {
-            final text = (controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.');
+            final text = (controllers[nome]?.text ?? '')
+                .replaceAll('.', '')
+                .replaceAll(',', '.');
             totalInicialCalc += double.tryParse(text) ?? 0;
           }
         }
@@ -371,7 +400,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
   }
 
-  Future<void> _excluirMedicao(Map<String, dynamic> medicao, bool isFinal) async {
+  Future<void> _excluirMedicao(
+    Map<String, dynamic> medicao,
+    bool isFinal,
+  ) async {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -416,7 +448,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
             ),
             child: Text(
               'CANCELAR',
-              style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
           ElevatedButton(
@@ -426,7 +461,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
             child: const Text('EXCLUIR'),
           ),
@@ -478,16 +515,16 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
   }
 
-  void _abrirDialogOInserirMedicao({
-    bool isFinal = false,
-  }) async {
+  void _abrirDialogOInserirMedicao({bool isFinal = false}) async {
     if (_bombeioLocal == null) return;
 
     final supabase = Supabase.instance.client;
     bool usarTabelaAlcool = false;
     final produtoNome = _produtoCtrl.text;
     final tanqueRef = _selectedTanque?['referencia'];
-    final produtoId = (_selectedTanque?['produto_id'] ?? _bombeioLocal?['produto_id'])?.toString();
+    final produtoId =
+        (_selectedTanque?['produto_id'] ?? _bombeioLocal?['produto_id'])
+            ?.toString();
 
     if (produtoNome.isNotEmpty) {
       try {
@@ -606,7 +643,13 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       for (var d in _distribuidoras) {
         final nome = d['nome']?.toString() ?? '';
         if (selecionadas[nome] == true) {
-          final val = double.tryParse((controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+          final val =
+              double.tryParse(
+                (controllers[nome]?.text ?? '')
+                    .replaceAll('.', '')
+                    .replaceAll(',', '.'),
+              ) ??
+              0;
           volumes[nome] = val;
           total += val;
         }
@@ -677,14 +720,23 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: const BoxDecoration(
                         color: Color(0xFF0D47A1),
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(9)),
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(9),
+                        ),
                       ),
                       child: Row(
                         children: const [
-                          Icon(Icons.check_circle, color: Colors.white, size: 20),
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           SizedBox(width: 8),
                           Text(
                             'Bombeio salvo',
@@ -710,12 +762,20 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.grey.shade50,
-                        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                        borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(9),
+                        ),
                         border: Border(
-                          top: BorderSide(color: Colors.grey.shade300, width: 1),
+                          top: BorderSide(
+                            color: Colors.grey.shade300,
+                            width: 1,
+                          ),
                         ),
                       ),
                       child: Row(
@@ -728,14 +788,19 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF0D47A1),
                                 foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 10,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
                               child: const Text(
                                 'OK',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -754,14 +819,26 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         // usando o contexto correto).
         if (fecharDialog) {
           final qtdFaturada = _bombeioLocal?['qtd_faturada'];
-          final bool temQtdFaturada = qtdFaturada != null && qtdFaturada.toString().trim().isNotEmpty && qtdFaturada != 0;
-          final bool temMedicaoInicial = _bombeioLocal?['medicao_inicial_id'] != null && _bombeioLocal!['medicao_inicial_id'].toString().trim().isNotEmpty;
-          final bool temMedicaoFinal = _bombeioLocal?['medicao_final_id'] != null && _bombeioLocal!['medicao_final_id'].toString().trim().isNotEmpty;
-          final bool abrirDetalhes = _bombeioLocal != null && temQtdFaturada && temMedicaoInicial && temMedicaoFinal;
+          final bool temQtdFaturada =
+              qtdFaturada != null &&
+              qtdFaturada.toString().trim().isNotEmpty &&
+              qtdFaturada != 0;
+          final bool temMedicaoInicial =
+              _bombeioLocal?['medicao_inicial_id'] != null &&
+              _bombeioLocal!['medicao_inicial_id'].toString().trim().isNotEmpty;
+          final bool temMedicaoFinal =
+              _bombeioLocal?['medicao_final_id'] != null &&
+              _bombeioLocal!['medicao_final_id'].toString().trim().isNotEmpty;
+          final bool abrirDetalhes =
+              _bombeioLocal != null &&
+              temQtdFaturada &&
+              temMedicaoInicial &&
+              temMedicaoFinal;
 
           Navigator.pop(context, {
             'abrirDetalhes': abrirDetalhes,
             'id': _bombeioLocal != null ? _bombeioLocal!['id'] : null,
+            'bombeio_id': _bombeioLocal != null ? _bombeioLocal!['id'] : null,
           });
         }
       }
@@ -801,10 +878,15 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: headerColor,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(9)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(9),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -834,10 +916,15 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)),
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(9),
+                  ),
                   border: Border(
                     top: BorderSide(color: Colors.grey.shade300, width: 1),
                   ),
@@ -859,7 +946,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         ),
                         child: const Text(
                           'OK',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -949,7 +1039,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     Color color, {
     bool isFinal = false,
   }) {
-    final bool podeEditar = _bombeioLocal?['qtd_faturada'] == null;
+    final bool podeEditar = !_isReadOnly && _bombeioLocal?['qtd_faturada'] == null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
@@ -978,7 +1068,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     children: [
                       Icon(Icons.delete, size: 16, color: Colors.red),
                       SizedBox(width: 8),
-                      Text('Excluir medição', style: TextStyle(fontSize: 13, color: Colors.red)),
+                      Text(
+                        'Excluir medição',
+                        style: TextStyle(fontSize: 13, color: Colors.red),
+                      ),
                     ],
                   ),
                 ),
@@ -1045,7 +1138,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     for (var d in _distribuidoras) {
       final nome = d['nome']?.toString() ?? '';
       if (selecionadas[nome] == true) {
-        final text = (controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.');
+        final text = (controllers[nome]?.text ?? '')
+            .replaceAll('.', '')
+            .replaceAll(',', '.');
         totalGeral += double.tryParse(text) ?? 0;
       }
     }
@@ -1085,7 +1180,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       controller: dataCtrl,
                       focusNode: _dataFocusNode,
                       keyboardType: TextInputType.number,
-                      readOnly: _temMedicoes,
+                      readOnly: _temMedicoes || _isReadOnly,
                       style: TextStyle(
                         color: dataInvalida ? Colors.red : Colors.black87,
                       ),
@@ -1149,7 +1244,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     child: TextField(
                       controller: horarioCtrl,
                       keyboardType: TextInputType.number,
-                      readOnly: _temMedicoes,
+                      readOnly: _temMedicoes || _isReadOnly,
                       onChanged: (v) {
                         String formatado = _aplicarMascaraHorario(
                           v,
@@ -1198,11 +1293,13 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       ),
                       items: _tanques.map((t) {
                         var prod = t['produtos'];
-                        if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
+                        if (prod is List)
+                          prod = prod.isNotEmpty ? prod[0] : null;
                         final prodName = (prod is Map)
                             ? (prod['nome_dois'] ?? prod['nome'] ?? '')
                             : '';
-                        final display = '${t['referencia'] ?? ''}${prodName.isNotEmpty ? ' - $prodName' : ''}';
+                        final display =
+                            '${t['referencia'] ?? ''}${prodName.isNotEmpty ? ' - $prodName' : ''}';
                         return DropdownMenuItem<Map<String, dynamic>>(
                           value: t,
                           child: Text(
@@ -1212,15 +1309,18 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                           ),
                         );
                       }).toList(),
-                      onChanged: _temMedicoes
+                      onChanged: (_temMedicoes || _isReadOnly)
                           ? null
                           : (val) {
                               setState(() {
                                 _selectedTanque = val;
                                 var prod = val?['produtos'];
-                                if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
+                                if (prod is List)
+                                  prod = prod.isNotEmpty ? prod[0] : null;
                                 _produtoNome = (prod is Map)
-                                    ? (prod['nome_dois'] ?? prod['nome'] ?? 'Sem produto')
+                                    ? (prod['nome_dois'] ??
+                                          prod['nome'] ??
+                                          'Sem produto')
                                     : 'Sem produto';
                                 _produtoCtrl.text = _produtoNome;
                               });
@@ -1279,7 +1379,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     selected: isSelected,
                     selectedColor: const Color(0xFF0D47A1),
                     checkmarkColor: Colors.white,
-                    onSelected: _temMedicoes
+                    onSelected: (_temMedicoes || _isReadOnly)
                         ? null
                         : (val) {
                             setState(() {
@@ -1319,7 +1419,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                     child: TextField(
                                       controller: controllers[nome],
                                       keyboardType: TextInputType.number,
-                                      readOnly: _temMedicoes,
+                                      readOnly: _temMedicoes || _isReadOnly,
                                       onChanged: (_) => setState(() {}),
                                       inputFormatters: [
                                         FilteringTextInputFormatter.digitsOnly,
@@ -1366,13 +1466,24 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                 sectionsSpace: 2,
                                 centerSpaceRadius: 30,
                                 sections: _distribuidoras
-                                    .where((d) => selecionadas[d['nome']] == true)
+                                    .where(
+                                      (d) => selecionadas[d['nome']] == true,
+                                    )
                                     .map((d) {
-                                      final String nome = d['nome']?.toString() ?? '';
-                                      final text = (controllers[nome]?.text ?? '').replaceAll('.', '').replaceAll(',', '.');
-                                      final double val = double.tryParse(text) ?? 0;
-                                      final double percent = totalGeral > 0 ? (val / totalGeral) * 100 : 0;
-                                      final int idx = _distribuidoras.indexOf(d);
+                                      final String nome =
+                                          d['nome']?.toString() ?? '';
+                                      final text =
+                                          (controllers[nome]?.text ?? '')
+                                              .replaceAll('.', '')
+                                              .replaceAll(',', '.');
+                                      final double val =
+                                          double.tryParse(text) ?? 0;
+                                      final double percent = totalGeral > 0
+                                          ? (val / totalGeral) * 100
+                                          : 0;
+                                      final int idx = _distribuidoras.indexOf(
+                                        d,
+                                      );
                                       final colors = [
                                         const Color(0xFF0D47A1),
                                         const Color(0xFFD32F2F),
@@ -1382,7 +1493,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                       return PieChartSectionData(
                                         color: colors[idx % colors.length],
                                         value: val > 0 ? val : 1,
-                                        title: val > 0 ? '${_fmt.format(val.toInt())}\n${percent.toStringAsFixed(0)}%' : '',
+                                        title: val > 0
+                                            ? '${_fmt.format(val.toInt())}\n${percent.toStringAsFixed(0)}%'
+                                            : '',
                                         radius: 60,
                                         titleStyle: const TextStyle(
                                           fontSize: 9,
@@ -1392,7 +1505,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                         ),
                                         titlePositionPercentageOffset: 0.55,
                                       );
-                                    }).toList(),
+                                    })
+                                    .toList(),
                               ),
                             ),
                           ),
@@ -1410,7 +1524,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                     const Color(0xFF388E3C),
                                     const Color(0xFFFBC02D),
                                   ];
-                                  final String nome = d['nome']?.toString() ?? '';
+                                  final String nome =
+                                      d['nome']?.toString() ?? '';
                                   return Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -1432,7 +1547,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                       ),
                                     ],
                                   );
-                                }).toList(),
+                                })
+                                .toList(),
                           ),
                         ],
                       ),
@@ -1450,20 +1566,30 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 const SizedBox(height: 12),
                 if (selecionadas.values.any((v) => v))
                   ElevatedButton.icon(
-                    onPressed:
-                        (_validarBasico &&
-                            totalGeral.round() != _totalVolumesNoInicio.round())
+                    onPressed: _isReadOnly
+                        ? null
+                        : (_validarBasico &&
+                              totalGeral.round() !=
+                                  _totalVolumesNoInicio.round())
                         ? () => _salvarBombeio(fecharDialog: false)
                         : null,
                     icon: const Icon(Icons.save, size: 18),
                     label: const Text('Salvar quantidades'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue[50],
-                      foregroundColor: const Color(0xFF0D47A1),
+                      backgroundColor: _isReadOnly
+                          ? Colors.grey[300]
+                          : Colors.blue[50],
+                      foregroundColor: _isReadOnly
+                          ? Colors.grey[600]
+                          : const Color(0xFF0D47A1),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
-                        side: const BorderSide(color: Color(0xFF0D47A1)),
+                        side: BorderSide(
+                          color: _isReadOnly
+                              ? Colors.grey[400]!
+                              : const Color(0xFF0D47A1),
+                        ),
                       ),
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -1476,25 +1602,25 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 const SizedBox(height: 16),
                 if (_medicaoInicialSalva == null)
                   ElevatedButton.icon(
-                    onPressed: _temQuantidadesSalvas
+                    onPressed: (_temQuantidadesSalvas && !_isReadOnly)
                         ? () => _abrirDialogOInserirMedicao(isFinal: false)
                         : null,
                     icon: const Icon(Icons.straighten, size: 18),
                     label: const Text('Inserir medição inicial'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _temQuantidadesSalvas
-                          ? Colors.grey[200]
-                          : Colors.grey[100],
-                      foregroundColor: _temQuantidadesSalvas
-                          ? const Color(0xFF0D47A1)
-                          : Colors.grey,
+                      backgroundColor: (_isReadOnly || !_temQuantidadesSalvas)
+                          ? Colors.grey[300]
+                          : Colors.grey[200],
+                      foregroundColor: (_isReadOnly || !_temQuantidadesSalvas)
+                          ? Colors.grey[600]
+                          : const Color(0xFF0D47A1),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: _temQuantidadesSalvas
-                              ? const Color(0xFF0D47A1)
-                              : Colors.grey[300]!,
+                          color: (_isReadOnly || !_temQuantidadesSalvas)
+                              ? Colors.grey[400]!
+                              : const Color(0xFF0D47A1),
                         ),
                       ),
                       padding: const EdgeInsets.symmetric(
@@ -1522,17 +1648,26 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   if (_medicaoFinalSalva == null) ...[
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: () =>
-                          _abrirDialogOInserirMedicao(isFinal: true),
+                      onPressed: _isReadOnly
+                          ? null
+                          : () => _abrirDialogOInserirMedicao(isFinal: true),
                       icon: const Icon(Icons.straighten, size: 18),
                       label: const Text('Inserir medição final'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange[50],
-                        foregroundColor: Colors.orange[900],
+                        backgroundColor: _isReadOnly
+                            ? Colors.grey[300]
+                            : Colors.orange[50],
+                        foregroundColor: _isReadOnly
+                            ? Colors.grey[600]
+                            : Colors.orange[900],
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.orange[900]!),
+                          side: BorderSide(
+                            color: _isReadOnly
+                                ? Colors.grey[400]!
+                                : Colors.orange[900]!,
+                          ),
                         ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1611,6 +1746,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         child: TextField(
                           controller: _qtdFaturadaCtrl,
                           keyboardType: TextInputType.number,
+                          readOnly: _isReadOnly,
                           onChanged: (_) =>
                               setState(() => _atualizarCalculos()),
                           inputFormatters: [
@@ -1665,9 +1801,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
           ),
         ),
         ElevatedButton(
-          onPressed: _podeSalvar ? _salvarBombeio : null,
+          onPressed: (_podeSalvar && !_isReadOnly) ? _salvarBombeio : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0D47A1),
+            backgroundColor: (_isReadOnly)
+                ? Colors.grey[400]
+                : const Color(0xFF0D47A1),
             foregroundColor: Colors.white,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),

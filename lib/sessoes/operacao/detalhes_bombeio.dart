@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
 import '../../main.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'rateio_payload.dart';
 
 class DetalhesBombeioPage extends StatefulWidget {
   final Map<String, dynamic> bombeio;
@@ -19,10 +20,15 @@ class DetalhesBombeioPage extends StatefulWidget {
   State<DetalhesBombeioPage> createState() => _DetalhesBombeioPageState();
 }
 
-class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAware {
+class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
+    with RouteAware {
   final NumberFormat _fmt = NumberFormat.decimalPattern('pt_BR');
   bool? _rateioRealizado;
   late Map<String, dynamic> _bombeio;
+
+  UsuarioAtual? get user => UsuarioAtual.instance;
+
+  bool get _isReadOnly => user?.empresaId != null && user!.empresaId!.isNotEmpty;
 
   String _formatarData(DateTime? data) => data == null
       ? '-'
@@ -72,10 +78,13 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
   Future<void> _reloadBombeio() async {
     try {
       final supabase = Supabase.instance.client;
-      final bombeioId = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
+      final bombeioId =
+          _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
       if (bombeioId == null || bombeioId.isEmpty) return;
 
-      final resp = await supabase.from('bombeios').select('''
+      final resp = await supabase
+          .from('bombeios')
+          .select('''
         id,
         num_controle,
         data,
@@ -110,13 +119,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
           volume_20
         ),
         rateio
-      ''').eq('id', bombeioId).maybeSingle();
+      ''')
+          .eq('id', bombeioId)
+          .maybeSingle();
 
       if (resp == null) return;
 
       // Reconstrói mapa local similar ao que o parent monta
-      final tanquesArr = resp['tanques!bombeios_tanque_id_fkey'] ?? resp['tanques'];
-      final tanques = tanquesArr is List ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null) : tanquesArr;
+      final tanquesArr =
+          resp['tanques!bombeios_tanque_id_fkey'] ?? resp['tanques'];
+      final tanques = tanquesArr is List
+          ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null)
+          : tanquesArr;
       final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
       final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
 
@@ -128,12 +142,16 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
           rawVols.forEach((key, value) {
             double sol = double.tryParse(value.toString()) ?? 0;
             totalSolicitado += sol;
-            participantes.add({'nome': key?.toString() ?? '', 'solicitado': sol});
+            participantes.add({
+              'nome': key?.toString() ?? '',
+              'solicitado': sol,
+            });
           });
         } else if (rawVols is List) {
           for (var v in rawVols) {
             if (v is Map) {
-              double sol = double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
+              double sol =
+                  double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
               participantes.add({'nome': v['nome'] ?? '', 'solicitado': sol});
               totalSolicitado += sol;
             }
@@ -142,14 +160,22 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
       }
 
       final medFinalArr = resp['medicao_final'];
-      final medFinal = medFinalArr is List ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null) : medFinalArr;
+      final medFinal = medFinalArr is List
+          ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null)
+          : medFinalArr;
       final medIniArr = resp['medicao_inicial'];
-      final medIni = medIniArr is List ? (medIniArr.isNotEmpty ? medIniArr[0] : null) : medIniArr;
+      final medIni = medIniArr is List
+          ? (medIniArr.isNotEmpty ? medIniArr[0] : null)
+          : medIniArr;
 
-      double volAmbIni = double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
-      double vol20Ini = double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
-      double volAmbFin = double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
-      double vol20Fin = double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbIni =
+          double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Ini =
+          double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbFin =
+          double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Fin =
+          double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
 
       double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
       double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
@@ -160,10 +186,13 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
         'data': DateTime.tryParse(resp['data'] ?? '') ?? DateTime.now(),
         'produto': produto,
         'tanque': tanqueNome,
-        'horario_inicial': resp['horario']?.toString().substring(0, 5) ?? '--:--',
-        'horario_final': medFinal?['horario']?.toString().substring(0,5) ?? '--:--',
+        'horario_inicial':
+            resp['horario']?.toString().substring(0, 5) ?? '--:--',
+        'horario_final':
+            medFinal?['horario']?.toString().substring(0, 5) ?? '--:--',
         'numero_controle': resp['num_controle'] ?? 'S/N',
-        'volume_total': double.tryParse(resp['total_bombeio']?.toString() ?? '0') ?? 0,
+        'volume_total':
+            double.tryParse(resp['total_bombeio']?.toString() ?? '0') ?? 0,
         'volume_solicitado': totalSolicitado,
         'participantes': participantes,
         'recebido_amb': recebidoAmb,
@@ -191,9 +220,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
       final supabase = Supabase.instance.client;
       // Preferência: verificar pelo próprio bombeio — se existir campo `rateio` não-nulo,
       // considera-se rateio realizado.
-      String? bombeioId = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
+      String? bombeioId =
+          _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
       if (bombeioId != null && bombeioId.isNotEmpty) {
-        final bom = await supabase.from('bombeios').select('rateio').eq('id', bombeioId).maybeSingle();
+        final bom = await supabase
+            .from('bombeios')
+            .select('rateio')
+            .eq('id', bombeioId)
+            .maybeSingle();
         // Considera rateio realizado apenas se o valor for estritamente boolean true
         final exists = bom != null && bom['rateio'] == true;
         if (mounted) setState(() => _rateioRealizado = exists);
@@ -212,7 +246,9 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
       if (_bombeio['data'] is DateTime) {
         dia = _bombeio['data'] as DateTime;
       } else {
-        dia = DateTime.tryParse(_bombeio['data']?.toString() ?? '') ?? DateTime.now();
+        dia =
+            DateTime.tryParse(_bombeio['data']?.toString() ?? '') ??
+            DateTime.now();
       }
       final dataInicio = DateTime(dia.year, dia.month, dia.day);
       final dataFim = DateTime(dia.year, dia.month, dia.day, 23, 59, 59);
@@ -257,7 +293,11 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                 if (title != null) ...[
                   Text(
                     title,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 65, 54, 49)),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color.fromARGB(255, 65, 54, 49),
+                    ),
                   ),
                   const SizedBox(height: 12),
                 ],
@@ -275,19 +315,39 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                       child: ElevatedButton(
                         onPressed: () => Navigator.of(context).pop(),
                         style: ButtonStyle(
-                          backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                            if (states.contains(WidgetState.hovered)) {
-                              return const Color.fromARGB(255, 65, 54, 49);
-                            }
-                            return Colors.black;
-                          }),
-                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-                          shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                          side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFB341), width: 1.6)),
+                          backgroundColor:
+                              WidgetStateProperty.resolveWith<Color?>((states) {
+                                if (states.contains(WidgetState.hovered)) {
+                                  return const Color.fromARGB(255, 65, 54, 49);
+                                }
+                                return Colors.black;
+                              }),
+                          foregroundColor: WidgetStateProperty.all<Color>(
+                            Colors.white,
+                          ),
+                          padding: WidgetStateProperty.all(
+                            const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 12,
+                            ),
+                          ),
+                          shape: WidgetStateProperty.all(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          side: WidgetStateProperty.all(
+                            const BorderSide(
+                              color: Color(0xFFFFB341),
+                              width: 1.6,
+                            ),
+                          ),
                           elevation: WidgetStateProperty.all(1),
                         ),
-                        child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w700)),
+                        child: const Text(
+                          'OK',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
                   ],
@@ -337,16 +397,33 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                       child: ElevatedButton(
                         onPressed: () => Navigator.of(context).pop(false),
                         style: ButtonStyle(
-                          backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                            if (states.contains(WidgetState.hovered)) {
-                              return const Color.fromARGB(255, 65, 54, 49);
-                            }
-                            return Colors.black;
-                          }),
-                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-                          shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                          side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFB341), width: 1.6)),
+                          backgroundColor:
+                              WidgetStateProperty.resolveWith<Color?>((states) {
+                                if (states.contains(WidgetState.hovered)) {
+                                  return const Color.fromARGB(255, 65, 54, 49);
+                                }
+                                return Colors.black;
+                              }),
+                          foregroundColor: WidgetStateProperty.all<Color>(
+                            Colors.white,
+                          ),
+                          padding: WidgetStateProperty.all(
+                            const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 12,
+                            ),
+                          ),
+                          shape: WidgetStateProperty.all(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          side: WidgetStateProperty.all(
+                            const BorderSide(
+                              color: Color(0xFFFFB341),
+                              width: 1.6,
+                            ),
+                          ),
                           elevation: WidgetStateProperty.all(1),
                         ),
                         child: const Text(
@@ -363,16 +440,33 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                       child: ElevatedButton(
                         onPressed: () => Navigator.of(context).pop(true),
                         style: ButtonStyle(
-                          backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                            if (states.contains(WidgetState.hovered)) {
-                              return const Color.fromARGB(255, 65, 54, 49);
-                            }
-                            return Colors.black;
-                          }),
-                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                          padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-                          shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                          side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFB341), width: 1.6)),
+                          backgroundColor:
+                              WidgetStateProperty.resolveWith<Color?>((states) {
+                                if (states.contains(WidgetState.hovered)) {
+                                  return const Color.fromARGB(255, 65, 54, 49);
+                                }
+                                return Colors.black;
+                              }),
+                          foregroundColor: WidgetStateProperty.all<Color>(
+                            Colors.white,
+                          ),
+                          padding: WidgetStateProperty.all(
+                            const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 12,
+                            ),
+                          ),
+                          shape: WidgetStateProperty.all(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          side: WidgetStateProperty.all(
+                            const BorderSide(
+                              color: Color(0xFFFFB341),
+                              width: 1.6,
+                            ),
+                          ),
                           elevation: WidgetStateProperty.all(1),
                         ),
                         child: const Text(
@@ -404,33 +498,44 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
         // Obter produto_id: pode estar presente em widget.bombeio['produto_id']
         String? produtoId = _bombeio['produto_id']?.toString();
         if (produtoId == null || produtoId.isEmpty) {
-          final tanq = await supabase.from('tanques').select('produto_id').eq('id', tanqueId).maybeSingle();
+          final tanq = await supabase
+              .from('tanques')
+              .select('produto_id')
+              .eq('id', tanqueId)
+              .maybeSingle();
           produtoId = tanq?['produto_id']?.toString();
         }
 
         final dataMov = _bombeio['data'] is DateTime
-          ? (_bombeio['data'] as DateTime).toIso8601String()
-          : (_bombeio['data']?.toString() ?? DateTime.now().toIso8601String());
+            ? (_bombeio['data'] as DateTime).toIso8601String()
+            : (_bombeio['data']?.toString() ??
+                  DateTime.now().toIso8601String());
 
-        final recebidoAmb = double.tryParse(_bombeio['recebido_amb']?.toString() ?? '0') ?? 0;
-        final recebido20 = double.tryParse(_bombeio['recebido_20']?.toString() ?? '0') ?? 0;
+        final recebidoAmb =
+            double.tryParse(_bombeio['recebido_amb']?.toString() ?? '0') ?? 0;
+        final recebido20 =
+            double.tryParse(_bombeio['recebido_20']?.toString() ?? '0') ?? 0;
 
         final participantes = (_bombeio['participantes'] is List)
-          ? List<Map<String, dynamic>>.from(_bombeio['participantes'])
-          : <Map<String, dynamic>>[];
+            ? List<Map<String, dynamic>>.from(_bombeio['participantes'])
+            : <Map<String, dynamic>>[];
 
         double totalSolicitado = 0;
         for (var p in participantes) {
-          totalSolicitado += double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
+          totalSolicitado +=
+              double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
         }
 
         final usuario = UsuarioAtual.instance;
         final terminalId = usuario?.terminalId;
+        final bombeioId =
+            _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
 
         final List<Map<String, dynamic>> inserts = [];
 
         for (var p in participantes) {
-          final solicit = double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
+          final solicit =
+              double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
           final peso = totalSolicitado > 0 ? (solicit / totalSolicitado) : 0;
           final entradaAmb = (recebidoAmb * peso).round();
           final entradaVinte = (recebido20 * peso).round();
@@ -444,23 +549,34 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
             empresaId = nomeRaw;
           } else if (nomeRaw.isNotEmpty) {
             // tenta achar pela coluna nome, nome_dois ou nome_abrev
-            var emp = await supabase.from('empresas').select('id').eq('nome', nomeRaw).maybeSingle();
-            emp ??= await supabase.from('empresas').select('id').eq('nome_dois', nomeRaw).maybeSingle();
-            emp ??= await supabase.from('empresas').select('id').eq('nome_abrev', nomeRaw).maybeSingle();
+            var emp = await supabase
+                .from('empresas')
+                .select('id')
+                .eq('nome', nomeRaw)
+                .maybeSingle();
+            emp ??= await supabase
+                .from('empresas')
+                .select('id')
+                .eq('nome_dois', nomeRaw)
+                .maybeSingle();
+            emp ??= await supabase
+                .from('empresas')
+                .select('id')
+                .eq('nome_abrev', nomeRaw)
+                .maybeSingle();
             empresaId = emp?['id']?.toString();
           }
 
-          final row = {
-            'tanque_id': tanqueId,
-            if (produtoId != null) 'produto_id': produtoId,
-            'data_mov': dataMov,
-            'entrada_amb': entradaAmb,
-            'entrada_vinte': entradaVinte,
-            'descricao': 'Cota Bombeio',
-            'empresa_id': empresaId,
-            'tipo_mov': 'bombeio',
-            'terminal_id': terminalId,
-          };
+          final row = buildRateioMovimentacaoRow(
+            tanqueId: tanqueId,
+            produtoId: produtoId,
+            bombeioId: bombeioId,
+            dataMov: dataMov,
+            entradaAmb: entradaAmb,
+            entradaVinte: entradaVinte,
+            empresaId: empresaId,
+            terminalId: terminalId,
+          );
 
           inserts.add(row);
         }
@@ -470,10 +586,12 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
           await supabase.from('movimentacoes_tanque').insert(inserts);
 
           // Marca o bombeio como rateado se tivermos o id do bombeio
-          final bombeioId = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
           if (bombeioId != null && bombeioId.isNotEmpty) {
             try {
-              await supabase.from('bombeios').update({'rateio': true}).eq('id', bombeioId);
+              await supabase
+                  .from('bombeios')
+                  .update({'rateio': true})
+                  .eq('id', bombeioId);
             } catch (e) {
               debugPrint('Erro ao marcar bombeio.rateio: $e');
             }
@@ -486,7 +604,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
           }
         } else {
           if (mounted) {
-            await _showMessageDialog('Nenhum participante para inserir', title: 'Aviso');
+            await _showMessageDialog(
+              'Nenhum participante para inserir',
+              title: 'Aviso',
+            );
           }
         }
       } catch (e) {
@@ -530,7 +651,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
   }
 
   Widget _buildMedicaoDisplay(
-      Map<String, dynamic> medicao, String label, Color color) {
+    Map<String, dynamic> medicao,
+    String label,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -570,25 +694,38 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
               children: [
                 Expanded(
                   flex: 3,
-                  child: _buildInfoColumn('Controle', medicao['num_controle'] ?? '-'),
+                  child: _buildInfoColumn(
+                    'Controle',
+                    medicao['num_controle'] ?? '-',
+                  ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: _buildInfoColumn('Data', _formatarDataIso(medicao['data'])),
+                  child: _buildInfoColumn(
+                    'Data',
+                    _formatarDataIso(medicao['data']),
+                  ),
                 ),
                 Expanded(
                   flex: 2,
-                  child: _buildInfoColumn('Horário', _formatarHorario(medicao['horario'])),
+                  child: _buildInfoColumn(
+                    'Horário',
+                    _formatarHorario(medicao['horario']),
+                  ),
                 ),
                 Expanded(
                   flex: 3,
-                  child: _buildInfoColumn('Vol. Amb.',
-                      '${_fmt.format((medicao['volume_ambiente'] as num?)?.toInt() ?? 0)} L'),
+                  child: _buildInfoColumn(
+                    'Vol. Amb.',
+                    '${_fmt.format((medicao['volume_ambiente'] as num?)?.toInt() ?? 0)} L',
+                  ),
                 ),
                 Expanded(
                   flex: 3,
-                  child: _buildInfoColumn('Vol. 20ºC',
-                      '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L'),
+                  child: _buildInfoColumn(
+                    'Vol. 20ºC',
+                    '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L',
+                  ),
                 ),
               ],
             ),
@@ -602,18 +739,24 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-                letterSpacing: 0.5)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+            letterSpacing: 0.5,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF0D47A1))),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0D47A1),
+          ),
+        ),
       ],
     );
   }
@@ -624,26 +767,32 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
     final double recebidoAmb = (_bombeio['recebido_amb'] ?? 0).toDouble();
     final double recebido20 = (_bombeio['recebido_20'] ?? 0).toDouble();
     final List<Map<String, dynamic>> participantes =
-      List<Map<String, dynamic>>.from(_bombeio['participantes']);
+        List<Map<String, dynamic>>.from(_bombeio['participantes']);
 
     // Ordenando da que mais participou para a que menos participou (pelo volume solicitado)
-    participantes.sort((a, b) =>
-        (b['solicitado'] as double).compareTo(a['solicitado'] as double));
+    participantes.sort(
+      (a, b) =>
+          (b['solicitado'] as double).compareTo(a['solicitado'] as double),
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('DETALHES DO BOMBEIO',
-            style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF0D47A1),
-                letterSpacing: 1.2)),
+        title: const Text(
+          'DETALHES DO BOMBEIO',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF0D47A1),
+            letterSpacing: 1.2,
+          ),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
-            onPressed: widget.onVoltar),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
+          onPressed: widget.onVoltar,
+        ),
         centerTitle: true,
       ),
       body: Column(
@@ -656,13 +805,13 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildHeaderMicroItem(
-                  'CONTROLE', _bombeio['numero_controle']),
+                _buildHeaderMicroItem('CONTROLE', _bombeio['numero_controle']),
                 _buildHeaderMicroItem('PRODUTO', _bombeio['produto']),
+                _buildHeaderMicroItem('DATA', _formatarData(_bombeio['data'])),
                 _buildHeaderMicroItem(
-                  'DATA', _formatarData(_bombeio['data'])),
-                _buildHeaderMicroItem('HORÁRIO',
-                  '${_bombeio['horario_inicial']} - ${_bombeio['horario_final']}'),
+                  'HORÁRIO',
+                  '${_bombeio['horario_inicial']} - ${_bombeio['horario_final']}',
+                ),
               ],
             ),
           ),
@@ -714,7 +863,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -728,41 +877,59 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  const Text('TOTAL SOLICITADO',
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.grey)),
+                                  const Text(
+                                    'TOTAL SOLICITADO',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text('${_fmt.format(totalSolicitado.toInt())} L',
-                                      style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF455A64))),
+                                  Text(
+                                    '${_fmt.format(totalSolicitado.toInt())} L',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF455A64),
+                                    ),
+                                  ),
                                   const SizedBox(height: 16),
-                                  const Text('TOTAL RECEBIDO (AMB)',
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.grey)),
+                                  const Text(
+                                    'TOTAL RECEBIDO (AMB)',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text('${_fmt.format(recebidoAmb.toInt())} L',
-                                      style: const TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.w900,
-                                          color: Color(0xFF0D47A1))),
+                                  Text(
+                                    '${_fmt.format(recebidoAmb.toInt())} L',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                  ),
                                   const SizedBox(height: 16),
-                                  const Text('TOTAL RECEBIDO (20ºC)',
-                                      style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.grey)),
+                                  const Text(
+                                    'TOTAL RECEBIDO (20ºC)',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
                                   const SizedBox(height: 2),
-                                  Text('${_fmt.format(recebido20.toInt())} L',
-                                        style: const TextStyle(
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.w900,
-                                            color: Color(0xFF388E3C))),
+                                  Text(
+                                    '${_fmt.format(recebido20.toInt())} L',
+                                    style: const TextStyle(
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF388E3C),
+                                    ),
+                                  ),
                                 ],
                               ),
                               const SizedBox(width: 30),
@@ -773,31 +940,41 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                   PieChartData(
                                     sectionsSpace: 2,
                                     centerSpaceRadius: 40,
-                                    sections: List.generate(participantes.length, (i) {
-                                      final p = participantes[i];
-                                      final colors = [
-                                        const Color(0xFF0D47A1), // Azul Escuro
-                                        const Color(0xFFD32F2F), // Vermelho
-                                        const Color(0xFF388E3C), // Verde
-                                        const Color(0xFFFBC02D), // Amarelo/Dourado
-                                      ];
-                                      return PieChartSectionData(
-                                        color: colors[i % colors.length],
-                                        value: p['solicitado'],
-                                        title:
-                                            '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((p['solicitado'] / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
-                                        radius: 50,
-                                        titleStyle: const TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                          shadows: [
-                                            Shadow(color: Colors.black45, blurRadius: 2)
-                                          ],
-                                        ),
-                                        titlePositionPercentageOffset: 0.55,
-                                      );
-                                    }),
+                                    sections: List.generate(
+                                      participantes.length,
+                                      (i) {
+                                        final p = participantes[i];
+                                        final colors = [
+                                          const Color(
+                                            0xFF0D47A1,
+                                          ), // Azul Escuro
+                                          const Color(0xFFD32F2F), // Vermelho
+                                          const Color(0xFF388E3C), // Verde
+                                          const Color(
+                                            0xFFFBC02D,
+                                          ), // Amarelo/Dourado
+                                        ];
+                                        return PieChartSectionData(
+                                          color: colors[i % colors.length],
+                                          value: p['solicitado'],
+                                          title:
+                                              '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((p['solicitado'] / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
+                                          radius: 50,
+                                          titleStyle: const TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            shadows: [
+                                              Shadow(
+                                                color: Colors.black45,
+                                                blurRadius: 2,
+                                              ),
+                                            ],
+                                          ),
+                                          titlePositionPercentageOffset: 0.55,
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
                               ),
@@ -820,45 +997,65 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                 children: [
                                   const SizedBox(width: 8),
                                   Expanded(
-                                      flex: 3,
-                                      child: Text('DISTRIBUIDORA',
-                                          textAlign: TextAlign.left,
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey[700]))),
+                                    flex: 3,
+                                    child: Text(
+                                      'DISTRIBUIDORA',
+                                      textAlign: TextAlign.left,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
                                   Expanded(
-                                      flex: 1,
-                                      child: Text('%',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey[700]))),
+                                    flex: 1,
+                                    child: Text(
+                                      '%',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
                                   Expanded(
-                                      flex: 2,
-                                      child: Text('SOLICITADO',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey[700]))),
+                                    flex: 2,
+                                    child: Text(
+                                      'SOLICITADO',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
                                   Expanded(
-                                      flex: 2,
-                                      child: Text('RECEB. (AMB)',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey[700]))),
+                                    flex: 2,
+                                    child: Text(
+                                      'RECEB. (AMB)',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
                                   Expanded(
-                                      flex: 2,
-                                      child: Text('RECEB. (20ºC)',
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.grey[700]))),
+                                    flex: 2,
+                                    child: Text(
+                                      'RECEB. (20ºC)',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -871,7 +1068,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                   : 0;
                               double recAmbPart = recebidoAmb * peso;
                               double rec20Part = recebido20 * peso;
-                              double percent = peso; // O percentual do rateio é baseado no solicitado
+                              double percent =
+                                  peso; // O percentual do rateio é baseado no solicitado
 
                               final colors = [
                                 const Color(0xFF0D47A1),
@@ -883,7 +1081,9 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                               return Column(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
                                     child: Row(
                                       children: [
                                         Expanded(
@@ -893,34 +1093,54 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                               Container(
                                                 width: 8,
                                                 height: 8,
-                                                margin: const EdgeInsets.only(right: 12),
+                                                margin: const EdgeInsets.only(
+                                                  right: 12,
+                                                ),
                                                 decoration: BoxDecoration(
-                                                  color: colors[index % colors.length],
+                                                  color:
+                                                      colors[index %
+                                                          colors.length],
                                                   shape: BoxShape.circle,
                                                 ),
                                               ),
                                               Expanded(
                                                 child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
                                                   children: [
                                                     Text(
-                                                      p['nome'].toString().toUpperCase(),
+                                                      p['nome']
+                                                          .toString()
+                                                          .toUpperCase(),
                                                       style: const TextStyle(
                                                         fontSize: 13,
-                                                        fontWeight: FontWeight.bold,
-                                                        color: Color(0xFF263238),
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        color: Color(
+                                                          0xFF263238,
+                                                        ),
                                                       ),
-                                                      overflow: TextOverflow.ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
                                                     const SizedBox(height: 6),
                                                     ClipRRect(
-                                                      borderRadius: BorderRadius.circular(2),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            2,
+                                                          ),
                                                       child: LinearProgressIndicator(
                                                         value: percent,
-                                                        backgroundColor: Colors.grey[100],
-                                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                                          colors[index % colors.length]
-                                                        ),
+                                                        backgroundColor:
+                                                            Colors.grey[100],
+                                                        valueColor:
+                                                            AlwaysStoppedAnimation<
+                                                              Color
+                                                            >(
+                                                              colors[index %
+                                                                  colors
+                                                                      .length],
+                                                            ),
                                                         minHeight: 3,
                                                       ),
                                                     ),
@@ -962,7 +1182,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                             style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w700,
-                                              color: colors[index % colors.length],
+                                              color:
+                                                  colors[index % colors.length],
                                             ),
                                           ),
                                         ),
@@ -974,7 +1195,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                             style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w900,
-                                              color: colors[index % colors.length],
+                                              color:
+                                                  colors[index % colors.length],
                                             ),
                                           ),
                                         ),
@@ -985,12 +1207,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                 ],
                               );
                             }),
-                            
+
                             // Botões de rateio adicionados abaixo da tabela
                             const SizedBox(height: 24),
                             // Enquanto não sabemos se o rateio foi realizado, não renderiza nenhum botão
                             if (_rateioRealizado == null)
-                              const Center(child: SizedBox(width: 200, height: 40))
+                              const Center(
+                                child: SizedBox(width: 200, height: 40),
+                              )
                             else if (_rateioRealizado == true)
                               Center(
                                 child: Container(
@@ -1000,7 +1224,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                   decoration: BoxDecoration(
                                     color: Colors.grey.shade100,
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: const Color(0xFFFFB341), width: 1.6),
+                                    border: Border.all(
+                                      color: const Color(0xFFFFB341),
+                                      width: 1.6,
+                                    ),
                                   ),
                                   child: const Text(
                                     'Rateio realizado',
@@ -1012,7 +1239,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                   ),
                                 ),
                               )
-                            else
+                            else if (!_isReadOnly)
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
@@ -1020,18 +1247,48 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                     width: 200,
                                     height: 40,
                                     child: ElevatedButton(
-                                      onPressed: () => _showRateioAutomaticoDialog(),
+                                      onPressed: () =>
+                                          _showRateioAutomaticoDialog(),
                                       style: ButtonStyle(
-                                        backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                                          if (states.contains(WidgetState.hovered)) {
-                                            return const Color.fromARGB(255, 65, 54, 49);
-                                          }
-                                          return Colors.black;
-                                        }),
-                                        foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                                        padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-                                        shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                                        side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFBD59), width: 1.6)),
+                                        backgroundColor:
+                                            WidgetStateProperty.resolveWith<
+                                              Color?
+                                            >((states) {
+                                              if (states.contains(
+                                                WidgetState.hovered,
+                                              )) {
+                                                return const Color.fromARGB(
+                                                  255,
+                                                  65,
+                                                  54,
+                                                  49,
+                                                );
+                                              }
+                                              return Colors.black;
+                                            }),
+                                        foregroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              Colors.white,
+                                            ),
+                                        padding: WidgetStateProperty.all(
+                                          const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                        ),
+                                        shape: WidgetStateProperty.all(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                        ),
+                                        side: WidgetStateProperty.all(
+                                          const BorderSide(
+                                            color: Color(0xFFFFBD59),
+                                            width: 1.6,
+                                          ),
+                                        ),
                                         elevation: WidgetStateProperty.all(1),
                                       ),
                                       child: const Text(
@@ -1050,19 +1307,55 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAwa
                                     height: 40,
                                     child: ElevatedButton(
                                       onPressed: () async {
-                                        await _showMessageDialog('Não disponível');
+                                        await _showMessageDialog(
+                                          'Não disponível',
+                                        );
                                       },
                                       style: ButtonStyle(
-                                        backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                                          if (states.contains(WidgetState.hovered)) {
-                                            return const Color.fromARGB(255, 65, 54, 49);
-                                          }
-                                          return Colors.black;
-                                        }),
-                                        foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                                        padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-                                        shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                                        side: WidgetStateProperty.all(const BorderSide(color: Color.fromARGB(255, 255, 179, 65), width: 1.6)),
+                                        backgroundColor:
+                                            WidgetStateProperty.resolveWith<
+                                              Color?
+                                            >((states) {
+                                              if (states.contains(
+                                                WidgetState.hovered,
+                                              )) {
+                                                return const Color.fromARGB(
+                                                  255,
+                                                  65,
+                                                  54,
+                                                  49,
+                                                );
+                                              }
+                                              return Colors.black;
+                                            }),
+                                        foregroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              Colors.white,
+                                            ),
+                                        padding: WidgetStateProperty.all(
+                                          const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                        ),
+                                        shape: WidgetStateProperty.all(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              6,
+                                            ),
+                                          ),
+                                        ),
+                                        side: WidgetStateProperty.all(
+                                          const BorderSide(
+                                            color: Color.fromARGB(
+                                              255,
+                                              255,
+                                              179,
+                                              65,
+                                            ),
+                                            width: 1.6,
+                                          ),
+                                        ),
                                         elevation: WidgetStateProperty.all(1),
                                       ),
                                       child: const Text(
