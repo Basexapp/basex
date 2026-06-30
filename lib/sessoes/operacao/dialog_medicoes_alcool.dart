@@ -6,6 +6,7 @@ import '../../login_page.dart';
 
 class DialogMedicoesAlcool extends StatefulWidget {
   final String? produtoNome;
+  final String? produtoId;
   final String? tanqueReferencia;
   final String? data;
   final String? horario;
@@ -17,6 +18,7 @@ class DialogMedicoesAlcool extends StatefulWidget {
   const DialogMedicoesAlcool({
     super.key,
     this.produtoNome,
+    this.produtoId,
     this.tanqueReferencia,
     this.data,
     this.horario,
@@ -366,12 +368,17 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     }
 
     try {
-      // 1. Buscar IDs necessários
-      final prodRes = await supabase
-          .from('produtos')
-          .select('id')
-          .eq('nome', widget.produtoNome ?? '')
-          .maybeSingle();
+      // 1. Buscar IDs necessários — usar somente produtoId (UUID)
+      final produtoId = widget.produtoId?.trim();
+      if (produtoId == null || produtoId.isEmpty) throw 'Produto id não informado.';
+
+      Map<String, dynamic>? prodRes;
+      try {
+        prodRes = await supabase.from('produtos').select('id').eq('id', produtoId).maybeSingle();
+      } catch (e) {
+        debugPrint('Erro ao buscar produto por id "$produtoId": $e');
+        prodRes = null;
+      }
 
       final tqRes = await supabase
           .from('tanques')
@@ -379,7 +386,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
           .eq('referencia', widget.tanqueReferencia ?? '')
           .maybeSingle();
 
-      if (prodRes == null) throw 'Produto não encontrado.';
+      if (prodRes == null) throw 'Produto não encontrado: id="$produtoId".';
 
       // 2. Formatar data e horário
       DateTime dataFormatada = DateFormat('dd/MM/yyyy').parse(_dataCtrl.text);

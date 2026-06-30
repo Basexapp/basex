@@ -317,6 +317,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
           'recebido_amb': recebidoAmb,
           'recebido_20': recebido20,
           'qtd_faturada': item['qtd_faturada'],
+          'medicao_inicial_id': item['medicao_inicial_id'],
+          'medicao_final_id': item['medicao_final_id'],
           'medicao_inicial': medIni,
           'medicao_final': medFinal,
         });
@@ -528,6 +530,14 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
     return Colors.grey;
   }
 
+  bool _podeAbrirDetalhes(Map<String, dynamic> item) {
+    final qtdFaturada = item['qtd_faturada'];
+    final bool temQtdFaturada = qtdFaturada != null && qtdFaturada.toString().trim().isNotEmpty && qtdFaturada != 0;
+    final bool temMedicaoInicial = item['medicao_inicial_id'] != null && item['medicao_inicial_id'].toString().trim().isNotEmpty;
+    final bool temMedicaoFinal = item['medicao_final_id'] != null && item['medicao_final_id'].toString().trim().isNotEmpty;
+    return temQtdFaturada && temMedicaoInicial && temMedicaoFinal;
+  }
+
   Widget _buildListaBombeios() {
     return Column(
       children: [
@@ -559,8 +569,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
               final fmt = NumberFormat.decimalPattern('pt_BR');
               return InkWell(
                 onTap: () async {
-                  // Abre detalhes quando já existe medição final (independente de rateio)
-                  if (item['medicao_final'] != null) {
+                  if (_podeAbrirDetalhes(item)) {
                     setState(() {
                       _bombeioSelecionado = item;
                       _mostrarRateio = true;

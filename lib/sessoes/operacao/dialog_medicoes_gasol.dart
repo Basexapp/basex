@@ -6,6 +6,7 @@ import '../../login_page.dart';
 
 class DialogMedicoesGasol extends StatefulWidget {
   final String? produtoNome;
+  final String? produtoId;
   final String? tanqueReferencia;
   final String? data;
   final String? horario;
@@ -17,6 +18,7 @@ class DialogMedicoesGasol extends StatefulWidget {
   const DialogMedicoesGasol({
     super.key,
     this.produtoNome,
+    this.produtoId,
     this.tanqueReferencia,
     this.data,
     this.horario,
@@ -406,12 +408,17 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
     }
 
     try {
-      // 1. Buscar IDs necessários
-      final prodRes = await supabase
-          .from('produtos')
-          .select('id')
-          .eq('nome', widget.produtoNome ?? '')
-          .maybeSingle();
+      // 1. Buscar IDs necessários — usar somente produtoId (UUID)
+      final produtoId = widget.produtoId?.trim();
+      if (produtoId == null || produtoId.isEmpty) throw 'Produto id não informado.';
+
+      Map<String, dynamic>? prodRes;
+      try {
+        prodRes = await supabase.from('produtos').select('id').eq('id', produtoId).maybeSingle();
+      } catch (e) {
+        debugPrint('Erro ao buscar produto por id "$produtoId": $e');
+        prodRes = null;
+      }
 
       final tqRes = await supabase
           .from('tanques')
@@ -419,7 +426,7 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
           .eq('referencia', widget.tanqueReferencia ?? '')
           .maybeSingle();
 
-      if (prodRes == null) throw 'Produto não encontrado.';
+      if (prodRes == null) throw 'Produto não encontrado: id="$produtoId".';
 
       // 2. Formatar data e horário
       DateTime dataFormatada = DateFormat('dd/MM/yyyy').parse(_dataCtrl.text);
@@ -539,7 +546,15 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
       return;
     }
 
-    final produtoNome = widget.produtoNome ?? '';
+    // Obter informações do produto a partir do produtoId (necessário para tabela_alcool e nome)
+    final supabase = Supabase.instance.client;
+    Map<String, dynamic>? produtoRegistro;
+    final produtoIdLocal = widget.produtoId?.trim();
+    if (produtoIdLocal != null && produtoIdLocal.isNotEmpty) {
+      produtoRegistro = await supabase.from('produtos').select('tabela_alcool,nome').eq('id', produtoIdLocal).maybeSingle();
+    }
+
+    final produtoNome = produtoRegistro != null ? (produtoRegistro['nome'] ?? widget.produtoNome ?? '') : (widget.produtoNome ?? '');
 
     if (mounted) setState(() => _calculandoVolume20 = true);
 
@@ -562,18 +577,9 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
         }
         return;
       }
-
-      // ───────────────────────────────────────────────────────────────────────
-      // Verificação para suspender cálculo se produtos.tabela_alcool for TRUE
-      // ───────────────────────────────────────────────────────────────────────
-      final supabase = Supabase.instance.client;
-      final prodRes = await supabase
-          .from('produtos')
-          .select('tabela_alcool')
-          .eq('nome', produtoNome)
-          .maybeSingle();
-
-      if (prodRes != null && prodRes['tabela_alcool'] == true) {
+      
+      final tabelaAlcoolFlag = produtoRegistro != null && produtoRegistro['tabela_alcool'] == true;
+      if (tabelaAlcoolFlag) {
         print('DEBUG FCV: Produto $produtoNome possui tabela_alcool=TRUE. Suspendendo cálculo.');
         if (mounted) {
           setState(() {

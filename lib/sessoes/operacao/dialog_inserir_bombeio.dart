@@ -487,6 +487,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     bool usarTabelaAlcool = false;
     final produtoNome = _produtoCtrl.text;
     final tanqueRef = _selectedTanque?['referencia'];
+    final produtoId = (_selectedTanque?['produto_id'] ?? _bombeioLocal?['produto_id'])?.toString();
 
     if (produtoNome.isNotEmpty) {
       try {
@@ -510,6 +511,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       builder: (context) => usarTabelaAlcool
           ? DialogMedicoesAlcool(
               produtoNome: produtoNome,
+              produtoId: produtoId,
               tanqueReferencia: tanqueRef,
               data: dataCtrl.text,
               horario: horarioCtrl.text,
@@ -531,6 +533,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
             )
           : DialogMedicoesGasol(
               produtoNome: produtoNome,
+              produtoId: produtoId,
               tanqueReferencia: tanqueRef,
               data: dataCtrl.text,
               horario: horarioCtrl.text,
@@ -750,10 +753,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         // indicando se devemos abrir a tela de detalhes (o chamador fará a navegação
         // usando o contexto correto).
         if (fecharDialog) {
-          final bool abrirDetalhes = _bombeioLocal != null &&
-              _bombeioLocal!['medicao_inicial_id'] != null &&
-              _bombeioLocal!['medicao_final_id'] != null &&
-              _bombeioLocal!['qtd_faturada'] != null;
+          final qtdFaturada = _bombeioLocal?['qtd_faturada'];
+          final bool temQtdFaturada = qtdFaturada != null && qtdFaturada.toString().trim().isNotEmpty && qtdFaturada != 0;
+          final bool temMedicaoInicial = _bombeioLocal?['medicao_inicial_id'] != null && _bombeioLocal!['medicao_inicial_id'].toString().trim().isNotEmpty;
+          final bool temMedicaoFinal = _bombeioLocal?['medicao_final_id'] != null && _bombeioLocal!['medicao_final_id'].toString().trim().isNotEmpty;
+          final bool abrirDetalhes = _bombeioLocal != null && temQtdFaturada && temMedicaoInicial && temMedicaoFinal;
 
           Navigator.pop(context, {
             'abrirDetalhes': abrirDetalhes,
