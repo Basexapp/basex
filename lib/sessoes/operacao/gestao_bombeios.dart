@@ -575,23 +575,35 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
       registrosExibidos = _todosRegistros.where((item) {
         final DateTime dt = item['data'] as DateTime;
         final String pesquisa = pesquisaController.text.toLowerCase();
-        if (dataInicial != null && dt.isBefore(dataInicial!)) return false;
-        if (dataFinal != null && dt.isAfter(dataFinal!.add(const Duration(days: 1)))) return false;
-        if (produtoSelecionado != null && item['produto'] != produtoSelecionado) return false;
-        if (tanqueSelecionadoId != null && item['tanque_id'] != tanqueSelecionadoId) return false;
-        if (statusSelecionado != null && statusSelecionado!.isNotEmpty && item['status'] != statusSelecionado) return false;
+        if (dataInicial != null && dt.isBefore(dataInicial!)) {
+          return false;
+        }
+        if (dataFinal != null && dt.isAfter(dataFinal!.add(const Duration(days: 1)))) {
+          return false;
+        }
+        if (produtoSelecionado != null && item['produto'] != produtoSelecionado) {
+          return false;
+        }
+        if (tanqueSelecionadoId != null && item['tanque_id'] != tanqueSelecionadoId) {
+          return false;
+        }
+        if (statusSelecionado != null && statusSelecionado!.isNotEmpty && item['status'] != statusSelecionado) {
+          return false;
+        }
         if (pesquisa.isNotEmpty) {
           final String dataStr = _formatarData(dt).toLowerCase();
           final String status = (item['status'] as String).toLowerCase();
           final String tanque = (item['tanque'] as String).toLowerCase();
           final String numControle = (item['numero_controle'] as String).toLowerCase();
           final String produto = (item['produto'] as String).toLowerCase();
-          
-          if (!produto.contains(pesquisa) && 
+
+          if (!produto.contains(pesquisa) &&
               !numControle.contains(pesquisa) &&
               !dataStr.contains(pesquisa) &&
               !status.contains(pesquisa) &&
-              !tanque.contains(pesquisa)) return false;
+              !tanque.contains(pesquisa)) {
+            return false;
+          }
         }
         return true;
       }).toList();
@@ -628,9 +640,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
               const SizedBox(width: 16),
               Expanded(flex: 1, child: Text('Data', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
               Expanded(flex: 2, child: Text('Produto', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
+              Expanded(flex: 1, child: Text('Tanque', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
               Expanded(flex: 1, child: Text('H.Inicial', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
               Expanded(flex: 1, child: Text('H.Final', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
-              Expanded(flex: 1, child: Text('Tanque', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
               Expanded(flex: 1, child: Text('Vol. Amb.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
               Expanded(flex: 1, child: Text('Vol. 20ºC', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
               Expanded(flex: 2, child: Text('Nº Controle', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey[700]))),
@@ -673,9 +685,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
                         const SizedBox(width: 12),
                         Expanded(flex: 1, child: Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text(_formatarData(item['data']), textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)))),
                         Expanded(flex: 2, child: Text(item['produto'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                        Expanded(flex: 1, child: Text(item['tanque'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))),
                         Expanded(flex: 1, child: Text(item['horario_inicial'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))),
                         Expanded(flex: 1, child: Text(item['horario_final'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))),
-                        Expanded(flex: 1, child: Text(item['tanque'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12))),
                         Expanded(flex: 1, child: Text(item['recebido_amb'] > 0 ? fmt.format(item['recebido_amb'].toInt()) : '-', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
                         Expanded(flex: 1, child: Text(item['recebido_20'] > 0 ? fmt.format(item['recebido_20'].toInt()) : '-', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0D47A1)))),
                         Expanded(flex: 2, child: Text(item['numero_controle'], textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: Colors.blue))),
