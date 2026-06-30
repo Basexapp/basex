@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'cacl_mov_visualiz.dart';
 import '../../login_page.dart';
 
 class EstoqueProdutoPage extends StatefulWidget {
@@ -18,8 +17,8 @@ class EstoqueProdutoPage extends StatefulWidget {
     super.key,
     this.filialId,
     this.terminalId,
-    required this.nomeFilial,
     this.empresaId,
+    required this.nomeFilial,
     required this.dataInicial,
     required this.dataFinal,
     required this.produtoId,
@@ -39,6 +38,7 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
   String _mensagemErro = '';
 
   String? _terminalId;
+  String? _empresaId;
   bool _carregandoTerminal = true;
 
   List<Map<String, dynamic>> _movs = [];
@@ -74,6 +74,7 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
     super.initState();
     _syncScroll();
     _produtoNome = widget.produtoNome;
+    _empresaId = widget.empresaId;
     _carregarTerminalDoUsuario();
   }
 
@@ -83,11 +84,14 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
       if (usuario == null) throw Exception('Usuário não logado');
 
       if (usuario.nivel < 3) {
-        // Níveis 1 e 2: terminal vem do login
         _terminalId = usuario.terminalId;
       } else {
-        // Nível 3: terminal vem por parâmetro da página anterior
         _terminalId = widget.terminalId;
+      }
+
+      // Se empresaId não veio do widget, tenta pegar do usuário
+      if (_empresaId == null || _empresaId!.isEmpty) {
+        _empresaId = usuario.empresaId;
       }
 
       await _carregar();
@@ -131,7 +135,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
         throw Exception('Terminal não identificado');
       }
 
-      // Chamar a função do produto (agora com terminal_id)
       final response = await _supabase.rpc(
         'calcular_estoque_inicial_produto',
         params: {
@@ -191,8 +194,8 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
       dataFim =
           '${fim.year}-${fim.month.toString().padLeft(2, '0')}-${fim.day.toString().padLeft(2, '0')} 23:59:59';
 
-      // Buscar movimentações do produto no terminal
-      final dadosMov = await _supabase
+      // Buscar movimentações do produto no terminal e empresa
+      var query = _supabase
           .from('movimentacoes_tanque')
           .select('''
             id,
@@ -204,70 +207,27 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
             entrada_vinte,
             saida_amb,
             saida_vinte,
-            tanques!inner (
-              id,
-              produto_id,
-              terminais!inner (
-                id
-              )
-            )
+            empresa_id,
+            terminal_id,
+            produto_id
           ''')
-          .eq('tanques.produto_id', widget.produtoId)
-          .eq('tanques.terminais.id', terminalId)
+          .eq('produto_id', widget.produtoId)
+          .eq('terminal_id', terminalId)
           .gte('data_mov', dataInicio)
           .lte('data_mov', dataFim);
 
-      // Buscar CACLS do tipo 'movimentacao'
-      final dadosCacl = await _supabase
-          .from('cacl')
-          .select('''
-            id,
-            data,
-            horario_inicial,
-            entrada_saida_ambiente,
-            entrada_saida_20,
-            tipo,
-            numero_controle,
-            produto_id,
-            produtos:produto_id (nome),
-            tanques!inner (
-              id,
-              produto_id,
-              terminais!inner (
-                id
-              )
-            )
-          ''')
-          .eq('tipo', 'movimentacao')
-          .eq('tanques.produto_id', widget.produtoId)
-          .eq('tanques.terminais.id', terminalId)
-          .gte('data', dataInicio.split(' ')[0])
-          .lte('data', dataFim.split(' ')[0]);
+      // Adicionar filtro por empresa_id se disponível
+      if (_empresaId != null && _empresaId!.isNotEmpty) {
+        query = query.eq('empresa_id', _empresaId!);
+      }
+
+      final dadosMov = await query;
 
       List<Map<String, dynamic>> registrosBrutos = [];
 
       // Adicionar movimentações normais
       for (var m in (dadosMov as List)) {
         registrosBrutos.add(Map<String, dynamic>.from(m));
-      }
-
-      // Adicionar CACLS de movimentação como entradas
-      for (var c in (dadosCacl as List)) {
-        final volume20 = (c['entrada_saida_20'] ?? 0) as num;
-        final volumeAmb = (c['entrada_saida_ambiente'] ?? 0) as num;
-        final nControle = c['numero_controle']?.toString() ?? c['id'].toString().substring(0, 8);
-        
-        registrosBrutos.add({
-          'id': c['id'],
-          'movimentacao_id': null,
-          'data_mov': c['horario_inicial'] ?? '${c['data']}T00:00:00',
-          'cliente': 'CACL Mov. $nControle',
-          'descricao': 'CACL Mov. $nControle',
-          'entrada_amb': volumeAmb,
-          'entrada_vinte': volume20,
-          'saida_amb': 0,
-          'saida_vinte': 0,
-        });
       }
 
       // Aplicar agrupamento se for Sintético
@@ -278,11 +238,10 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
           final dtStr = reg['data_mov']?.toString() ?? '';
           if (dtStr.isEmpty) continue;
           
-          // Tratar formatos como "2026-03-11T16:17:00.068 00:00:00" ou ISO puro
-          final dataLimpa = dtStr.split(' ')[0]; // Pega a primeira parte se houver espaço
+          final dataLimpa = dtStr.split(' ')[0];
           final dataApenas = dataLimpa.contains('T') 
               ? dataLimpa.split('T')[0] 
-              : dataLimpa; // yyyy-MM-dd
+              : dataLimpa;
 
           if (!agrupados.containsKey(dataApenas)) {
             agrupados[dataApenas] = {
@@ -323,7 +282,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
         final cmpData = dataA.compareTo(dataB);
         if (cmpData != 0) return cmpData;
 
-        // Dentro da mesma data (Apenas Dia/Mês/Ano): registros com 'Sobra' ou 'Perda' vão por último
         bool temSobraOuPerda(Map<String, dynamic> m) {
           final cliente = (m['cliente']?.toString() ?? '').toUpperCase();
           final descricao = (m['descricao']?.toString() ?? '').toUpperCase();
@@ -340,7 +298,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
           return aLast.compareTo(bLast);
         }
 
-        // Se ambos forem do mesmo tipo (ambos normais ou ambos sobra/perda), mantém a ordem do horário
         return da.compareTo(db);
       });
 
@@ -363,8 +320,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
         final String desc = (m['descricao']?.toString().trim() ?? '');
         final String descricao = cliente.isNotEmpty ? cliente : desc;
 
-        // "mostre apenas o resultado da subtração de saída ambiente menos saída 20"
-        // Filtro: se saída ambiente ou saída 20 for zero, não calcula a diferença.
         final num? sobraPerda = (saidaAmb != 0 && saidaVinte != 0) ? saidaAmb - saidaVinte : null;
 
         saldoAmb += entradaAmb - saidaAmb;
@@ -689,7 +644,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
   }
 
   Widget _corpo() {
-    // Calcular totais para o rodapé
     num totalEntradaAmb = 0;
     num totalEntradaVinte = 0;
     num totalSaidaAmb = 0;
@@ -740,7 +694,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
               }
 
               final e = _movsOrdenadas[i - 1];
-              final isCacl = e['id'] != null && e['movimentacao_id'] == null && (e['descricao'] ?? '').toString().startsWith('CACL');
               
               return Container(
                 height: _hRow,
@@ -748,16 +701,7 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
                 child: Row(
                   children: [
                     _cell(_fmtData(e['data_mov']), _wData),
-                    isCacl 
-                      ? _clickableCell(e['descricao'] ?? '-', _wDesc, () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => CaclMovVisualizPage(caclId: e['id']),
-                            ),
-                          );
-                        })
-                      : _cell(e['descricao'] ?? '-', _wDesc),
+                    _cell(e['descricao'] ?? '-', _wDesc),
                     _cell(_fmtNum(e['entrada_amb']), _wNum, bg: _bgEntrada()),
                     _cell(_fmtNum(e['entrada_vinte']), _wNum, bg: _bgEntrada()),
                     _cell(_fmtNum(e['saida_amb']), _wNum, bg: _bgSaida()),
@@ -828,31 +772,6 @@ class _EstoqueProdutoPageState extends State<EstoqueProdutoPage> {
           fontSize: 12,
           color: cor ?? Colors.grey.shade700,
           fontWeight: fw,
-        ),
-      ),
-    );
-  }
-
-  Widget _clickableCell(String t, double w, VoidCallback onTap, {Color? bg, Color? cor, FontWeight? fw}) {
-    return SelectionContainer.disabled(
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: w,
-            alignment: Alignment.center,
-            color: bg,
-            child: Text(
-              t.isEmpty ? '-' : t,
-              style: TextStyle(
-                fontSize: 12,
-                color: cor ?? Colors.blue.shade700,
-                fontWeight: fw ?? FontWeight.bold,
-                decoration: TextDecoration.none,
-              ),
-            ),
-          ),
         ),
       ),
     );

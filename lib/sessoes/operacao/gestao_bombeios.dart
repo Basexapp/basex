@@ -170,7 +170,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
         return;
       }
 
-      final relacoes = await _supabase
+      var relacoesQuery = _supabase
           .from('relacoes_terminais')
           .select('''
             terminal_id,
@@ -178,8 +178,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
               id,
               nome
             )
-          ''')
-          .eq('empresa_id', empresaIdLocal);
+          ''');
+      relacoesQuery = relacoesQuery.eq('empresa_id', empresaIdLocal);
+      final relacoes = await relacoesQuery;
 
       final Map<String, Map<String, dynamic>> terminaisUnicos = {};
       for (var relacao in relacoes) {
@@ -274,10 +275,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> wit
         query = query.eq('terminal_id', terminalSelecionadoId!);
       } else if (terminalId != null && terminalId!.isNotEmpty) {
         query = query.eq('terminal_id', terminalId!);
-      }
-      
-      if (empresaId != null) {
-        query = query.eq('empresa_id', empresaId!);
+      } else if (empresaId != null && empresaId!.trim().isNotEmpty) {
+        query = query.eq('empresa_id', empresaId!.trim());
       }
 
       if (tanqueSelecionadoId != null) {
