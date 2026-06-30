@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
+import '../../main.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class DetalhesBombeioPage extends StatefulWidget {
@@ -18,9 +19,10 @@ class DetalhesBombeioPage extends StatefulWidget {
   State<DetalhesBombeioPage> createState() => _DetalhesBombeioPageState();
 }
 
-class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
+class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> with RouteAware {
   final NumberFormat _fmt = NumberFormat.decimalPattern('pt_BR');
-  bool _rateioRealizado = false;
+  bool? _rateioRealizado;
+  late Map<String, dynamic> _bombeio;
 
   String _formatarData(DateTime? data) => data == null
       ? '-'
@@ -39,21 +41,178 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
   @override
   void initState() {
     super.initState();
+    // mantém uma cópia local que podemos atualizar ao retornar para a rota
+    _bombeio = Map<String, dynamic>.from(widget.bombeio);
     _verificarRateioExistente();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route as ModalRoute<dynamic>);
+    }
+  }
+
+  @override
+  void dispose() {
+    try {
+      routeObserver.unsubscribe(this);
+    } catch (_) {}
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Voltou para esta página — recarrega informações do bombeio
+    _reloadBombeio();
+  }
+
+  Future<void> _reloadBombeio() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final bombeioId = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
+      if (bombeioId == null || bombeioId.isEmpty) return;
+
+      final resp = await supabase.from('bombeios').select('''
+        id,
+        num_controle,
+        data,
+        horario,
+        medicao_inicial_id,
+        medicao_final_id,
+        volumes_solicitados,
+        total_bombeio,
+        tanque_id,
+        qtd_faturada,
+        tanques!bombeios_tanque_id_fkey (
+          referencia,
+          produto_id,
+          produtos (
+            nome
+          )
+        ),
+        medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
+        ),
+        medicao_final:medicoes!bombeios_medicao_final_id_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
+        ),
+        rateio
+      ''').eq('id', bombeioId).maybeSingle();
+
+      if (resp == null) return;
+
+      // Reconstrói mapa local similar ao que o parent monta
+      final tanquesArr = resp['tanques!bombeios_tanque_id_fkey'] ?? resp['tanques'];
+      final tanques = tanquesArr is List ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null) : tanquesArr;
+      final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
+      final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
+
+      double totalSolicitado = 0;
+      List<Map<String, dynamic>> participantes = [];
+      final rawVols = resp['volumes_solicitados'];
+      if (rawVols != null) {
+        if (rawVols is Map) {
+          rawVols.forEach((key, value) {
+            double sol = double.tryParse(value.toString()) ?? 0;
+            totalSolicitado += sol;
+            participantes.add({'nome': key?.toString() ?? '', 'solicitado': sol});
+          });
+        } else if (rawVols is List) {
+          for (var v in rawVols) {
+            if (v is Map) {
+              double sol = double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
+              participantes.add({'nome': v['nome'] ?? '', 'solicitado': sol});
+              totalSolicitado += sol;
+            }
+          }
+        }
+      }
+
+      final medFinalArr = resp['medicao_final'];
+      final medFinal = medFinalArr is List ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null) : medFinalArr;
+      final medIniArr = resp['medicao_inicial'];
+      final medIni = medIniArr is List ? (medIniArr.isNotEmpty ? medIniArr[0] : null) : medIniArr;
+
+      double volAmbIni = double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Ini = double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbFin = double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Fin = double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
+
+      double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
+      double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
+
+      final novo = {
+        'id': resp['id'],
+        'tanque_id': resp['tanque_id'],
+        'data': DateTime.tryParse(resp['data'] ?? '') ?? DateTime.now(),
+        'produto': produto,
+        'tanque': tanqueNome,
+        'horario_inicial': resp['horario']?.toString().substring(0, 5) ?? '--:--',
+        'horario_final': medFinal?['horario']?.toString().substring(0,5) ?? '--:--',
+        'numero_controle': resp['num_controle'] ?? 'S/N',
+        'volume_total': double.tryParse(resp['total_bombeio']?.toString() ?? '0') ?? 0,
+        'volume_solicitado': totalSolicitado,
+        'participantes': participantes,
+        'recebido_amb': recebidoAmb,
+        'recebido_20': recebido20,
+        'qtd_faturada': resp['qtd_faturada'],
+        'medicao_inicial': medIni,
+        'medicao_final': medFinal,
+        'rateio': resp['rateio'],
+      };
+
+      if (mounted) {
+        setState(() {
+          _bombeio = novo;
+        });
+        // também atualiza flag de rateio
+        await _verificarRateioExistente();
+      }
+    } catch (e) {
+      debugPrint('Erro ao recarregar bombeio: $e');
+    }
   }
 
   Future<void> _verificarRateioExistente() async {
     try {
       final supabase = Supabase.instance.client;
-      final tanqueId = widget.bombeio['tanque_id']?.toString();
-      if (tanqueId == null || tanqueId.isEmpty) return;
+      // Preferência: verificar pelo próprio bombeio — se existir campo `rateio` não-nulo,
+      // considera-se rateio realizado.
+      String? bombeioId = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
+      if (bombeioId != null && bombeioId.isNotEmpty) {
+        final bom = await supabase.from('bombeios').select('rateio').eq('id', bombeioId).maybeSingle();
+        // Considera rateio realizado apenas se o valor for estritamente boolean true
+        final exists = bom != null && bom['rateio'] == true;
+        if (mounted) setState(() => _rateioRealizado = exists);
+        return;
+      }
+
+      // Fallback (compatibilidade): caso não haja id do bombeio, verifica por tanque+data
+      final tanqueId = _bombeio['tanque_id']?.toString();
+      if (tanqueId == null || tanqueId.isEmpty) {
+        if (mounted) setState(() => _rateioRealizado = false);
+        return;
+      }
 
       // determina intervalo do dia da data do bombeio
       DateTime dia;
-      if (widget.bombeio['data'] is DateTime) {
-        dia = widget.bombeio['data'] as DateTime;
+      if (_bombeio['data'] is DateTime) {
+        dia = _bombeio['data'] as DateTime;
       } else {
-        dia = DateTime.tryParse(widget.bombeio['data']?.toString() ?? '') ?? DateTime.now();
+        dia = DateTime.tryParse(_bombeio['data']?.toString() ?? '') ?? DateTime.now();
       }
       final dataInicio = DateTime(dia.year, dia.month, dia.day);
       final dataFim = DateTime(dia.year, dia.month, dia.day, 23, 59, 59);
@@ -61,7 +220,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
       final inicioIso = dataInicio.toIso8601String();
       final fimIso = dataFim.toIso8601String();
 
-        final resp = await supabase
+      final resp = await supabase
           .from('movimentacoes_tanque')
           .select('id')
           .eq('tanque_id', tanqueId)
@@ -69,7 +228,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
           .lte('data_mov', fimIso)
           .limit(1);
 
-        final exists = resp.isNotEmpty;
+      final exists = resp.isNotEmpty;
       if (mounted) setState(() => _rateioRealizado = exists);
     } catch (e) {
       // falhar silent; não bloquear interface
@@ -237,28 +396,28 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
       try {
         final supabase = Supabase.instance.client;
 
-        final tanqueId = widget.bombeio['tanque_id']?.toString();
+        final tanqueId = _bombeio['tanque_id']?.toString();
         if (tanqueId == null || tanqueId.isEmpty) {
           throw Exception('tanque_id ausente no bombeio');
         }
 
         // Obter produto_id: pode estar presente em widget.bombeio['produto_id']
-        String? produtoId = widget.bombeio['produto_id']?.toString();
+        String? produtoId = _bombeio['produto_id']?.toString();
         if (produtoId == null || produtoId.isEmpty) {
           final tanq = await supabase.from('tanques').select('produto_id').eq('id', tanqueId).maybeSingle();
           produtoId = tanq?['produto_id']?.toString();
         }
 
-        final dataMov = widget.bombeio['data'] is DateTime
-            ? (widget.bombeio['data'] as DateTime).toIso8601String()
-            : (widget.bombeio['data']?.toString() ?? DateTime.now().toIso8601String());
+        final dataMov = _bombeio['data'] is DateTime
+          ? (_bombeio['data'] as DateTime).toIso8601String()
+          : (_bombeio['data']?.toString() ?? DateTime.now().toIso8601String());
 
-        final recebidoAmb = double.tryParse(widget.bombeio['recebido_amb']?.toString() ?? '0') ?? 0;
-        final recebido20 = double.tryParse(widget.bombeio['recebido_20']?.toString() ?? '0') ?? 0;
+        final recebidoAmb = double.tryParse(_bombeio['recebido_amb']?.toString() ?? '0') ?? 0;
+        final recebido20 = double.tryParse(_bombeio['recebido_20']?.toString() ?? '0') ?? 0;
 
-        final participantes = (widget.bombeio['participantes'] is List)
-            ? List<Map<String, dynamic>>.from(widget.bombeio['participantes'])
-            : <Map<String, dynamic>>[];
+        final participantes = (_bombeio['participantes'] is List)
+          ? List<Map<String, dynamic>>.from(_bombeio['participantes'])
+          : <Map<String, dynamic>>[];
 
         double totalSolicitado = 0;
         for (var p in participantes) {
@@ -309,7 +468,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
         if (inserts.isNotEmpty) {
           // realiza insert
           await supabase.from('movimentacoes_tanque').insert(inserts);
-          // sucesso
+
+          // Marca o bombeio como rateado se tivermos o id do bombeio
+          final bombeioId = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
+          if (bombeioId != null && bombeioId.isNotEmpty) {
+            try {
+              await supabase.from('bombeios').update({'rateio': true}).eq('id', bombeioId);
+            } catch (e) {
+              debugPrint('Erro ao marcar bombeio.rateio: $e');
+            }
+          }
+
+          // sucesso UI
           if (mounted) {
             setState(() => _rateioRealizado = true);
             await _showMessageDialog('Rateio automático realizado');
@@ -450,11 +620,11 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
 
   @override
   Widget build(BuildContext context) {
-    final double totalSolicitado = widget.bombeio['volume_solicitado'];
-    final double recebidoAmb = (widget.bombeio['recebido_amb'] ?? 0).toDouble();
-    final double recebido20 = (widget.bombeio['recebido_20'] ?? 0).toDouble();
+    final double totalSolicitado = _bombeio['volume_solicitado'];
+    final double recebidoAmb = (_bombeio['recebido_amb'] ?? 0).toDouble();
+    final double recebido20 = (_bombeio['recebido_20'] ?? 0).toDouble();
     final List<Map<String, dynamic>> participantes =
-        List<Map<String, dynamic>>.from(widget.bombeio['participantes']);
+      List<Map<String, dynamic>>.from(_bombeio['participantes']);
 
     // Ordenando da que mais participou para a que menos participou (pelo volume solicitado)
     participantes.sort((a, b) =>
@@ -487,12 +657,12 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildHeaderMicroItem(
-                    'CONTROLE', widget.bombeio['numero_controle']),
-                _buildHeaderMicroItem('PRODUTO', widget.bombeio['produto']),
+                  'CONTROLE', _bombeio['numero_controle']),
+                _buildHeaderMicroItem('PRODUTO', _bombeio['produto']),
                 _buildHeaderMicroItem(
-                    'DATA', _formatarData(widget.bombeio['data'])),
+                  'DATA', _formatarData(_bombeio['data'])),
                 _buildHeaderMicroItem('HORÁRIO',
-                    '${widget.bombeio['horario_inicial']} - ${widget.bombeio['horario_final']}'),
+                  '${_bombeio['horario_inicial']} - ${_bombeio['horario_final']}'),
               ],
             ),
           ),
@@ -515,17 +685,17 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (widget.bombeio['medicao_inicial'] != null)
+                  if (_bombeio['medicao_inicial'] != null)
                     _buildMedicaoDisplay(
-                      widget.bombeio['medicao_inicial'],
+                      _bombeio['medicao_inicial'],
                       'MEDIÇÃO INICIAL',
                       const Color(0xFF0D47A1),
                     ),
-                  if (widget.bombeio['medicao_inicial'] != null)
+                  if (_bombeio['medicao_inicial'] != null)
                     const SizedBox(height: 8),
-                  if (widget.bombeio['medicao_final'] != null)
+                  if (_bombeio['medicao_final'] != null)
                     _buildMedicaoDisplay(
-                      widget.bombeio['medicao_final'],
+                      _bombeio['medicao_final'],
                       'MEDIÇÃO FINAL',
                       Colors.green.shade700,
                     ),
@@ -818,91 +988,95 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage> {
                             
                             // Botões de rateio adicionados abaixo da tabela
                             const SizedBox(height: 24),
-                            _rateioRealizado
-                                ? Center(
-                                    child: Container(
-                                      height: 40,
-                                      width: 200,
-                                      alignment: Alignment.center,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(color: const Color(0xFFFFB341), width: 1.6),
+                            // Enquanto não sabemos se o rateio foi realizado, não renderiza nenhum botão
+                            if (_rateioRealizado == null)
+                              const Center(child: SizedBox(width: 200, height: 40))
+                            else if (_rateioRealizado == true)
+                              Center(
+                                child: Container(
+                                  height: 40,
+                                  width: 200,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: const Color(0xFFFFB341), width: 1.6),
+                                  ),
+                                  child: const Text(
+                                    'Rateio realizado',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color.fromARGB(255, 65, 54, 49),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 200,
+                                    height: 40,
+                                    child: ElevatedButton(
+                                      onPressed: () => _showRateioAutomaticoDialog(),
+                                      style: ButtonStyle(
+                                        backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                          if (states.contains(WidgetState.hovered)) {
+                                            return const Color.fromARGB(255, 65, 54, 49);
+                                          }
+                                          return Colors.black;
+                                        }),
+                                        foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                                        padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
+                                        shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                                        side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFBD59), width: 1.6)),
+                                        elevation: WidgetStateProperty.all(1),
                                       ),
                                       child: const Text(
-                                        'Rateio realizado',
+                                        'RATEIO AUTOMÁTICO',
                                         style: TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                          color: Color.fromARGB(255, 65, 54, 49),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.8,
                                         ),
                                       ),
                                     ),
-                                  )
-                                : Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 200,
-                                        height: 40,
-                                        child: ElevatedButton(
-                                          onPressed: () => _showRateioAutomaticoDialog(),
-                                          style: ButtonStyle(
-                                            backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                                              if (states.contains(WidgetState.hovered)) {
-                                                return const Color.fromARGB(255, 65, 54, 49);
-                                              }
-                                              return Colors.black;
-                                            }),
-                                            foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                                            padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-                                            shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                                            side: WidgetStateProperty.all(const BorderSide(color: Color(0xFFFFBD59), width: 1.6)),
-                                            elevation: WidgetStateProperty.all(1),
-                                          ),
-                                          child: const Text(
-                                            'RATEIO AUTOMÁTICO',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: 0.8,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      SizedBox(
-                                        width: 200,
-                                        height: 40,
-                                        child: ElevatedButton(
-                                          onPressed: () async {
-                                            await _showMessageDialog('Rateio manual em desenvolvimento');
-                                          },
-                                          style: ButtonStyle(
-                                            backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
-                                              if (states.contains(WidgetState.hovered)) {
-                                                return const Color.fromARGB(255, 65, 54, 49);
-                                              }
-                                              return Colors.black;
-                                            }),
-                                            foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
-                                            padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
-                                            shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
-                                            side: WidgetStateProperty.all(const BorderSide(color: Color.fromARGB(255, 255, 179, 65), width: 1.6)),
-                                            elevation: WidgetStateProperty.all(1),
-                                          ),
-                                          child: const Text(
-                                            'RATEIO MANUAL',
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              letterSpacing: 0.8,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                   ),
+                                  const SizedBox(width: 16),
+                                  SizedBox(
+                                    width: 200,
+                                    height: 40,
+                                    child: ElevatedButton(
+                                      onPressed: () async {
+                                        await _showMessageDialog('Não disponível');
+                                      },
+                                      style: ButtonStyle(
+                                        backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                                          if (states.contains(WidgetState.hovered)) {
+                                            return const Color.fromARGB(255, 65, 54, 49);
+                                          }
+                                          return Colors.black;
+                                        }),
+                                        foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                                        padding: WidgetStateProperty.all(const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
+                                        shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))),
+                                        side: WidgetStateProperty.all(const BorderSide(color: Color.fromARGB(255, 255, 179, 65), width: 1.6)),
+                                        elevation: WidgetStateProperty.all(1),
+                                      ),
+                                      child: const Text(
+                                        'RATEIO MANUAL',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.8,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             const SizedBox(height: 16),
                           ],
                         ),

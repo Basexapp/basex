@@ -2,6 +2,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../../login_page.dart';
+import '../../main.dart';
 import 'dialog_inserir_bombeio.dart';
 import 'detalhes_bombeio.dart';
 
@@ -32,7 +33,7 @@ class FiltroGestaoBombeiosPage extends StatefulWidget {
   State<FiltroGestaoBombeiosPage> createState() => _FiltroGestaoBombeiosPageState();
 }
 
-class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
+class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> with RouteAware {
   final SupabaseClient _supabase = Supabase.instance.client;
 
   // Variáveis globais baseadas no usuário
@@ -84,10 +85,30 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     pesquisaController.addListener(_aplicarFiltrosLocal);
   }
 
+  
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) {
+      routeObserver.subscribe(this, route as ModalRoute<dynamic>);
+    }
+  }
+
   @override
   void dispose() {
+    try {
+      routeObserver.unsubscribe(this);
+    } catch (_) {}
     pesquisaController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didPopNext() {
+    // Voltou para esta página a partir de outra rota — recarrega registros
+    _carregarBombeios(resetPagina: true);
   }
 
   void _carregarDadosIniciais() async {
@@ -145,6 +166,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     try {
       var query = _supabase.from('bombeios').select('''
         id,
+        rateio,
         num_controle,
         data,
         horario,
@@ -229,7 +251,10 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         } else if (item['qtd_faturada'] == null) {
           status = 'Aguardando informações';
         } else {
-          status = 'Concluído';
+          // Antes era 'Concluído' — agora distingue se houve rateio
+          // Considera rateio realizado apenas se o valor for estritamente boolean true
+          final bool hasRateio = item['rateio'] == true;
+          status = hasRateio ? 'Finalizado com rateio' : 'Aguardando rateio';
         }
 
         double totalSolicitado = 0;
@@ -278,6 +303,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
         dadosTransformados.add({
           'id': item['id'],
           'tanque_id': item['tanque_id'],
+          'rateio': item['rateio'],
           'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
           'produto': produto,
           'tanque': tanqueNome,
@@ -355,6 +381,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     try {
       final resp = await _supabase.from('bombeios').select('''
         id,
+        rateio,
         num_controle,
         data,
         horario,
@@ -434,6 +461,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
 
       final Map<String, dynamic> bombeioParaDetalhes = {
         'id': item['id'],
+        'rateio': item['rateio'],
         'tanque_id': item['tanque_id'],
         'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
         'produto': produto,
@@ -492,7 +520,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
   String _formatarData(DateTime? data) => data == null ? '-' : "${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}";
 
   Color _getStatusColor(String? status) {
-    if (status == 'Concluído') return Colors.green;
+    if (status == 'Finalizado com rateio') return Colors.green;
+    if (status == 'Aguardando rateio') return Colors.orange;
     if (status == 'Em andamento') return Colors.orange;
     if (status == 'Aguardando informações') return Colors.purple;
     if (status == 'Definindo quantidades') return Colors.blue;
@@ -530,7 +559,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
               final fmt = NumberFormat.decimalPattern('pt_BR');
               return InkWell(
                 onTap: () async {
-                  if (item['status'] == 'Concluído') {
+                  // Abre detalhes quando já existe medição final (independente de rateio)
+                  if (item['medicao_final'] != null) {
                     setState(() {
                       _bombeioSelecionado = item;
                       _mostrarRateio = true;
@@ -852,7 +882,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage> {
     if (_mostrarRateio && _bombeioSelecionado != null) {
       return DetalhesBombeioPage(
         bombeio: _bombeioSelecionado!,
-        onVoltar: () => setState(() => _mostrarRateio = false),
+        onVoltar: () => setState(() { _mostrarRateio = false; _carregarBombeios(resetPagina: true); }),
       );
     }
 

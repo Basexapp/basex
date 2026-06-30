@@ -243,9 +243,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     try {
         final List<dynamic> data = await Supabase.instance.client
           .from('tanques')
-          .select('id, referencia, produto_id, produtos(nome)')
+          // traz também produtos.nome_dois para exibir na lista
+          .select('id, referencia, produto_id, produtos(nome_dois, nome)')
           .eq('terminal_id', terminalId as Object)
-          .eq('tipo_abastecimento', 'exa');
+          // incluir qualquer tipo, exceto os que contenham explicitamente 'ltc'
+          .not('tipo_abastecimento', 'ilike', '%lct%');
 
       if (mounted) {
         final List<Map<String, dynamic>> tanquesList =
@@ -273,7 +275,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               _selectedTanque = _tanques.firstWhere(
                 (t) => t['id'] == _bombeioLocal!['tanque_id'],
               );
-              _produtoNome = _selectedTanque?['produtos']?['nome'] ?? '';
+              var prod = _selectedTanque?['produtos'];
+              if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
+              _produtoNome = (prod is Map)
+                  ? (prod['nome_dois'] ?? prod['nome'] ?? '')
+                  : '';
               _produtoCtrl.text = _produtoNome;
             } catch (_) {}
           }
@@ -1173,6 +1179,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     flex: 2,
                     child: DropdownButtonFormField<Map<String, dynamic>>(
                       value: _selectedTanque,
+                      isExpanded: true,
+                      // limita a altura do menu para permitir rolagem quando muitos itens
+                      menuMaxHeight: 300,
                       decoration: const InputDecoration(
                         labelText: 'Tanque',
                         border: OutlineInputBorder(),
@@ -1184,11 +1193,18 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         ),
                       ),
                       items: _tanques.map((t) {
+                        var prod = t['produtos'];
+                        if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
+                        final prodName = (prod is Map)
+                            ? (prod['nome_dois'] ?? prod['nome'] ?? '')
+                            : '';
+                        final display = '${t['referencia'] ?? ''}${prodName.isNotEmpty ? ' - $prodName' : ''}';
                         return DropdownMenuItem<Map<String, dynamic>>(
                           value: t,
                           child: Text(
-                            t['referencia'] ?? '',
+                            display,
                             style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         );
                       }).toList(),
@@ -1197,8 +1213,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                           : (val) {
                               setState(() {
                                 _selectedTanque = val;
-                                _produtoNome =
-                                    val?['produtos']?['nome'] ?? 'Sem produto';
+                                var prod = val?['produtos'];
+                                if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
+                                _produtoNome = (prod is Map)
+                                    ? (prod['nome_dois'] ?? prod['nome'] ?? 'Sem produto')
+                                    : 'Sem produto';
                                 _produtoCtrl.text = _produtoNome;
                               });
                             },
