@@ -28,7 +28,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
   UsuarioAtual? get user => UsuarioAtual.instance;
 
-  bool get _isReadOnly => user?.empresaId != null && user!.empresaId!.isNotEmpty;
+  bool get _isReadOnly => user?.empresaId?.isNotEmpty ?? false;
 
   String _formatarData(DateTime? data) => data == null
       ? '-'
@@ -78,9 +78,9 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
   Future<void> _reloadBombeio() async {
     try {
       final supabase = Supabase.instance.client;
-      final bombeioId =
+        final String? bombeioId =
           _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
-      if (bombeioId == null || bombeioId.isEmpty) return;
+        if (bombeioId?.isEmpty ?? true) return;
 
       final resp = await supabase
           .from('bombeios')
@@ -120,7 +120,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         ),
         rateio
       ''')
-          .eq('id', bombeioId)
+          .eq('id', bombeioId!)
           .maybeSingle();
 
       if (resp == null) return;
@@ -220,35 +220,34 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       final supabase = Supabase.instance.client;
       // Preferência: verificar pelo próprio bombeio — se existir campo `rateio` não-nulo,
       // considera-se rateio realizado.
-      String? bombeioId =
+      final String? bombeioId =
           _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
-      if (bombeioId != null && bombeioId.isNotEmpty) {
+      if (bombeioId?.isNotEmpty == true) {
         final bom = await supabase
             .from('bombeios')
             .select('rateio')
-            .eq('id', bombeioId)
+            .eq('id', bombeioId!)
             .maybeSingle();
         // Considera rateio realizado apenas se o valor for estritamente boolean true
-        final exists = bom != null && bom['rateio'] == true;
+        final exists = bom?['rateio'] == true;
         if (mounted) setState(() => _rateioRealizado = exists);
         return;
       }
 
       // Fallback (compatibilidade): caso não haja id do bombeio, verifica por tanque+data
-      final tanqueId = _bombeio['tanque_id']?.toString();
-      if (tanqueId == null || tanqueId.isEmpty) {
+      final String? tanqueId = _bombeio['tanque_id']?.toString();
+      if (tanqueId?.isEmpty ?? true) {
         if (mounted) setState(() => _rateioRealizado = false);
         return;
       }
 
       // determina intervalo do dia da data do bombeio
+      final dynamic rawData = _bombeio['data'];
       DateTime dia;
-      if (_bombeio['data'] is DateTime) {
-        dia = _bombeio['data'] as DateTime;
+      if (rawData is DateTime) {
+        dia = rawData;
       } else {
-        dia =
-            DateTime.tryParse(_bombeio['data']?.toString() ?? '') ??
-            DateTime.now();
+        dia = DateTime.tryParse(rawData?.toString() ?? '') ?? DateTime.now();
       }
       final dataInicio = DateTime(dia.year, dia.month, dia.day);
       final dataFim = DateTime(dia.year, dia.month, dia.day, 23, 59, 59);
@@ -259,7 +258,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       final resp = await supabase
           .from('movimentacoes_tanque')
           .select('id')
-          .eq('tanque_id', tanqueId)
+          .eq('tanque_id', tanqueId!)
           .gte('data_mov', inicioIso)
           .lte('data_mov', fimIso)
           .limit(1);
@@ -490,18 +489,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       try {
         final supabase = Supabase.instance.client;
 
-        final tanqueId = _bombeio['tanque_id']?.toString();
-        if (tanqueId == null || tanqueId.isEmpty) {
+        final String? tanqueId = _bombeio['tanque_id']?.toString();
+        if (tanqueId?.isEmpty ?? true) {
           throw Exception('tanque_id ausente no bombeio');
         }
 
         // Obter produto_id: pode estar presente em widget.bombeio['produto_id']
         String? produtoId = _bombeio['produto_id']?.toString();
-        if (produtoId == null || produtoId.isEmpty) {
+        if (produtoId?.isEmpty ?? true) {
           final tanq = await supabase
               .from('tanques')
               .select('produto_id')
-              .eq('id', tanqueId)
+              .eq('id', tanqueId!)
               .maybeSingle();
           produtoId = tanq?['produto_id']?.toString();
         }
@@ -582,25 +581,81 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         }
 
         if (inserts.isNotEmpty) {
-          // realiza insert
-          await supabase.from('movimentacoes_tanque').insert(inserts);
-
-          // Marca o bombeio como rateado se tivermos o id do bombeio
-          if (bombeioId != null && bombeioId.isNotEmpty) {
+          // Atualiza apenas a coluna `entrada_vinte` das movimentações já existentes
+          int updatedCount = 0;
+          for (var row in inserts) {
             try {
-              await supabase
-                  .from('bombeios')
-                  .update({'rateio': true})
-                  .eq('id', bombeioId);
+              final empresaId = row['empresa_id']?.toString();
+              final entradaVinte = row['entrada_vinte'] as int? ?? 0;
+              bool didUpdate = false;
+
+              if (bombeioId?.isNotEmpty == true) {
+                if (empresaId?.isNotEmpty == true) {
+                  final resp = await supabase
+                      .from('movimentacoes_tanque')
+                      .update({'entrada_vinte': entradaVinte})
+                      .eq('bombeio_id', bombeioId!)
+                      .eq('empresa_id', empresaId!)
+                      .select();
+                  if (resp.isNotEmpty) {
+                    didUpdate = true;
+                    updatedCount += resp.length;
+                  }
+                } else {
+                  // empresa_id não informado: procura movimentação com bombeio_id e empresa_id IS NULL
+                  final found = await supabase
+                      .from('movimentacoes_tanque')
+                      .select('id')
+                      .eq('bombeio_id', bombeioId!)
+                      .filter('empresa_id', 'is', 'null')
+                      .limit(1);
+                  if (found.isNotEmpty) {
+                    final id = found[0]['id'];
+                    final resp2 = await supabase
+                        .from('movimentacoes_tanque')
+                        .update({'entrada_vinte': entradaVinte})
+                        .eq('id', id)
+                        .select();
+                    if (resp2.isNotEmpty) {
+                      didUpdate = true;
+                      updatedCount += resp2.length;
+                    }
+                  }
+                }
+              }
+
+              if (!didUpdate) {
+                debugPrint('Nenhuma movimentacao encontrada para atualizar (bombeio:${bombeioId}, empresa:${empresaId})');
+              }
             } catch (e) {
-              debugPrint('Erro ao marcar bombeio.rateio: $e');
+              debugPrint('Erro ao atualizar movimentacoes_tanque: $e');
             }
           }
 
-          // sucesso UI
-          if (mounted) {
-            setState(() => _rateioRealizado = true);
-            await _showMessageDialog('Rateio automático realizado');
+            if (updatedCount > 0) {
+            // Marca o bombeio como rateado se tivermos o id do bombeio
+            if (bombeioId?.isNotEmpty == true) {
+              try {
+                await supabase
+                    .from('bombeios')
+                    .update({'rateio': true})
+                    .eq('id', bombeioId!);
+              } catch (e) {
+                debugPrint('Erro ao marcar bombeio.rateio: $e');
+              }
+            }
+
+            if (mounted) {
+              setState(() => _rateioRealizado = true);
+              await _showMessageDialog('Rateio automático realizado');
+            }
+          } else {
+            if (mounted) {
+              await _showMessageDialog(
+                'Nenhum participante para atualizar',
+                title: 'Aviso',
+              );
+            }
           }
         } else {
           if (mounted) {

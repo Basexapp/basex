@@ -694,7 +694,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           child: Row(
             children: [
-              const SizedBox(width: 16),
+              const SizedBox(width: 56),
               Expanded(
                 flex: 1,
                 child: Text(
@@ -865,6 +865,24 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                           ),
                         ),
                         const SizedBox(width: 12),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4.0),
+                          child: PopupMenuButton<String>(
+                            icon: const Icon(
+                              Icons.more_vert,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                            onSelected: (_) {},
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'cancelar',
+                                child: Text('Cancelar bombeio'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           flex: 1,
                           child: Padding(
@@ -1014,7 +1032,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(
+                SizedBox(
+                  width: 250,
                   child: DropdownButtonFormField<String>(
                     value: terminalSelecionadoId,
                     dropdownColor: Colors.white,
@@ -1270,7 +1289,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  width: 300,
+                  width: 190,
                   child: TextField(
                     controller: pesquisaController,
                     decoration: const InputDecoration(

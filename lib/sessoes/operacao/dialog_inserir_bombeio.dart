@@ -6,6 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../login_page.dart';
 import 'dialog_medicoes_gasol.dart';
 import 'dialog_medicoes_alcool.dart';
+import 'rateio_payload.dart';
 
 class ThousandSeparatorInputFormatter extends TextInputFormatter {
   @override
@@ -361,7 +362,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
           });
         }
 
-        if (b['participantes'] != null && b['participantes'] is List) {
+        if (b['participantes'] is List) {
           for (var p in b['participantes']) {
             final nomeRaw = p['nome']?.toString() ?? '';
             final solicit = p['solicitado'];
@@ -699,6 +700,109 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
       // Atualiza o total de referência para o novo valor salvo
       _totalVolumesNoInicio = total;
+
+      // Inserir registros em movimentacoes_tanque correspondentes aos volumes solicitados
+      try {
+        if (volumes.isNotEmpty) {
+          final tanqueId = _selectedTanque?['id']?.toString() ?? _bombeioLocal?['tanque_id']?.toString();
+          String? produtoId = _selectedTanque?['produto_id']?.toString() ?? _bombeioLocal?['produto_id']?.toString();
+
+          final String dataMov = _bombeioLocal?['data'] is DateTime
+              ? (_bombeioLocal!['data'] as DateTime).toIso8601String()
+              : (DateTime.tryParse(_bombeioLocal?['data']?.toString() ?? '')?.toIso8601String() ?? DateTime.now().toIso8601String());
+
+          final List<Map<String, dynamic>> inserts = [];
+          for (var e in volumes.entries) {
+            final nomeRaw = e.key.toString();
+            final solicit = (e.value as double?) ?? 0.0;
+
+            String? empresaIdResolved;
+            final looksLikeUuid = nomeRaw.length == 36 && nomeRaw.contains('-');
+            if (looksLikeUuid) {
+              empresaIdResolved = nomeRaw;
+            } else if (nomeRaw.isNotEmpty) {
+              try {
+                var emp = await supabase
+                    .from('empresas')
+                    .select('id')
+                    .eq('nome', nomeRaw)
+                    .maybeSingle();
+                emp ??= await supabase
+                    .from('empresas')
+                    .select('id')
+                    .eq('nome_dois', nomeRaw)
+                    .maybeSingle();
+                emp ??= await supabase
+                    .from('empresas')
+                    .select('id')
+                    .eq('nome_abrev', nomeRaw)
+                    .maybeSingle();
+                empresaIdResolved = emp?['id']?.toString();
+              } catch (_) {
+                empresaIdResolved = null;
+              }
+            }
+
+            final row = buildRateioMovimentacaoRow(
+              tanqueId: tanqueId,
+              produtoId: produtoId,
+              bombeioId: _bombeioLocal?['id']?.toString(),
+              dataMov: dataMov,
+              entradaAmb: solicit.round(),
+              entradaVinte: 0,
+              empresaId: empresaIdResolved,
+              terminalId: terminalId,
+            );
+
+            // Tenta atualizar registro existente por bombeio_id + empresa_id
+            bool updated = false;
+            try {
+              final bombeioId = _bombeioLocal?['id']?.toString();
+              if (bombeioId != null && bombeioId.isNotEmpty) {
+                if (empresaIdResolved != null && empresaIdResolved.isNotEmpty) {
+                  final resp = await supabase
+                      .from('movimentacoes_tanque')
+                      .update(row)
+                      .eq('bombeio_id', bombeioId)
+                      .eq('empresa_id', empresaIdResolved)
+                      .select();
+                  if (resp.isNotEmpty) {
+                    updated = true;
+                  }
+                } else {
+                  // empresa_id não resolvida: tenta achar registro existente com bombeio_id e empresa_id NULL
+                    final found = await supabase
+                      .from('movimentacoes_tanque')
+                      .select('id')
+                      .eq('bombeio_id', bombeioId)
+                      .filter('empresa_id', 'is', 'null')
+                      .limit(1);
+                  if (found.isNotEmpty) {
+                    final id = found[0]['id'];
+                    await supabase
+                        .from('movimentacoes_tanque')
+                        .update(row)
+                        .eq('id', id);
+                    updated = true;
+                  }
+                }
+              }
+            } catch (_) {
+              updated = false;
+            }
+
+            if (!updated) {
+              inserts.add(row);
+            }
+          }
+
+          if (inserts.isNotEmpty) {
+            await supabase.from('movimentacoes_tanque').insert(inserts);
+          }
+        }
+      } catch (e) {
+        debugPrint('Erro ao inserir movimentacoes_tanque ao salvar bombeio: $e');
+      }
 
       if (mounted) {
         // Quando pediram para exibir mensagem e não fechar o diálogo,
