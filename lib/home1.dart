@@ -1435,7 +1435,7 @@ class _HomePageState extends State<HomePage>
                           child: MouseRegion(
                             cursor: SystemMouseCursors.click,
                             child: Image.asset(
-                              'assets/logo-top-home4.png',
+                              'assets/logo-top-home.png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -1456,7 +1456,7 @@ class _HomePageState extends State<HomePage>
                                         usuario?.nome ?? '',
                                         style: const TextStyle(
                                           fontSize: 14,
-                                          color: Color(0xFF0D47A1),
+                                          color: Colors.black,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1466,7 +1466,7 @@ class _HomePageState extends State<HomePage>
                                         usuario?.nome ?? '',
                                         style: const TextStyle(
                                           fontSize: 14,
-                                          color: Color(0xFF0D47A1),
+                                          color: Colors.black,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1510,7 +1510,7 @@ class _HomePageState extends State<HomePage>
                               color: Colors.white,
                               icon: const Icon(
                                 Icons.account_circle,
-                                color: Color(0xFF0D47A1),
+                                color: Colors.black,
                                 size: 30,
                               ),
                               onSelected: (value) async {
@@ -1625,7 +1625,7 @@ class _HomePageState extends State<HomePage>
                         _formatarDataAtual(),
                         style: const TextStyle(
                           fontSize: 18,
-                          color: Color(0xFF0D47A1),
+                          color: Colors.black,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -3864,7 +3864,7 @@ class _HomePageState extends State<HomePage>
       decoration: const BoxDecoration(
         color: Colors.white,
         image: DecorationImage(
-          image: AssetImage('assets/home-fundo2.png'),
+          image: AssetImage('assets/home-fundo.png'),
           alignment: Alignment.center,
           scale: 1.0, // Mantém o tamanho original
           opacity: 0.1, // Transparência para a imagem de fundo

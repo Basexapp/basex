@@ -438,13 +438,33 @@ class _LoginPageState extends State<LoginPage> {
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0A4B78).withOpacity(0.8),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                            style: ButtonStyle(
+                              backgroundColor:
+                                  WidgetStateProperty.resolveWith<Color?>((states) {
+                                    if (states.contains(WidgetState.hovered)) {
+                                      return const Color.fromARGB(255, 65, 54, 49);
+                                    }
+                                    return Colors.black;
+                                  }),
+                              foregroundColor: WidgetStateProperty.all<Color>(
+                                Colors.white,
                               ),
+                              padding: WidgetStateProperty.all(
+                                const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                  horizontal: 16,
+                                ),
+                              ),
+                              shape: WidgetStateProperty.all(
+                                RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                  side: const BorderSide(
+                                    color: Color(0xFFFFB341),
+                                    width: 1.6,
+                                  ),
+                                ),
+                              ),
+                              elevation: WidgetStateProperty.all(1),
                             ),
                             onPressed: _isLoading ? null : loginUser,
                             child: _isLoading
@@ -454,7 +474,7 @@ class _LoginPageState extends State<LoginPage> {
                                     'Entrar',
                                     style: TextStyle(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight: FontWeight.w800,
                                       letterSpacing: 1.1,
                                     ),
                                   ),

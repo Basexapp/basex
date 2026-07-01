@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -108,33 +109,24 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
             child: Image.asset('assets/logo-top-login.png'),
           ),
 
-          // ===== Botão Voltar =====
-          Positioned(
-            top: 50,
-            left: 20,
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-
           // ===== Caixa principal =====
           Center(
-            child: Container(
-              width: 380,
-              padding: const EdgeInsets.all(30),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  width: 420,
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1.5,
+                    ),
                   ),
-                ],
-              ),
-              child: Column(
+                  child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const SizedBox(height: 10),
@@ -144,7 +136,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
                         ? Icons.check_circle_outline
                         : Icons.lock_reset_outlined,
                     size: 64,
-                    color: const Color(0xFF0A4B78),
+                    color: Colors.black,
                   ),
 
                   const SizedBox(height: 20),
@@ -154,7 +146,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
                     style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0A4B78),
+                      color: Colors.black,
                     ),
                   ),
 
@@ -220,11 +212,33 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
                       width: double.infinity,
                       height: 48,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A4B78),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                        style: ButtonStyle(
+                          backgroundColor:
+                              WidgetStateProperty.resolveWith<Color?>((states) {
+                                if (states.contains(WidgetState.hovered)) {
+                                  return const Color.fromARGB(255, 65, 54, 49);
+                                }
+                                return Colors.black;
+                              }),
+                          foregroundColor: WidgetStateProperty.all<Color>(
+                            Colors.white,
                           ),
+                          padding: WidgetStateProperty.all(
+                            const EdgeInsets.symmetric(
+                              vertical: 12,
+                              horizontal: 16,
+                            ),
+                          ),
+                          shape: WidgetStateProperty.all(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: const BorderSide(
+                                color: Color(0xFFFFB341),
+                                width: 1.6,
+                              ),
+                            ),
+                          ),
+                          elevation: WidgetStateProperty.all(1),
                         ),
                         onPressed: _isLoading ? null : _recuperarSenha,
                         child: _isLoading
@@ -240,30 +254,40 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
                                 'Solicitar redefinição de senha',
                                 style: TextStyle(
                                   fontSize: 16,
+                                  fontWeight: FontWeight.w800,
                                   color: Colors.white,
                                 ),
                               ),
                       ),
                     ),
-                  ] else ...[
-                    SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A4B78),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 12),
+                    Center(
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: const Color.fromARGB(255, 0, 0, 0),
+                          textStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
                           ),
+                          overlayColor: Colors.white.withOpacity(0.15),
                         ),
                         onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          'Voltar para Login',
-                          style: TextStyle(
+                        child: const Text('Voltar ao login'),
+                      ),
+                    ),
+                  ] else ...[
+                    Center(
+                      child: TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.black,
+                          textStyle: const TextStyle(
                             fontSize: 16,
-                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
                           ),
+                          overlayColor: Colors.black.withOpacity(0.05),
                         ),
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Voltar para Login'),
                       ),
                     ),
                   ],
@@ -273,6 +297,8 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
               ),
             ),
           ),
+        ),
+      ),
 
           // ===== Rodapé =====
           Positioned(

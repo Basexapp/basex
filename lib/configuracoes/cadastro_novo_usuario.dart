@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../login_page.dart';
@@ -233,21 +234,22 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
           // ===== Conteúdo principal =====
           Center(
             child: SingleChildScrollView(
-              child: Container(
-                width: 420,
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.95),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    width: 420,
+                    padding: const EdgeInsets.all(30),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 1.5,
+                      ),
                     ),
-                  ],
-                ),
-                child: Form(
+                    child: Form(
                   key: _formKey,
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -259,7 +261,7 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0A4B78),
+                          color: Colors.black,
                         ),
                       ),
                       const SizedBox(height: 25),
@@ -353,11 +355,32 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                         height: 48,
                         child: ElevatedButton(
                           onPressed: _salvando ? null : _enviarCadastro,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0A4B78),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                          style: ButtonStyle(
+                            backgroundColor:
+                                MaterialStateProperty.resolveWith<Color?>((states) {
+                                  if (states.contains(MaterialState.hovered)) {
+                                    return const Color.fromARGB(255, 65, 54, 49);
+                                  }
+                                  return Colors.black;
+                                }),
+                            foregroundColor:
+                                MaterialStateProperty.all<Color>(Colors.white),
+                            padding: MaterialStateProperty.all(
+                              const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 16,
+                              ),
                             ),
+                            shape: MaterialStateProperty.all(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                side: const BorderSide(
+                                  color: Color(0xFFFFB341),
+                                  width: 1.6,
+                                ),
+                              ),
+                            ),
+                            elevation: MaterialStateProperty.all(1),
                           ),
                           child: _salvando
                               ? const CircularProgressIndicator(
@@ -368,7 +391,7 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                         ),
@@ -378,6 +401,14 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                       // Voltar para login
                       Center(
                         child: TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.black,
+                            textStyle: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            overlayColor: Colors.black.withOpacity(0.05),
+                          ),
                           onPressed: () {
                             Navigator.pushReplacement(
                               context,
@@ -387,7 +418,6 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                           },
                           child: const Text(
                             "Voltar ao login",
-                            style: TextStyle(color: Color(0xFF0A4B78)),
                           ),
                         ),
                       ),
@@ -397,6 +427,8 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
               ),
             ),
           ),
+        ),
+      ),
 
           // ===== Rodapé =====
           Positioned(

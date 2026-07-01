@@ -1392,7 +1392,7 @@ class _HomePageCardsState extends State<HomePageCards>
                                         usuario?.nome ?? '',
                                         style: const TextStyle(
                                           fontSize: 14,
-                                          color: Color(0xFF0D47A1),
+                                          color: Colors.black,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1402,7 +1402,7 @@ class _HomePageCardsState extends State<HomePageCards>
                                         usuario?.nome ?? '',
                                         style: const TextStyle(
                                           fontSize: 14,
-                                          color: Color(0xFF0D47A1),
+                                          color: Colors.black,
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),
@@ -1446,7 +1446,7 @@ class _HomePageCardsState extends State<HomePageCards>
                               color: Colors.white,
                               icon: const Icon(
                                 Icons.account_circle,
-                                color: Color(0xFF0D47A1),
+                                color: Colors.black,
                                 size: 30,
                               ),
                               onSelected: (value) async {
@@ -1559,7 +1559,7 @@ class _HomePageCardsState extends State<HomePageCards>
                       _formatarDataAtual(),
                       style: const TextStyle(
                         fontSize: 18,
-                        color: Color(0xFF0D47A1),
+                        color: Colors.black,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

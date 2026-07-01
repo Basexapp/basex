@@ -77,9 +77,12 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     super.initState();
     _carregarTabelaArqueacao();
     _tanqueCtrl.text = widget.tanqueReferencia ?? '';
-    _dataCtrl.text = widget.data ?? DateFormat('dd/MM/yyyy').format(DateTime.now());
+    _dataCtrl.text =
+        widget.data ?? DateFormat('dd/MM/yyyy').format(DateTime.now());
     if (widget.horario != null) {
-      _horarioCtrl.text = widget.horario!.contains('h') ? widget.horario! : '${widget.horario!} h';
+      _horarioCtrl.text = widget.horario!.contains('h')
+          ? widget.horario!
+          : '${widget.horario!} h';
     }
 
     _cmCtrl.addListener(_onAlturaChanged);
@@ -241,7 +244,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     String parteInteira = apenasNumeros.substring(0, 1);
     String parteDecimal = '';
     if (apenasNumeros.length > 1) parteDecimal = apenasNumeros.substring(1);
-    return parteDecimal.isEmpty ? '$parteInteira,' : '$parteInteira,$parteDecimal';
+    return parteDecimal.isEmpty
+        ? '$parteInteira,'
+        : '$parteInteira,$parteDecimal';
   }
 
   // ── Cálculo do volume ao ambiente ─────────────────────────────────────────
@@ -266,7 +271,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
       final volume = await _buscarVolumeReal(cm, mm);
 
       _volumeTotalRaw = volume;
-      _volCalcCtrl.text = volume > 0 ? _formatarVolume(volume).replaceAll(' L', '') : '';
+      _volCalcCtrl.text = volume > 0
+          ? _formatarVolume(volume).replaceAll(' L', '')
+          : '';
 
       _atualizarVolumeLiquido();
 
@@ -303,7 +310,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
       final volume = await _buscarVolumeReal(cm, mm);
 
       _volumeAguaRaw = volume;
-      _volAguaCtrl.text = volume > 0 ? _formatarVolume(volume).replaceAll(' L', '') : '';
+      _volAguaCtrl.text = volume > 0
+          ? _formatarVolume(volume).replaceAll(' L', '')
+          : '';
 
       _atualizarVolumeLiquido();
 
@@ -324,7 +333,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     final liquido = _volumeTotalRaw - _volumeAguaRaw;
     final valorFinal = liquido > 0 ? liquido : 0.0;
 
-    _volAmbProdutoCtrl.text = valorFinal > 0 ? _formatarVolume(valorFinal).replaceAll(' L', '') : '';
+    _volAmbProdutoCtrl.text = valorFinal > 0
+        ? _formatarVolume(valorFinal).replaceAll(' L', '')
+        : '';
 
     // Dispara o cálculo de 20C se houver volume de produto
     if (valorFinal > 0) {
@@ -339,7 +350,11 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
 
   double? _parseNumero(String v) {
     if (v.isEmpty || v == '-') return null;
-    final t = v.replaceAll('.', '').replaceAll(',', '.').replaceAll(' L', '').trim();
+    final t = v
+        .replaceAll('.', '')
+        .replaceAll(',', '.')
+        .replaceAll(' L', '')
+        .trim();
     return double.tryParse(t);
   }
 
@@ -347,20 +362,98 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     final supabase = Supabase.instance.client;
 
     // Validações básicas antes de salvar
-    if (_horarioCtrl.text.isEmpty || _cmCtrl.text.isEmpty || _tempTanqueCtrl.text.isEmpty || _densidadeObsCtrl.text.isEmpty) {
+    if (_horarioCtrl.text.isEmpty ||
+        _cmCtrl.text.isEmpty ||
+        _tempTanqueCtrl.text.isEmpty ||
+        _densidadeObsCtrl.text.isEmpty) {
       await showDialog<void>(
         context: context,
         barrierDismissible: true,
         builder: (context) => Dialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFFB00020), width: 1)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+          ),
           child: SizedBox(
-            width: 380,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: const BoxDecoration(color: Color(0xFFB00020), borderRadius: BorderRadius.vertical(top: Radius.circular(9))), child: Row(children: const [Icon(Icons.error, color: Colors.white), SizedBox(width: 8), Text('Erro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))])),
-              const Padding(padding: EdgeInsets.all(20), child: Text('Por favor, preencha os campos obrigatórios: Horário, Altura, Temp. Tanque e Densid. Obs.', textAlign: TextAlign.center)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)), border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [SizedBox(width: 120, child: ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')))])),
-            ]),
+            width: 320,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Erro',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color.fromARGB(255, 65, 54, 49),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Por favor, preencha os campos obrigatórios: Horário, Altura, Temp. Tanque e Densid. Obs.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        height: 40,
+                        width: 140,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: ButtonStyle(
+                            backgroundColor:
+                                WidgetStateProperty.resolveWith<Color?>((
+                                  states,
+                                ) {
+                                  if (states.contains(WidgetState.hovered)) {
+                                    return const Color.fromARGB(
+                                      255,
+                                      65,
+                                      54,
+                                      49,
+                                    );
+                                  }
+                                  return Colors.black;
+                                }),
+                            foregroundColor: WidgetStateProperty.all<Color>(
+                              Colors.white,
+                            ),
+                            padding: WidgetStateProperty.all(
+                              const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 12,
+                              ),
+                            ),
+                            shape: WidgetStateProperty.all(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            side: WidgetStateProperty.all(
+                              const BorderSide(
+                                color: Color(0xFFFFB341),
+                                width: 1.6,
+                              ),
+                            ),
+                            elevation: WidgetStateProperty.all(1),
+                          ),
+                          child: const Text(
+                            'OK',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -370,11 +463,16 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     try {
       // 1. Buscar IDs necessários — usar somente produtoId (UUID)
       final produtoId = widget.produtoId?.trim();
-      if (produtoId == null || produtoId.isEmpty) throw 'Produto id não informado.';
+      if (produtoId == null || produtoId.isEmpty)
+        throw 'Produto id não informado.';
 
       Map<String, dynamic>? prodRes;
       try {
-        prodRes = await supabase.from('produtos').select('id').eq('id', produtoId).maybeSingle();
+        prodRes = await supabase
+            .from('produtos')
+            .select('id')
+            .eq('id', produtoId)
+            .maybeSingle();
       } catch (e) {
         debugPrint('Erro ao buscar produto por id "$produtoId": $e');
         prodRes = null;
@@ -393,7 +491,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
       String isoData = DateFormat('yyyy-MM-dd').format(dataFormatada);
       String isoHorario = _horarioCtrl.text.replaceAll(' h', '').trim();
       if (isoHorario.length == 4 && !isoHorario.contains(':')) {
-        isoHorario = '${isoHorario.substring(0, 2)}:${isoHorario.substring(2, 4)}';
+        isoHorario =
+            '${isoHorario.substring(0, 2)}:${isoHorario.substring(2, 4)}';
       }
 
       // 3. Montar payload
@@ -402,6 +501,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         'horario': isoHorario,
         'produto_id': prodRes['id'],
         'tanque_id': tqRes?['id'],
+        if (widget.bombeioId != null && widget.bombeioId!.isNotEmpty)
+          'bombeio_id': widget.bombeioId,
         'terminal_id': UsuarioAtual.instance?.terminalId,
         'usuario_id': supabase.auth.currentUser?.id,
         'altura_total_cm': _parseNumero(_cmCtrl.text),
@@ -420,7 +521,11 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         'observacoes': _observacoesCtrl.text.trim(),
       };
 
-      final savedMedicao = await supabase.from('medicoes').insert(payload).select().single();
+      final savedMedicao = await supabase
+          .from('medicoes')
+          .insert(payload)
+          .select()
+          .single();
 
       // Se foi aberto a partir de um bombeio, vincula a medição ao bombeio
       if (widget.bombeioId != null && widget.bombeioField != null) {
@@ -437,12 +542,90 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
           barrierDismissible: true,
           builder: (context) => Dialog(
             backgroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFF0D47A1), width: 1)),
-            child: SizedBox(width: 380, child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: const BoxDecoration(color: Color(0xFF0D47A1), borderRadius: BorderRadius.vertical(top: Radius.circular(9))), child: Row(children: const [Icon(Icons.check_circle, color: Colors.white), SizedBox(width: 8), Text('Medição salva', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))])),
-              const Padding(padding: EdgeInsets.all(20), child: Text('Medição salva com sucesso!', textAlign: TextAlign.center)),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)), border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [SizedBox(width: 120, child: ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')))])),
-            ])),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+              side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+            ),
+            child: SizedBox(
+              width: 320,
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Medição salva',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color.fromARGB(255, 65, 54, 49),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Medição salva com sucesso!',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        SizedBox(
+                          height: 40,
+                          width: 140,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: ButtonStyle(
+                              backgroundColor:
+                                  WidgetStateProperty.resolveWith<Color?>((
+                                    states,
+                                  ) {
+                                    if (states.contains(WidgetState.hovered)) {
+                                      return const Color.fromARGB(
+                                        255,
+                                        65,
+                                        54,
+                                        49,
+                                      );
+                                    }
+                                    return Colors.black;
+                                  }),
+                              foregroundColor: WidgetStateProperty.all<Color>(
+                                Colors.white,
+                              ),
+                              padding: WidgetStateProperty.all(
+                                const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                  horizontal: 12,
+                                ),
+                              ),
+                              shape: WidgetStateProperty.all(
+                                RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              side: WidgetStateProperty.all(
+                                const BorderSide(
+                                  color: Color(0xFFFFB341),
+                                  width: 1.6,
+                                ),
+                              ),
+                              elevation: WidgetStateProperty.all(1),
+                            ),
+                            child: const Text(
+                              'OK',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         );
         if (widget.onSaved != null) widget.onSaved!(savedMedicao);
@@ -453,12 +636,90 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         barrierDismissible: true,
         builder: (context) => Dialog(
           backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Color(0xFFB00020), width: 1)),
-          child: SizedBox(width: 380, child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: const BoxDecoration(color: Color(0xFFB00020), borderRadius: BorderRadius.vertical(top: Radius.circular(9))), child: Row(children: const [Icon(Icons.error, color: Colors.white), SizedBox(width: 8), Text('Erro', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))])),
-            Padding(padding: const EdgeInsets.all(20), child: Text('Erro ao salvar medição: $e', textAlign: TextAlign.center)),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14), decoration: BoxDecoration(color: Colors.grey.shade50, borderRadius: const BorderRadius.vertical(bottom: Radius.circular(9)), border: Border(top: BorderSide(color: Colors.grey.shade300, width: 1))), child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [SizedBox(width: 120, child: ElevatedButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK')))])),
-          ])),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+          ),
+          child: SizedBox(
+            width: 320,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Erro',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color.fromARGB(255, 65, 54, 49),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Erro ao salvar medição: $e',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        height: 40,
+                        width: 140,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: ButtonStyle(
+                            backgroundColor:
+                                WidgetStateProperty.resolveWith<Color?>((
+                                  states,
+                                ) {
+                                  if (states.contains(WidgetState.hovered)) {
+                                    return const Color.fromARGB(
+                                      255,
+                                      65,
+                                      54,
+                                      49,
+                                    );
+                                  }
+                                  return Colors.black;
+                                }),
+                            foregroundColor: WidgetStateProperty.all<Color>(
+                              Colors.white,
+                            ),
+                            padding: WidgetStateProperty.all(
+                              const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 12,
+                              ),
+                            ),
+                            shape: WidgetStateProperty.all(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            ),
+                            side: WidgetStateProperty.all(
+                              const BorderSide(
+                                color: Color(0xFFFFB341),
+                                width: 1.6,
+                              ),
+                            ),
+                            elevation: WidgetStateProperty.all(1),
+                          ),
+                          child: const Text(
+                            'OK',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -515,15 +776,19 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
 
       final fcvNum = resultado['fcv'];
       final vol20 = volAmb * fcvNum;
-      
+
       // Densidade a 20°C (kg/m³) -> converte para kg/L dividindo por 1000
       final densidade20 = resultado['densidade20'] / 1000;
       final massa = vol20 * densidade20;
 
       if (mounted) {
         setState(() {
-          _grauAlcoolGLCtrl.text = resultado['grauGl'].toStringAsFixed(2).replaceAll('.', ',');
-          _fcvCtrl.text = resultado['fcv'].toStringAsFixed(4).replaceAll('.', ',');
+          _grauAlcoolGLCtrl.text = resultado['grauGl']
+              .toStringAsFixed(2)
+              .replaceAll('.', ',');
+          _fcvCtrl.text = resultado['fcv']
+              .toStringAsFixed(4)
+              .replaceAll('.', ',');
           _vol20Ctrl.text = _formatarVolume(vol20).replaceAll(' L', '');
           _massaCtrl.text = _formatarVolume(massa).replaceAll(' L', '');
           _calculandoVolume20 = false;
@@ -547,18 +812,19 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     required String densidadeObservada,
   }) async {
     final supabase = Supabase.instance.client;
-    
+
     try {
       // Converte os valores de entrada (vírgula para ponto)
       final tempNum = double.tryParse(temperatura.replaceAll(',', '.')) ?? 0;
-      double densNum = double.tryParse(densidadeObservada.replaceAll(',', '.')) ?? 0;
-      
+      double densNum =
+          double.tryParse(densidadeObservada.replaceAll(',', '.')) ?? 0;
+
       // 🔥 CORREÇÃO: Converte de kg/L para kg/m³ (multiplica por 1000)
       // Se o valor for menor que 10, assume que está em kg/L e converte
       if (densNum < 10) {
         densNum = densNum * 1000;
       }
-      
+
       // Busca todos os registros com a mesma temperatura (com tolerância de 0.1°C)
       final registros = await supabase
           .from('tcv_alcool')
@@ -566,37 +832,33 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
           .gte('temp_obs', tempNum - 0.1)
           .lte('temp_obs', tempNum + 0.1)
           .order('densid_obs');
-      
+
       if (registros.isEmpty) {
         return null;
       }
-      
+
       // Encontra o registro com densidade observada mais próxima
       Map<String, dynamic>? melhorRegistro;
       double menorDiferenca = double.infinity;
-      
+
       for (var reg in registros) {
         final densReg = (reg['densid_obs'] as num).toDouble();
         final diferenca = (densReg - densNum).abs();
-        
+
         if (diferenca < menorDiferenca) {
           menorDiferenca = diferenca;
           melhorRegistro = reg;
         }
       }
-      
+
       if (melhorRegistro == null) return null;
 
       // Extrai os valores numéricos
       final fcv = (melhorRegistro['fcv'] as num).toDouble();
       final densidade20 = (melhorRegistro['densid_vinte'] as num).toDouble();
       final grauGl = (melhorRegistro['grau_alcol_gl'] as num).toDouble();
-      
-      return {
-        'fcv': fcv,
-        'densidade20': densidade20,
-        'grauGl': grauGl,
-      };
+
+      return {'fcv': fcv, 'densidade20': densidade20, 'grauGl': grauGl};
     } catch (e) {
       debugPrint('Erro na busca da tabela alcoométrica: $e');
       return null;
@@ -643,7 +905,10 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
 
       if (resultadoMm == null || resultadoMm[colunaMm] == null) return volumeCm;
 
-      final volumeMm = _converterVolumeLitros(resultadoMm[colunaMm], isMilimetros: true);
+      final volumeMm = _converterVolumeLitros(
+        resultadoMm[colunaMm],
+        isMilimetros: true,
+      );
       return double.parse((volumeCm + volumeMm).toStringAsFixed(3));
     } catch (e) {
       debugPrint('Erro ao buscar volume real: $e');
@@ -654,7 +919,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
   double _converterVolumeLitros(dynamic valor, {bool isMilimetros = false}) {
     try {
       if (valor == null) return 0.0;
-      
+
       // Se já for numérico (double/int vindo do banco/Supabase),
       // assumimos que está em m³ e convertemos para Litros (multiplicando por 1000).
       if (valor is num) {
@@ -674,11 +939,11 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         // Ex: "1.000.610" -> integerPart = "1000", decimalPart = "610"
         final decimalPart = partes.last;
         final integerPart = partes.sublist(0, partes.length - 1).join('');
-        
+
         // Normalizamos a parte decimal para 3 dígitos para garantir precisão ex: "701.2"
         String d = decimalPart.padRight(3, '0');
         if (d.length > 3) d = d.substring(0, 3);
-        
+
         final double? v = double.tryParse('$integerPart.$d');
         if (v != null) finalValue = v * 1000;
       } else {
@@ -686,7 +951,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         final double? v = double.tryParse(str);
         if (v != null) finalValue = v * 1000;
       }
-      
+
       // Se for milímetros, o valor da tabela (ex: "412") já representa Litros
       return isMilimetros ? finalValue / 1000 : finalValue;
     } catch (_) {
@@ -737,7 +1002,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
     ].contains(label);
 
     // Validação básica: se for obrigatório e estiver vazio, exibe alerta
-    final bool showWarning = isMandatory && effectiveController.text.trim().isEmpty;
+    final bool showWarning =
+        isMandatory && effectiveController.text.trim().isEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -781,7 +1047,8 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
               valorAntigo = v;
             }
           },
-          keyboardType: maxLength != null ||
+          keyboardType:
+              maxLength != null ||
                   label.contains('Temp') ||
                   label.contains('Dens') ||
                   label.contains('Alt') ||
@@ -795,7 +1062,10 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 8,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(4),
               borderSide: BorderSide(
@@ -853,9 +1123,22 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
               // Primeira linha: Tanque, Data, Horário
               Row(
                 children: [
-                  Expanded(child: _buildField('Tanque', 'Ex: TQ-01', controller: _tanqueCtrl, enabled: false)),
+                  Expanded(
+                    child: _buildField(
+                      'Tanque',
+                      'Ex: TQ-01',
+                      controller: _tanqueCtrl,
+                      enabled: false,
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildField('Data', '00/00/0000', controller: _dataCtrl)),
+                  Expanded(
+                    child: _buildField(
+                      'Data',
+                      '00/00/0000',
+                      controller: _dataCtrl,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildField(
@@ -867,7 +1150,11 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                         if (masked != v) {
                           controller.value = TextEditingValue(
                             text: masked,
-                            selection: TextSelection.collapsed(offset: masked.endsWith(' h') && masked.length > 2 ? masked.length - 2 : masked.length),
+                            selection: TextSelection.collapsed(
+                              offset: masked.endsWith(' h') && masked.length > 2
+                                  ? masked.length - 2
+                                  : masked.length,
+                            ),
                           );
                         }
                       },
@@ -876,13 +1163,29 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // Segunda linha: Alturas e Volume total
               Row(
                 children: [
-                  Expanded(child: _buildField('Alt. cm', '0', controller: _cmCtrl, focusNode: _cmFocus, maxLength: 4)),
+                  Expanded(
+                    child: _buildField(
+                      'Alt. cm',
+                      '0',
+                      controller: _cmCtrl,
+                      focusNode: _cmFocus,
+                      maxLength: 4,
+                    ),
+                  ),
                   const SizedBox(width: 8),
-                  Expanded(child: _buildField('Alt. mm', '0', controller: _mmCtrl, focusNode: _mmFocus, maxLength: 1)),
+                  Expanded(
+                    child: _buildField(
+                      'Alt. mm',
+                      '0',
+                      controller: _mmCtrl,
+                      focusNode: _mmFocus,
+                      maxLength: 1,
+                    ),
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _buildField(
@@ -900,9 +1203,25 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: _buildField('Alt. cm (Água)', '0', controller: _aguaCmCtrl, focusNode: _aguaCmFocus, maxLength: 4)),
+                    Expanded(
+                      child: _buildField(
+                        'Alt. cm (Água)',
+                        '0',
+                        controller: _aguaCmCtrl,
+                        focusNode: _aguaCmFocus,
+                        maxLength: 4,
+                      ),
+                    ),
                     const SizedBox(width: 8),
-                    Expanded(child: _buildField('Alt. mm (Água)', '0', controller: _aguaMmCtrl, focusNode: _aguaMmFocus, maxLength: 1)),
+                    Expanded(
+                      child: _buildField(
+                        'Alt. mm (Água)',
+                        '0',
+                        controller: _aguaMmCtrl,
+                        focusNode: _aguaMmFocus,
+                        maxLength: 1,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: _buildField(
@@ -916,7 +1235,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ),
               ],
               const SizedBox(height: 12),
-              
+
               // Quarta linha: Temperatura, Densidade, Grau Alcóolico e FCV (conforme solicitado)
               Row(
                 children: [
@@ -931,7 +1250,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                         if (masked != v) {
                           controller.value = TextEditingValue(
                             text: masked,
-                            selection: TextSelection.collapsed(offset: masked.length),
+                            selection: TextSelection.collapsed(
+                              offset: masked.length,
+                            ),
                           );
                         }
                       },
@@ -949,7 +1270,9 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                         if (masked != v) {
                           controller.value = TextEditingValue(
                             text: masked,
-                            selection: TextSelection.collapsed(offset: masked.length),
+                            selection: TextSelection.collapsed(
+                              offset: masked.length,
+                            ),
                           );
                         }
                       },
@@ -976,7 +1299,7 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // Quinta linha: Massa, Volume Ambiente, Volume 20°C
               Row(
                 children: [
@@ -1012,9 +1335,14 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
                 ],
               ),
               const SizedBox(height: 12),
-              
+
               // Sexta linha: Observações
-              _buildField('Observações', '', controller: _observacoesCtrl, maxLines: 2),
+              _buildField(
+                'Observações',
+                '',
+                controller: _observacoesCtrl,
+                maxLines: 2,
+              ),
             ],
           ),
         ),
@@ -1023,17 +1351,34 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
         TextButton(
           onPressed: () => Navigator.pop(context),
           style: TextButton.styleFrom(
+            foregroundColor: Colors.black,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           ),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          child: const Text('Cancelar'),
         ),
         SizedBox(
           child: ElevatedButton(
             onPressed: _salvarMedicao,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0D47A1),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            style: ButtonStyle(
+              backgroundColor: WidgetStateProperty.resolveWith<Color?>((
+                states,
+              ) {
+                if (states.contains(WidgetState.hovered)) {
+                  return const Color.fromARGB(255, 65, 54, 49);
+                }
+                return Colors.black;
+              }),
+              foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+              padding: WidgetStateProperty.all(
+                const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              side: WidgetStateProperty.all(
+                const BorderSide(color: Color(0xFFFFB341), width: 1.6),
+              ),
+              elevation: WidgetStateProperty.all(1),
             ),
             child: const Text(
               'Salvar dados',

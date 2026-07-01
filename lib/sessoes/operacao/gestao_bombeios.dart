@@ -686,6 +686,94 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
     return temQtdFaturada && temMedicaoInicial && temMedicaoFinal;
   }
 
+  Future<void> _cancelarBombeio(Map<String, dynamic> item) async {
+    final bombeioId = item['id']?.toString();
+    if (bombeioId == null || bombeioId.isEmpty) return;
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        title: const Text(
+          'Cancelar bombeio',
+          style: TextStyle(color: Color.fromARGB(255, 65, 54, 49)),
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tem certeza que quer prosseguir com o cancelamento do bombeio?'),
+            SizedBox(height: 8),
+            Text(
+              'Essa ação também cancelará as medições realizadas, atreladas a este bombeio.',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text('Voltar'),
+          ),
+          SizedBox(
+            height: 40,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                  if (states.contains(WidgetState.hovered)) {
+                    return const Color.fromARGB(255, 65, 54, 49);
+                  }
+                  return Colors.black;
+                }),
+                foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                side: WidgetStateProperty.all(
+                  const BorderSide(color: Color(0xFFFFB341), width: 1.6),
+                ),
+                elevation: WidgetStateProperty.all(1),
+              ),
+              child: const Text('Sim, cancelar.'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      await _supabase.from('bombeios').delete().eq('id', bombeioId);
+
+      if (!mounted) return;
+      setState(() {
+        _bombeioSelecionado = null;
+        _mostrarRateio = false;
+      });
+      await _carregarBombeios(resetPagina: true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao cancelar bombeio: $e')),
+      );
+    }
+  }
+
   Widget _buildListaBombeios() {
     return Column(
       children: [
@@ -873,7 +961,11 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                               size: 20,
                               color: Colors.grey,
                             ),
-                            onSelected: (_) {},
+                            onSelected: (value) async {
+                              if (value == 'cancelar') {
+                                await _cancelarBombeio(item);
+                              }
+                            },
                             itemBuilder: (context) => [
                               const PopupMenuItem(
                                 value: 'cancelar',
@@ -1367,6 +1459,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
               ),
               child: Container(
                 width: 350,
@@ -1381,7 +1474,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                           children: [
                             const Icon(
                               Icons.calendar_today,
-                              color: Color(0xFF0D47A1),
+                              color: Colors.black,
                               size: 24,
                             ),
                             const SizedBox(width: 12),
@@ -1390,14 +1483,14 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF0D47A1),
+                                color: Colors.black,
                               ),
                             ),
                             const Spacer(),
                             IconButton(
                               icon: const Icon(Icons.close),
                               onPressed: () => Navigator.of(context).pop(),
-                              color: Colors.grey,
+                              color: Colors.black,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                             ),
@@ -1412,7 +1505,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                               IconButton(
                                 icon: const Icon(
                                   Icons.chevron_left,
-                                  color: Color(0xFF0D47A1),
+                                  color: Colors.black,
                                 ),
                                 onPressed: () => setStateDialog(
                                   () => tempDate = DateTime(
@@ -1427,13 +1520,13 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF0D47A1),
+                                  color: Colors.black,
                                 ),
                               ),
                               IconButton(
                                 icon: const Icon(
                                   Icons.chevron_right,
-                                  color: Color(0xFF0D47A1),
+                                  color: Colors.black,
                                 ),
                                 onPressed: () => setStateDialog(
                                   () => tempDate = DateTime(
@@ -1457,7 +1550,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                               child: Text(
                                 day,
                                 style: const TextStyle(
-                                  color: Color(0xFF0D47A1),
+                                  color: Colors.black,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -1504,13 +1597,11 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                                       margin: const EdgeInsets.all(2),
                                       decoration: BoxDecoration(
                                         color: isSelected
-                                            ? const Color(0xFF0D47A1)
+                                            ? Colors.black
                                             : (day != null && hoveredDay == day)
-                                            ? const Color(
-                                                0xFF0D47A1,
-                                              ).withOpacity(0.1)
+                                            ? Colors.black.withOpacity(0.1)
                                             : isToday
-                                            ? const Color(0x220D47A1)
+                                            ? Colors.black.withOpacity(0.13)
                                             : Colors.transparent,
                                         shape: BoxShape.circle,
                                       ),
@@ -1523,7 +1614,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                                                 : isToday ||
                                                       (day != null &&
                                                           hoveredDay == day)
-                                                ? const Color(0xFF0D47A1)
+                                                ? Colors.black
                                                 : Colors.black87,
                                             fontWeight:
                                                 isSelected ||
