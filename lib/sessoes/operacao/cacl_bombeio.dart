@@ -2,64 +2,127 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
 import 'cacl_pdf.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class CaclBombeioDialog extends StatelessWidget {
   final Map<String, dynamic>? bombeio;
   const CaclBombeioDialog({super.key, this.bombeio});
+
+  /// Busca um `bombeio` completo no banco (Supabase) e abre o diálogo.
+  static Future<void> showById(BuildContext context, String bombeioId) async {
+    try {
+      final supabase = Supabase.instance.client;
+
+      // 1) Buscar o bombeio
+      final b = await supabase.from('bombeios').select().eq('id', bombeioId).maybeSingle();
+      if (b == null) {
+        await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('Erro'), content: const Text('Bombeio não encontrado.'), actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))]));
+        return;
+      }
+
+      // 2) Buscar medições inicial e final (se existirem)
+      Map<String, dynamic>? medIni;
+      Map<String, dynamic>? medFin;
+      if (b['medicao_inicial_id'] != null) {
+        final m = await supabase.from('medicoes').select().eq('id', b['medicao_inicial_id']).maybeSingle();
+        if (m != null) medIni = Map<String, dynamic>.from(m);
+      }
+      if (b['medicao_final_id'] != null) {
+        final m = await supabase.from('medicoes').select().eq('id', b['medicao_final_id']).maybeSingle();
+        if (m != null) medFin = Map<String, dynamic>.from(m);
+      }
+
+      // 3) Buscar tanque (+ produto)
+      Map<String, dynamic>? tanque;
+      Map<String, dynamic>? produto;
+      if (b['tanque_id'] != null) {
+        final t = await supabase.from('tanques').select('*, produtos(id, nome, nome_dois)').eq('id', b['tanque_id']).maybeSingle();
+        if (t != null) {
+          tanque = Map<String, dynamic>.from(t);
+          final p = t['produtos'];
+          if (p is List) produto = p.isNotEmpty ? Map<String, dynamic>.from(p[0]) : null;
+          else if (p is Map) produto = Map<String, dynamic>.from(p);
+        }
+      }
+
+      // 4) Terminal e empresa
+      Map<String, dynamic>? terminal;
+      Map<String, dynamic>? empresa;
+      if (b['terminal_id'] != null) {
+        final t = await supabase.from('terminais').select().eq('id', b['terminal_id']).maybeSingle();
+        if (t != null) terminal = Map<String, dynamic>.from(t);
+      }
+      if (b['empresa_id'] != null) {
+        final e = await supabase.from('empresas').select().eq('id', b['empresa_id']).maybeSingle();
+        if (e != null) empresa = Map<String, dynamic>.from(e);
+      }
+
+      // 5) Montar mapa no formato esperado pelo diálogo / PDF
+      final Map<String, dynamic> combined = Map<String, dynamic>.from(b);
+      combined['medicao_inicial'] = medIni;
+      combined['medicao_final'] = medFin;
+      combined['tanque'] = tanque;
+      combined['produto'] = produto ?? tankProdutoFromMap(tanque);
+      combined['terminal'] = terminal;
+      combined['empresa'] = empresa;
+
+      // Montar também um submap 'medicoes' compatível com o que o PDF espera
+      final medicoes = <String, dynamic>{};
+      if (medIni != null) {
+        medicoes['cmInicial'] = medIni['altura_total_cm']?.toString();
+        medicoes['mmInicial'] = medIni['altura_total_mm']?.toString();
+        medicoes['volumeTotalLiquidoInicial'] = medIni['volume_total_liquido'] ?? medIni['volume_ambiente'];
+        medicoes['alturaAguaInicial'] = medIni['agua_cm']?.toString();
+        medicoes['volumeAguaInicial'] = medIni['vol_agua'] ?? medIni['vol_agua'];
+        medicoes['alturaProdutoInicial'] = (medIni['altura_total_cm'] != null) ? ((medIni['altura_total_cm'] - (medIni['agua_cm'] ?? 0)).toString()) : null;
+        medicoes['volumeProdutoInicial'] = medIni['volume_ambiente'] ?? medIni['volume_total_liquido'];
+        medicoes['tempTanqueInicial'] = medIni['temperatura_tanque']?.toString();
+        medicoes['densidadeInicial'] = medIni['densidade_observada']?.toString();
+        medicoes['tempAmostraInicial'] = medIni['temperatura_amostra']?.toString();
+        medicoes['densidade20Inicial'] = medIni['densidade_20']?.toString();
+        medicoes['fatorCorrecaoInicial'] = medIni['fcv']?.toString();
+        medicoes['volume20Inicial'] = medIni['volume_20'];
+        medicoes['massaInicial'] = medIni['massa'];
+      }
+      if (medFin != null) {
+        medicoes['cmFinal'] = medFin['altura_total_cm']?.toString();
+        medicoes['mmFinal'] = medFin['altura_total_mm']?.toString();
+        medicoes['volumeTotalLiquidoFinal'] = medFin['volume_total_liquido'] ?? medFin['volume_ambiente'];
+        medicoes['alturaAguaFinal'] = medFin['agua_cm']?.toString();
+        medicoes['volumeAguaFinal'] = medFin['vol_agua'] ?? medFin['vol_agua'];
+        medicoes['alturaProdutoFinal'] = (medFin['altura_total_cm'] != null) ? ((medFin['altura_total_cm'] - (medFin['agua_cm'] ?? 0)).toString()) : null;
+        medicoes['volumeProdutoFinal'] = medFin['volume_ambiente'] ?? medFin['volume_total_liquido'];
+        medicoes['tempTanqueFinal'] = medFin['temperatura_tanque']?.toString();
+        medicoes['densidadeFinal'] = medFin['densidade_observada']?.toString();
+        medicoes['tempAmostraFinal'] = medFin['temperatura_amostra']?.toString();
+        medicoes['densidade20Final'] = medFin['densidade_20']?.toString();
+        medicoes['fatorCorrecaoFinal'] = medFin['fcv']?.toString();
+        medicoes['volume20Final'] = medFin['volume_20'];
+        medicoes['massaFinal'] = medFin['massa'];
+      }
+      combined['medicoes'] = medicoes;
+
+      // 6) Finalmente abre o diálogo com dados completos
+      return show(context, bombeio: combined);
+    } catch (e) {
+      await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('Erro'), content: Text('Erro ao carregar bombeio: $e'), actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))]));
+    }
+  }
+
+  static Map<String,dynamic>? tankProdutoFromMap(Map<String,dynamic>? tanqueMap) {
+    if (tanqueMap == null) return null;
+    final p = tanqueMap['produtos'];
+    if (p == null) return null;
+    if (p is List && p.isNotEmpty) return Map<String,dynamic>.from(p[0]);
+    if (p is Map) return Map<String,dynamic>.from(p);
+    return null;
+  }
 
   static Future<void> show(BuildContext context, {Map<String, dynamic>? bombeio}) {
     return showDialog<void>(
       context: context,
       builder: (context) => CaclBombeioDialog(bombeio: bombeio),
     );
-  }
-
-  // Dados fictícios para teste do layout
-  Map<String, dynamic> _getDadosFicticios() {
-    return {
-      'data': '01/07/2026',
-      'horario_inicial': '08:00 h',
-      'horario_final': '12:00 h',
-      'base': 'FILIAL CENTRO',
-      'produto': 'Gasolina Aditivada',
-      'tanque': 'TQ-01-JN',
-      'medicoes': {
-        'cmInicial': '150,5',
-        'cmFinal': '155,3',
-        'volumeTotalLiquidoInicial': 10000,
-        'volumeTotalLiquidoFinal': 10500,
-        'alturaAguaInicial': '5,0',
-        'alturaAguaFinal': '5,0',
-        'volumeAguaInicial': 150,
-        'volumeAguaFinal': 150,
-        'alturaProdutoInicial': '145,5',
-        'alturaProdutoFinal': '150,3',
-        'volumeProdutoInicial': 9850,
-        'volumeProdutoFinal': 10350,
-        'tempTanqueInicial': '28,5',
-        'tempTanqueFinal': '29,0',
-        'densidadeInicial': '0,7450',
-        'densidadeFinal': '0,7445',
-        'tempAmostraInicial': '26,0',
-        'tempAmostraFinal': '26,5',
-        'densidade20Inicial': '0,7520',
-        'densidade20Final': '0,7515',
-        'fatorCorrecaoInicial': '0,9825',
-        'fatorCorrecaoFinal': '0,9820',
-        'volume20Inicial': 9680,
-        'volume20Final': 10165,
-        'massaInicial': 7279.4,
-        'massaFinal': 7638.0,
-        'totalEntradasPeriodo': 500,
-        'totalSaidasPeriodo': 15,
-        'faturadoFinal': 490,
-      },
-      'entrada_saida_ambiente': 500,
-      'entrada_saida_20': 485,
-      'sobra_perda': 10,
-      'estoque_final_calculado': 10165,
-      'observacoes': 'Bombeio realizado conforme procedimento padrão.',
-    };
   }
 
   String _formatarVolumeLitros(double volume) {
@@ -209,15 +272,56 @@ class CaclBombeioDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dados = bombeio ?? _getDadosFicticios();
-    final medicoes = dados['medicoes'] ?? {};
+    final dados = bombeio ?? <String, dynamic>{};
+    // medicoes pode vir já populado por showById ou pelo dialog de edição
+    final medicoes = Map<String, dynamic>.from(dados['medicoes'] ?? {});
 
-    final data = _formatarDataDisplay(dados['data']?.toString() ?? '01/07/2026');
-    final base = dados['base']?.toString() ?? 'FILIAL CENTRO';
-    final produto = dados['produto']?.toString() ?? 'Gasolina Aditivada';
-    final tanque = dados['tanque']?.toString() ?? 'TQ-01-JN';
-    final horarioInicial = dados['horario_inicial']?.toString() ?? '08:00 h';
-    final horarioFinal = dados['horario_final']?.toString() ?? '12:00 h';
+    // Se não houver 'medicoes' tente construir a partir de medicao_inicial/final
+    if (medicoes.isEmpty) {
+      final medIni = dados['medicao_inicial'];
+      final medFin = dados['medicao_final'];
+      if (medIni is Map || medFin is Map) {
+        if (medIni is Map) {
+          medicoes['cmInicial'] = medIni['altura_total_cm']?.toString();
+          medicoes['mmInicial'] = medIni['altura_total_mm']?.toString();
+          medicoes['volumeTotalLiquidoInicial'] = medIni['volume_total_liquido'] ?? medIni['volume_ambiente'];
+          medicoes['alturaAguaInicial'] = medIni['agua_cm']?.toString();
+          medicoes['volumeAguaInicial'] = medIni['vol_agua'] ?? medIni['vol_agua'];
+          medicoes['alturaProdutoInicial'] = (medIni['altura_total_cm'] != null) ? ((medIni['altura_total_cm'] - (medIni['agua_cm'] ?? 0)).toString()) : null;
+          medicoes['volumeProdutoInicial'] = medIni['volume_ambiente'] ?? medIni['volume_total_liquido'];
+          medicoes['tempTanqueInicial'] = medIni['temperatura_tanque']?.toString();
+          medicoes['densidadeInicial'] = medIni['densidade_observada']?.toString();
+          medicoes['tempAmostraInicial'] = medIni['temperatura_amostra']?.toString();
+          medicoes['densidade20Inicial'] = medIni['densidade_20']?.toString();
+          medicoes['fatorCorrecaoInicial'] = medIni['fcv']?.toString();
+          medicoes['volume20Inicial'] = medIni['volume_20'];
+          medicoes['massaInicial'] = medIni['massa'];
+        }
+        if (medFin is Map) {
+          medicoes['cmFinal'] = medFin['altura_total_cm']?.toString();
+          medicoes['mmFinal'] = medFin['altura_total_mm']?.toString();
+          medicoes['volumeTotalLiquidoFinal'] = medFin['volume_total_liquido'] ?? medFin['volume_ambiente'];
+          medicoes['alturaAguaFinal'] = medFin['agua_cm']?.toString();
+          medicoes['volumeAguaFinal'] = medFin['vol_agua'] ?? medFin['vol_agua'];
+          medicoes['alturaProdutoFinal'] = (medFin['altura_total_cm'] != null) ? ((medFin['altura_total_cm'] - (medFin['agua_cm'] ?? 0)).toString()) : null;
+          medicoes['volumeProdutoFinal'] = medFin['volume_ambiente'] ?? medFin['volume_total_liquido'];
+          medicoes['tempTanqueFinal'] = medFin['temperatura_tanque']?.toString();
+          medicoes['densidadeFinal'] = medFin['densidade_observada']?.toString();
+          medicoes['tempAmostraFinal'] = medFin['temperatura_amostra']?.toString();
+          medicoes['densidade20Final'] = medFin['densidade_20']?.toString();
+          medicoes['fatorCorrecaoFinal'] = medFin['fcv']?.toString();
+          medicoes['volume20Final'] = medFin['volume_20'];
+          medicoes['massaFinal'] = medFin['massa'];
+        }
+      }
+    }
+
+    final data = _formatarDataDisplay(dados['data']?.toString() ?? '');
+    final base = (dados['terminal'] is Map) ? (dados['terminal']['nome'] ?? dados['terminal']['referencia'])?.toString() : (dados['base']?.toString() ?? '');
+    final produto = (dados['produto'] is Map) ? (dados['produto']['nome_dois'] ?? dados['produto']['nome'])?.toString() : (dados['produto']?.toString() ?? '');
+    final tanque = (dados['tanque'] is Map) ? (dados['tanque']['referencia'] ?? dados['tanque']['id'])?.toString() : (dados['tanque']?.toString() ?? '');
+    final horarioInicial = dados['horario_inicial']?.toString() ?? dados['horario']?.toString() ?? '';
+    final horarioFinal = dados['horario_final']?.toString() ?? '';
 
     final volumeTotalInicial = (medicoes['volumeTotalLiquidoInicial'] ?? 0).toDouble();
     final volumeTotalFinal = (medicoes['volumeTotalLiquidoFinal'] ?? 0).toDouble();
@@ -283,7 +387,7 @@ class CaclBombeioDialog extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _secaoTitulo("DATA:"),
-                          _linhaValor(data),
+                          _linhaValor(data.isEmpty ? '-' : data),
                         ],
                       ),
                     ),
@@ -294,7 +398,7 @@ class CaclBombeioDialog extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _secaoTitulo("HORÁRIO:"),
-                          _linhaValor("$horarioInicial — $horarioFinal"),
+                          _linhaValor((horarioInicial.isEmpty && horarioFinal.isEmpty) ? '-' : "$horarioInicial — $horarioFinal"),
                         ],
                       ),
                     ),
@@ -305,7 +409,7 @@ class CaclBombeioDialog extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _secaoTitulo("TERMINAL:"),
-                          _linhaValor(base),
+                          _linhaValor(base ?? '-'),
                         ],
                       ),
                     ),
@@ -316,7 +420,7 @@ class CaclBombeioDialog extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _secaoTitulo("TANQUE Nº:"),
-                          _linhaValor(tanque),
+                          _linhaValor(tanque ?? '-'),
                         ],
                       ),
                     ),
@@ -327,7 +431,7 @@ class CaclBombeioDialog extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _secaoTitulo("PRODUTO:"),
-                          _linhaValor(produto),
+                          _linhaValor(produto ?? '-'),
                         ],
                       ),
                     ),

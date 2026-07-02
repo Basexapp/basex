@@ -1850,8 +1850,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   ElevatedButton.icon(
                     onPressed: _isReadOnly
                         ? null
-                        : () {
-                            CaclBombeioDialog.show(context, bombeio: _bombeioLocal);
+                        : () async {
+                            final id = _bombeioLocal?['id']?.toString();
+                            if (id == null || id.isEmpty) return;
+                            await CaclBombeioDialog.showById(context, id);
                           },
                     icon: const Icon(Icons.calculate, size: 18),
                     label: const Text('CACL'),
