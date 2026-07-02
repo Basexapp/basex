@@ -7,6 +7,7 @@ import '../../login_page.dart';
 import 'dialog_medicoes_gasol.dart';
 import 'dialog_medicoes_alcool.dart';
 import 'rateio_payload.dart';
+import 'cacl_bombeio.dart';
 
 class ThousandSeparatorInputFormatter extends TextInputFormatter {
   @override
@@ -1847,7 +1848,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   const SizedBox(height: 12),
                   // Botão slim CACL — aparece somente quando há segunda medição
                   ElevatedButton.icon(
-                    onPressed: null,
+                    onPressed: _isReadOnly
+                        ? null
+                        : () {
+                            CaclBombeioDialog.show(context, bombeio: _bombeioLocal);
+                          },
                     icon: const Icon(Icons.calculate, size: 18),
                     label: const Text('CACL'),
                     style: ElevatedButton.styleFrom(
