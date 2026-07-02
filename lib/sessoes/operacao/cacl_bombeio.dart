@@ -16,6 +16,9 @@ class CaclBombeioDialog extends StatelessWidget {
       // 1) Buscar o bombeio
       final b = await supabase.from('bombeios').select().eq('id', bombeioId).maybeSingle();
       if (b == null) {
+        if (!context.mounted) {
+          return;
+        }
         await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('Erro'), content: const Text('Bombeio não encontrado.'), actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))]));
         return;
       }
@@ -40,8 +43,11 @@ class CaclBombeioDialog extends StatelessWidget {
         if (t != null) {
           tanque = Map<String, dynamic>.from(t);
           final p = t['produtos'];
-          if (p is List) produto = p.isNotEmpty ? Map<String, dynamic>.from(p[0]) : null;
-          else if (p is Map) produto = Map<String, dynamic>.from(p);
+          if (p is List) {
+            produto = p.isNotEmpty ? Map<String, dynamic>.from(p[0]) : null;
+          } else if (p is Map) {
+            produto = Map<String, dynamic>.from(p);
+          }
         }
       }
 
@@ -103,8 +109,14 @@ class CaclBombeioDialog extends StatelessWidget {
       combined['medicoes'] = medicoes;
 
       // 6) Finalmente abre o diálogo com dados completos
+      if (!context.mounted) {
+        return;
+      }
       return show(context, bombeio: combined);
     } catch (e) {
+      if (!context.mounted) {
+        return;
+      }
       await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('Erro'), content: Text('Erro ao carregar bombeio: $e'), actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))]));
     }
   }
@@ -171,7 +183,7 @@ class CaclBombeioDialog extends StatelessWidget {
         final y = isoMatch.group(1)!;
         final m = isoMatch.group(2)!;
         final d = isoMatch.group(3)!;
-        return '${d}/${m}/${y}';
+        return '$d/$m/$y';
       }
 
       final brMatch = RegExp(r'^(\d{2})/(\d{2})/(\d{4})').firstMatch(s);
@@ -219,9 +231,12 @@ class CaclBombeioDialog extends StatelessWidget {
         border: Border.all(color: Colors.black26),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        valor,
-        style: const TextStyle(fontSize: 11),
+      child: Center(
+        child: Text(
+          valor,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 11),
+        ),
       ),
     );
   }
@@ -318,10 +333,12 @@ class CaclBombeioDialog extends StatelessWidget {
 
     final data = _formatarDataDisplay(dados['data']?.toString() ?? '');
     final base = (dados['terminal'] is Map) ? (dados['terminal']['nome'] ?? dados['terminal']['referencia'])?.toString() : (dados['base']?.toString() ?? '');
-    final produto = (dados['produto'] is Map) ? (dados['produto']['nome_dois'] ?? dados['produto']['nome'])?.toString() : (dados['produto']?.toString() ?? '');
+    final produto = (dados['produto'] is Map) ? (dados['produto']['nome'] ?? dados['produto']['nome_dois'])?.toString() : (dados['produto']?.toString() ?? '');
     final tanque = (dados['tanque'] is Map) ? (dados['tanque']['referencia'] ?? dados['tanque']['id'])?.toString() : (dados['tanque']?.toString() ?? '');
-    final horarioInicial = dados['horario_inicial']?.toString() ?? dados['horario']?.toString() ?? '';
-    final horarioFinal = dados['horario_final']?.toString() ?? '';
+    final horarioInicial = (dados['medicao_inicial'] is Map)
+      ? (dados['medicao_inicial']['horario']?.toString() ?? '')
+      : (dados['horario_inicial']?.toString() ?? '');
+    final horarioFinal = '';
 
     final volumeTotalInicial = (medicoes['volumeTotalLiquidoInicial'] ?? 0).toDouble();
     final volumeTotalFinal = (medicoes['volumeTotalLiquidoFinal'] ?? 0).toDouble();
@@ -330,7 +347,6 @@ class CaclBombeioDialog extends StatelessWidget {
     final volume20Inicial = (medicoes['volume20Inicial'] ?? 0).toDouble();
     final volume20Final = (medicoes['volume20Final'] ?? 0).toDouble();
 
-    final entradaSaidaAmbiente = (dados['entrada_saida_ambiente'] ?? 0).toDouble();
     final entradaSaida20 = (dados['entrada_saida_20'] ?? 0).toDouble();
     final sobraPerda = (dados['sobra_perda'] ?? 0).toDouble();
     final estoqueFinalCalculado = (dados['estoque_final_calculado'] ?? 0).toDouble();
@@ -362,7 +378,7 @@ class CaclBombeioDialog extends StatelessWidget {
                 ),
                 child: const Center(
                   child: Text(
-                    "CACL - BOMBEIO",
+                    "CACL - PRÉ-VISUALIZAÇÃO",
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -384,9 +400,9 @@ class CaclBombeioDialog extends StatelessWidget {
                     Expanded(
                       flex: 16,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _secaoTitulo("DATA:"),
+                          Center(child: _secaoTitulo("DATA:")),
                           _linhaValor(data.isEmpty ? '-' : data),
                         ],
                       ),
@@ -395,10 +411,10 @@ class CaclBombeioDialog extends StatelessWidget {
                     Expanded(
                       flex: 16,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _secaoTitulo("HORÁRIO:"),
-                          _linhaValor((horarioInicial.isEmpty && horarioFinal.isEmpty) ? '-' : "$horarioInicial — $horarioFinal"),
+                              Center(child: _secaoTitulo("HORÁRIO:")),
+                              _linhaValor(horarioInicial.isEmpty ? '-' : horarioInicial),
                         ],
                       ),
                     ),
@@ -406,9 +422,9 @@ class CaclBombeioDialog extends StatelessWidget {
                     Expanded(
                       flex: 28,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _secaoTitulo("TERMINAL:"),
+                          Center(child: _secaoTitulo("TERMINAL:")),
                           _linhaValor(base ?? '-'),
                         ],
                       ),
@@ -417,9 +433,9 @@ class CaclBombeioDialog extends StatelessWidget {
                     Expanded(
                       flex: 20,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _secaoTitulo("TANQUE Nº:"),
+                          Center(child: _secaoTitulo("TANQUE Nº:")),
                           _linhaValor(tanque ?? '-'),
                         ],
                       ),
@@ -428,9 +444,9 @@ class CaclBombeioDialog extends StatelessWidget {
                     Expanded(
                       flex: 20,
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          _secaoTitulo("PRODUTO:"),
+                          Center(child: _secaoTitulo("PRODUTO:")),
                           _linhaValor(produto ?? '-'),
                         ],
                       ),
@@ -695,20 +711,20 @@ class CaclBombeioDialog extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              // BLOCO FATURADO / SOBRA E PERDA
-              Row(
-                children: [
-                  Expanded(flex: 7, child: Container()),
-                  Expanded(
-                    flex: 3,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black54),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Table(
-                        defaultColumnWidth: const IntrinsicColumnWidth(),
-                        border: TableBorder.all(color: Colors.black54),
+              // BLOCO FATURADO / SOBRA E PERDA (alinhado à direita)
+              Align(
+                alignment: Alignment.centerRight,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.black54),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Table(
+                      // segunda coluna terá largura proporcional igual à última coluna da tabela de comparação
+                      columnWidths: const {0: FixedColumnWidth(121), 1: FixedColumnWidth(121)},
+                      border: TableBorder.all(color: Colors.black54),
                         children: [
                           // Entrada/Saída Líquida
                           TableRow(
@@ -718,7 +734,7 @@ class CaclBombeioDialog extends StatelessWidget {
                                 color: const Color(0xFFF5F5F5),
                                 child: const Center(
                                   child: Text(
-                                    "Entrada/Saída",
+                                    "Vol. apurado a 20ºC:",
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
@@ -753,7 +769,7 @@ class CaclBombeioDialog extends StatelessWidget {
                                 color: const Color(0xFFF5F5F5),
                                 child: const Center(
                                   child: Text(
-                                    "Faturado",
+                                    "Vol. faturado:",
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
@@ -819,8 +835,7 @@ class CaclBombeioDialog extends StatelessWidget {
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
 
               const SizedBox(height: 15),
 
@@ -909,6 +924,9 @@ class CaclBombeioDialog extends StatelessWidget {
               await Printing.sharePdf(bytes: bytes, filename: 'cacl_bombeio.pdf');
 
               // Mostrar diálogo de sucesso
+              if (!context.mounted) {
+                return;
+              }
               showDialog<void>(
                 context: context,
                 builder: (context) => AlertDialog(
@@ -922,10 +940,13 @@ class CaclBombeioDialog extends StatelessWidget {
                   ],
                 ),
               );
-            } catch (e, st) {
+            } catch (e) {
               final errorText = 'Erro ao gerar PDF:\n${e.toString()}';
 
               // Mostrar diálogo de erro centralizado com texto selecionável e botão de copiar
+              if (!context.mounted) {
+                return;
+              }
               showDialog<void>(
                 context: context,
                 builder: (context) => AlertDialog(
@@ -938,6 +959,9 @@ class CaclBombeioDialog extends StatelessWidget {
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: errorText));
                         // confirmação simples
+                        if (!context.mounted) {
+                          return;
+                        }
                         showDialog<void>(
                           context: context,
                           builder: (ctx) => AlertDialog(
