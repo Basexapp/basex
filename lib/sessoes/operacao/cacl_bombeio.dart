@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:printing/printing.dart';
+import 'cacl_pdf.dart';
 
 class CaclBombeioDialog extends StatelessWidget {
   final Map<String, dynamic>? bombeio;
@@ -795,14 +798,65 @@ class CaclBombeioDialog extends StatelessWidget {
           ),
         ),
         ElevatedButton.icon(
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('✓ PDF do CACL Bombeio gerado com sucesso!'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 2),
-              ),
-            );
+          onPressed: () async {
+            try {
+              final doc = await CACLPdf.gerar(dadosFormulario: dados);
+              final bytes = await doc.save();
+              await Printing.sharePdf(bytes: bytes, filename: 'cacl_bombeio.pdf');
+
+              // Mostrar diálogo de sucesso
+              showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('PDF gerado'),
+                  content: const Text('PDF do CACL Bombeio gerado com sucesso.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            } catch (e, st) {
+              final errorText = 'Erro ao gerar PDF:\n${e.toString()}';
+
+              // Mostrar diálogo de erro centralizado com texto selecionável e botão de copiar
+              showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Erro'),
+                  content: SingleChildScrollView(
+                    child: SelectableText(errorText),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: errorText));
+                        // confirmação simples
+                        showDialog<void>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            content: const Text('Mensagem copiada para a área de transferência.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(ctx).pop(),
+                                child: const Text('OK'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      child: const Text('COPIAR'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            }
           },
           icon: const Icon(Icons.picture_as_pdf, size: 18),
           label: const Text('Gerar PDF'),

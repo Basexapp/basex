@@ -11,9 +11,12 @@ class CACLPdf {
     // Cores personalizadas
     final azulPrincipal = PdfColor.fromInt(0xFF0D47A1);
     final cinzaClaro = PdfColor.fromInt(0xFFF5F5F5);
-    final medicoes = dadosFormulario['medicoes'] ?? {};
-    final data = dadosFormulario['data']?.toString() ?? "";
-    final hora = dadosFormulario['horarioInicial']?.toString() ?? "";
+    // Normalizar dados recebidos (pode ser LinkedMap de alguns decode/JSON)
+    final dados = Map<String, dynamic>.from(dadosFormulario);
+    final rawMedicoes = dados['medicoes'];
+    final medicoes = (rawMedicoes is Map) ? Map<String, dynamic>.from(rawMedicoes) : <String, dynamic>{};
+    final data = dados['data']?.toString() ?? "";
+    final hora = dados['horarioInicial']?.toString() ?? "";
     
     pdf.addPage(
       pw.Page(
