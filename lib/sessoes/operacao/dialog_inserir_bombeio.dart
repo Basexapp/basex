@@ -196,7 +196,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       dataCtrl.text = DateFormat('dd/MM/yyyy').format(DateTime.now());
     }
 
-    _fetchTanques();
+    _fetchTanques().whenComplete(() {
+      // Após carregar tanques, tenta buscar medições completas caso falte tanque_id
+      _fetchMedicaoFullIfNeeded(_medicaoInicialSalva, false);
+      _fetchMedicaoFullIfNeeded(_medicaoFinalSalva, true);
+    });
     _fetchDistribuidoras();
     _qtdFaturadaCtrl.addListener(_atualizarCalculos);
     _dataFocusNode.addListener(() {
@@ -245,6 +249,32 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       if (mounted) {
         setState(() {});
       }
+    }
+  }
+
+  Future<void> _fetchMedicaoFullIfNeeded(Map<String, dynamic>? med, bool isFinal) async {
+    if (med == null) return;
+    try {
+      final id = med['id']?.toString();
+        if (id == null || id.isEmpty) return;        
+        if (med['tanque_id'] != null && med['tanque_id'].toString().trim().isNotEmpty) return;        
+      final supabase = Supabase.instance.client;
+      final full = await supabase.from('medicoes').select().eq('id', id).maybeSingle();
+      if (full != null) {
+        if (isFinal) {
+          setState(() {
+            _medicaoFinalSalva = Map<String, dynamic>.from(full);
+          });
+        } else {
+          setState(() {
+            _medicaoInicialSalva = Map<String, dynamic>.from(full);
+          });
+        }
+        _atualizarCalculos();
+      } else {
+      }
+    } catch (e) {
+      // swallow error silently to avoid noisy logs in production
     }
   }
 
@@ -479,7 +509,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     if (medId == null) return;
 
     try {
-      // 1. Remove o vínculo no bombeio
       final field = isFinal ? 'medicao_final_id' : 'medicao_inicial_id';
       await supabase
           .from('bombeios')
@@ -497,7 +526,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         }
         _atualizarCalculos();
       });
-
+        // swallow error silently to avoid noisy logs in production
       if (mounted) {
         await _showStyledDialog(
           title: 'Medição excluída',
@@ -1145,6 +1174,22 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   }) {
     final bool podeEditar = !_isReadOnly && _bombeioLocal?['qtd_faturada'] == null;
 
+    // Resolve referência do tanque para exibição (lógica simples e leve):
+    String tanqueDisplay = '-';
+    var ref = medicao['tanques']?['referencia'] ?? medicao['tanque_referencia'] ?? medicao['tanque'];
+    if (ref == null || ref.toString().trim().isEmpty) {
+      // tenta obter id/uuid do tanque e buscar na lista _tanques
+      var idVal = medicao['tanque_id'] ?? medicao['tanques']?['id'] ?? medicao['tanque'];
+      if (idVal != null && _tanques.isNotEmpty) {
+        final match = _tanques.firstWhere(
+          (t) => t['id']?.toString() == idVal.toString(),
+          orElse: () => <String, dynamic>{},
+        );
+        if (match.isNotEmpty) ref = match['referencia'];
+      }
+    }
+    tanqueDisplay = (ref?.toString() ?? '-');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
       decoration: BoxDecoration(
@@ -1189,6 +1234,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildColumnInfo('Cód.', medicao['num_controle'] ?? '-'),
+                _buildColumnInfo('Tanque', tanqueDisplay),
                 _buildColumnInfo('Data', _formatarDataIso(medicao['data'])),
                 _buildColumnInfo('Hora', _formatarHorario(medicao['horario'])),
                 _buildColumnInfo(
@@ -1702,7 +1748,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     ),
                   ),
                 const SizedBox(height: 8),
-                const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                const Divider(height: 1, color: Color(0xFFBDBDBD)),
                 const SizedBox(height: 16),
                 if (_medicaoInicialSalva == null)
                   ElevatedButton.icon(
@@ -1798,7 +1844,31 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     Colors.orange[900]!,
                     isFinal: true,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
+                  // Botão slim CACL — aparece somente quando há segunda medição
+                  ElevatedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.calculate, size: 18),
+                    label: const Text('CACL'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isReadOnly ? Colors.grey[300] : Colors.blue[50],
+                      foregroundColor: _isReadOnly ? Colors.grey[600] : const Color(0xFF0D47A1),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: _isReadOnly ? Colors.grey[400]! : const Color(0xFF0D47A1),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Divider(height: 1, color: Color(0xFFBDBDBD)),
+                  const SizedBox(height: 12),
                   const Text(
                     'Análise de Recebimento e Faturamento:',
                     style: TextStyle(
