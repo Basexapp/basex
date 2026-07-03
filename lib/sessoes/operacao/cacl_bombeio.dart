@@ -347,11 +347,16 @@ class CaclBombeioDialog extends StatelessWidget {
     final volume20Inicial = (medicoes['volume20Inicial'] ?? 0).toDouble();
     final volume20Final = (medicoes['volume20Final'] ?? 0).toDouble();
 
-    final entradaSaida20 = (dados['entrada_saida_20'] ?? 0).toDouble();
-    final sobraPerda = (dados['sobra_perda'] ?? 0).toDouble();
-    final estoqueFinalCalculado = (dados['estoque_final_calculado'] ?? 0).toDouble();
+    // Vol. apurado a 20ºC deve ser a diferença entre as medições a 20ºC
+    final volApurado20 = (volume20Final - volume20Inicial);
 
-    final faturado = (medicoes['faturadoFinal'] ?? 0).toDouble();
+    // O volume faturado vem do campo 'qtd_faturada' do bombeio (DialogInserirBombeio)
+    final faturado = (dados['qtd_faturada'] ?? medicoes['faturadoFinal'] ?? 0).toDouble();
+
+    // Sobra/Perda = Vol. apurado a 20ºC - Vol. faturado
+    final sobraPerda = (volApurado20 - faturado);
+
+    final estoqueFinalCalculado = (dados['estoque_final_calculado'] ?? 0).toDouble();
 
     return AlertDialog(
       backgroundColor: Colors.white,
@@ -749,7 +754,7 @@ class CaclBombeioDialog extends StatelessWidget {
                                 color: Colors.white,
                                 child: Center(
                                   child: Text(
-                                    _formatarVolumeLitros(entradaSaida20),
+                                    _formatarVolumeLitros(volApurado20),
                                     style: const TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.bold,

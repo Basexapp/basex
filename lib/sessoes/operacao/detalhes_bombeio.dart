@@ -5,6 +5,7 @@ import '../../login_page.dart';
 import '../../main.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'rateio_payload.dart';
+import 'cacl_bombeio.dart';
 
 class DetalhesBombeioPage extends StatefulWidget {
   final Map<String, dynamic> bombeio;
@@ -1299,7 +1300,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   SizedBox(
-                                    width: 200,
+                                    width: 180,
                                     height: 40,
                                     child: ElevatedButton(
                                       onPressed: () =>
@@ -1356,9 +1357,9 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 16),
+                                  const SizedBox(width: 12),
                                   SizedBox(
-                                    width: 200,
+                                    width: 180,
                                     height: 40,
                                     child: ElevatedButton(
                                       onPressed: () async {
@@ -1420,6 +1421,46 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           fontWeight: FontWeight.w700,
                                           letterSpacing: 0.8,
                                         ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: 150,
+                                    height: 40,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final id = _bombeio['id']?.toString();
+                                        if (id == null || id.isEmpty) return;
+                                        await CaclBombeioDialog.showById(context, id);
+                                      },
+                                      icon: const Icon(Icons.calculate, size: 18),
+                                      label: const Text('CACL'),
+                                      style: ButtonStyle(
+                                        backgroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              Colors.blue[50]!,
+                                            ),
+                                        foregroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              const Color(0xFF0D47A1),
+                                            ),
+                                        padding: WidgetStateProperty.all(
+                                          const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                        ),
+                                        shape: WidgetStateProperty.all(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(6),
+                                            side: const BorderSide(
+                                              color: Color(0xFF0D47A1),
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                        elevation: WidgetStateProperty.all(0),
                                       ),
                                     ),
                                   ),

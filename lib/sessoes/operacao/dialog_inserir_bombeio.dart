@@ -7,7 +7,6 @@ import '../../login_page.dart';
 import 'dialog_medicoes_gasol.dart';
 import 'dialog_medicoes_alcool.dart';
 import 'rateio_payload.dart';
-import 'cacl_bombeio.dart';
 
 class ThousandSeparatorInputFormatter extends TextInputFormatter {
   @override
@@ -1846,34 +1845,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     isFinal: true,
                   ),
                   const SizedBox(height: 12),
-                  // Botão slim CACL — aparece somente quando há segunda medição
-                  ElevatedButton.icon(
-                    onPressed: _isReadOnly
-                        ? null
-                        : () async {
-                            final id = _bombeioLocal?['id']?.toString();
-                            if (id == null || id.isEmpty) return;
-                            await CaclBombeioDialog.showById(context, id);
-                          },
-                    icon: const Icon(Icons.calculate, size: 18),
-                    label: const Text('CACL'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isReadOnly ? Colors.grey[300] : Colors.blue[50],
-                      foregroundColor: _isReadOnly ? Colors.grey[600] : const Color(0xFF0D47A1),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: _isReadOnly ? Colors.grey[400]! : const Color(0xFF0D47A1),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   const Divider(height: 1, color: Color(0xFFBDBDBD)),
                   const SizedBox(height: 12),
                   const Text(
