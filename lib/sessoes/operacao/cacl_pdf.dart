@@ -102,11 +102,18 @@ class CACLPdf {
                           ),
                         ),
                         pw.SizedBox(width: 8),
-                        // Base
+                        // Terminal (antes chamado 'Base')
                         pw.Expanded(
                           child: _infoLinhaPDFMuitoCompacta(
-                            'Base:',
-                            dadosFormulario['base']?.toString() ?? "POLO DE COMBUSTÍVEL",
+                            'Terminal:',
+                            // if terminal was passed as a Map, try to extract a name
+                            () {
+                              final t = dadosFormulario['terminal'];
+                              if (t is Map) {
+                                return (t['nome'] ?? t['referencia'] ?? t['nome_dois'])?.toString() ?? 'POLO DE COMBUSTÍVEL';
+                              }
+                              return dadosFormulario['terminal']?.toString() ?? 'POLO DE COMBUSTÍVEL';
+                            }(),
                           ),
                         ),
                         pw.SizedBox(width: 8),

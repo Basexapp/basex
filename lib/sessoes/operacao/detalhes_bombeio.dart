@@ -1272,28 +1272,71 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                 child: SizedBox(width: 200, height: 40),
                               )
                             else if (_rateioRealizado == true)
-                              Center(
-                                child: Container(
-                                  height: 40,
-                                  width: 200,
-                                  alignment: Alignment.center,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: const Color(0xFFFFB341),
-                                      width: 1.6,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    height: 40,
+                                    width: 200,
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: const Color(0xFFFFB341),
+                                        width: 1.6,
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Rateio realizado',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color.fromARGB(255, 65, 54, 49),
+                                      ),
                                     ),
                                   ),
-                                  child: const Text(
-                                    'Rateio realizado',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color.fromARGB(255, 65, 54, 49),
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: 150,
+                                    height: 40,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () async {
+                                        final id = _bombeio['id']?.toString();
+                                        if (id == null || id.isEmpty) return;
+                                        await CaclBombeioDialog.showById(context, id);
+                                      },
+                                      icon: const Icon(Icons.calculate, size: 18),
+                                      label: const Text('CACL'),
+                                      style: ButtonStyle(
+                                        backgroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              Colors.blue[50]!,
+                                            ),
+                                        foregroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              const Color(0xFF0D47A1),
+                                            ),
+                                        padding: WidgetStateProperty.all(
+                                          const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                        ),
+                                        shape: WidgetStateProperty.all(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(6),
+                                            side: const BorderSide(
+                                              color: Color(0xFF0D47A1),
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                        elevation: WidgetStateProperty.all(0),
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               )
                             else if (!_isReadOnly)
                               Row(
