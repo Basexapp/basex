@@ -126,31 +126,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   }
 
   bool get _podeSalvar {
+    // Permite salvar em qualquer situação, exceto quando o diálogo é somente leitura
+    // (usuário com empresaId). Mantemos a proteção contra múltiplos salvamentos
+    // verificando a flag `salvando`.
+    if (_isReadOnly) return false;
     if (salvando) return false;
-    if (!_validarBasico) return false;
-
-    // Se tem inicial mas não tem final -> Desabilita
-    if (_medicaoInicialSalva != null && _medicaoFinalSalva == null) {
-      return false;
-    }
-
-    // Se tem as duas
-    if (_medicaoInicialSalva != null && _medicaoFinalSalva != null) {
-      // Se já abriu com as duas
-      if (_initialBothMedicoesExist) {
-        if (_initialQtdFaturadaEmpty) {
-          // Abriu vazia -> habilita se preencher agora
-          return _qtdFaturadaCtrl.text.isNotEmpty;
-        } else {
-          // Abriu preenchida -> desabilita (não há o que salvar)
-          return false;
-        }
-      }
-      // Se acabou de lançar a segunda medição nesta sessão (ou abriu com faturada vazia e preencheu)
-      return true;
-    }
-
-    // Caso não tenha nenhuma medição ainda (está criando ou editando dados básicos)
     return true;
   }
 
@@ -689,6 +669,38 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       faturadoControllers.putIfAbsent(nome, () => TextEditingController());
     }
 
+    // Tentar ler do banco a coluna quantidades_faturadas mais atualizada
+    try {
+      final supabase = Supabase.instance.client;
+      final bombeioId = _bombeioLocal?['id']?.toString();
+      if (bombeioId != null && bombeioId.isNotEmpty) {
+        final resp = await supabase.from('bombeios').select('quantidades_faturadas').eq('id', bombeioId).maybeSingle();
+        final qf = resp != null ? resp['quantidades_faturadas'] : null;
+        if (qf != null) {
+          Map<String, dynamic> qmap = {};
+          if (qf is String) {
+            try {
+              final parsed = jsonDecode(qf);
+              if (parsed is Map) qmap = Map<String, dynamic>.from(parsed);
+            } catch (_) {}
+          } else if (qf is Map) {
+            qmap = Map<String, dynamic>.from(qf);
+          }
+          qmap.forEach((key, value) {
+            final keyStr = key.toString();
+            final idx = _distribuidoras.indexWhere((d) => (d['id']?.toString() == keyStr) || (d['nome']?.toString() == keyStr));
+            if (idx != -1) {
+              final nome = _distribuidoras[idx]['nome'] as String;
+              faturadoControllers.putIfAbsent(nome, () => TextEditingController());
+              faturadoControllers[nome]!.text = _fmt.format((value as num).toInt());
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Erro ao buscar quantidades_faturadas no banco: $e');
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -711,11 +723,30 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         final nome = d['nome']?.toString() ?? '';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: TextField(
-                            controller: faturadoControllers[nome],
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [ FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(7), ThousandSeparatorInputFormatter() ],
-                            decoration: InputDecoration(labelText: nome, border: const OutlineInputBorder(), isDense: true, floatingLabelBehavior: FloatingLabelBehavior.always),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: faturadoControllers[nome],
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [ FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(7), ThousandSeparatorInputFormatter() ],
+                                  decoration: InputDecoration(labelText: nome, border: const OutlineInputBorder(), isDense: true, floatingLabelBehavior: FloatingLabelBehavior.always),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 36,
+                                height: 36,
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  tooltip: 'Zerar',
+                                  onPressed: () {
+                                    faturadoControllers[nome]?.text = '';
+                                  },
+                                  icon: const Icon(Icons.delete_outline, size: 20),
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       }),

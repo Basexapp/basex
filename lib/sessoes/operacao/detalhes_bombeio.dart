@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
 import '../../main.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dialog_inserir_bombeio.dart';
 import 'rateio_payload.dart';
 import 'cacl_bombeio.dart';
 
@@ -1235,13 +1236,23 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     width: 150,
                                     height: 40,
                                     child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        // TODO: Implementar edição do bombeio
-                                        // Por enquanto, apenas exibe mensagem
-                                        _showMessageDialog(
-                                          'Funcionalidade em desenvolvimento',
-                                          title: 'Editar Bombeio',
-                                        );
+                                      onPressed: () async {
+                                        // Abre o diálogo de inserir/editar bombeio com dados preenchidos
+                                        try {
+                                          final result = await DialogInserirBombeio.show(
+                                            context,
+                                            bombeio: _bombeio,
+                                          );
+                                          // Se houve modificação (result não-nulo), atualiza estado local
+                                          if (result != null && mounted) {
+                                            setState(() {
+                                              _bombeio = Map<String, dynamic>.from(result);
+                                              _rateioRealizado = result['rateio'] == true;
+                                            });
+                                          }
+                                        } catch (e) {
+                                          await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
+                                        }
                                       },
                                       icon: const Icon(Icons.edit, size: 18),
                                       label: const Text('Editar bombeio'),
@@ -1449,13 +1460,22 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     width: 150,
                                     height: 40,
                                     child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        // TODO: Implementar edição do bombeio
-                                        // Por enquanto, apenas exibe mensagem
-                                        _showMessageDialog(
-                                          'Funcionalidade em desenvolvimento',
-                                          title: 'Editar Bombeio',
-                                        );
+                                      onPressed: () async {
+                                        // Abre o diálogo de inserir/editar bombeio com dados preenchidos
+                                        try {
+                                          final result = await DialogInserirBombeio.show(
+                                            context,
+                                            bombeio: _bombeio,
+                                          );
+                                          if (result != null && mounted) {
+                                            setState(() {
+                                              _bombeio = Map<String, dynamic>.from(result);
+                                              _rateioRealizado = result['rateio'] == true;
+                                            });
+                                          }
+                                        } catch (e) {
+                                          await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
+                                        }
                                       },
                                       icon: const Icon(Icons.edit, size: 18),
                                       label: const Text('Editar bombeio'),
