@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import '../../login_page.dart';
 import 'dialog_medicoes_gasol.dart';
@@ -68,6 +69,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   List<Map<String, dynamic>> _distribuidoras = [];
   Map<String, bool> selecionadas = {};
   Map<String, TextEditingController> controllers = {};
+  // Controllers para quantidades faturadas por distribuidora
+  Map<String, TextEditingController> faturadoControllers = {};
   final TextEditingController dataCtrl = TextEditingController();
   final TextEditingController horarioCtrl = TextEditingController();
   final TextEditingController _qtdFaturadaCtrl = TextEditingController();
@@ -370,12 +373,16 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
           for (var e in _distribuidoras)
             (e['nome'] as String): TextEditingController(),
         };
+        faturadoControllers = {
+          for (var e in _distribuidoras)
+            (e['nome'] as String): TextEditingController(),
+        };
       });
 
       // Se abriu com um bombeio existente, aplica volumes/participantes carregados
-      if (_bombeioLocal != null) {
-        final b = _bombeioLocal!;
-        final vsol = b['volumes_solicitados'];
+        if (_bombeioLocal != null) {
+          final b = _bombeioLocal!;
+          final vsol = b['volumes_solicitados'];
         if (vsol != null && vsol is Map) {
           vsol.forEach((key, value) {
             final String keyStr = key?.toString() ?? '';
@@ -407,6 +414,37 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               controllers[nome]!.text = _fmt.format((solicit as num).toInt());
             }
           }
+        }
+
+        // Se existe quantidades_faturadas salvas, aplica nos controllers de faturado
+        final qf = b['quantidades_faturadas'];
+        if (qf != null) {
+          try {
+            Map<String, dynamic> qmap = {};
+                if (qf is String) {
+                  try {
+                    final parsed = jsonDecode(qf);
+                    if (parsed is Map) {
+                      qmap = Map<String, dynamic>.from(parsed);
+                    }
+                  } catch (_) {
+                    // ignore malformed JSON
+                  }
+                } else if (qf is Map) {
+                  qmap = Map<String, dynamic>.from(qf);
+                }
+            qmap.forEach((key, value) {
+              final String keyStr = key.toString();
+              final int idx = _distribuidoras.indexWhere(
+                (d) => (d['id']?.toString() == keyStr) || (d['nome']?.toString() == keyStr),
+              );
+              if (idx != -1) {
+                final nome = _distribuidoras[idx]['nome'] as String;
+                faturadoControllers.putIfAbsent(nome, () => TextEditingController());
+                faturadoControllers[nome]!.text = _fmt.format((value as num).toInt());
+              }
+            });
+          } catch (_) {}
         }
 
         // Calcula o total inicial a partir do que foi carregado nos campos da UI
@@ -633,8 +671,122 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     _produtoCtrl.dispose();
     _qtdFaturadaCtrl.dispose();
     _dataFocusNode.dispose();
-    for (var c in controllers.values) c.dispose();
+    for (var c in controllers.values) {
+      c.dispose();
+    }
+    for (var c in faturadoControllers.values) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _abrirDialogFaturadoDistribuidoras() async {
+    // lista apenas as distribuidoras selecionadas
+    final participantes = _distribuidoras.where((d) => selecionadas[d['nome']] == true).toList();
+    // garante controllers para cada participante
+    for (var d in participantes) {
+      final nome = d['nome']?.toString() ?? '';
+      faturadoControllers.putIfAbsent(nome, () => TextEditingController());
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Quantidade faturada por distribuidora', style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      ...participantes.map((d) {
+                        final nome = d['nome']?.toString() ?? '';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: TextField(
+                            controller: faturadoControllers[nome],
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [ FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(7), ThousandSeparatorInputFormatter() ],
+                            decoration: InputDecoration(labelText: nome, border: const OutlineInputBorder(), isDense: true, floatingLabelBehavior: FloatingLabelBehavior.always),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('CANCELAR')),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () async {
+                          // soma valores e atualiza campo principal
+                          double total = 0;
+                          for (var d in participantes) {
+                            final nome = d['nome']?.toString() ?? '';
+                            final text = faturadoControllers[nome]?.text ?? '';
+                            final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+                            total += val;
+                          }
+                          setState(() {
+                            _qtdFaturadaCtrl.text = _fmt.format(total.toInt());
+                            _atualizarCalculos();
+                          });
+                          // Se já existe um bombeio salvo, persiste quantidades_faturadas imediatamente
+                          if (_bombeioLocal != null) {
+                            final Map<String, double> qm = {};
+                            for (var d in participantes) {
+                              final nome = d['nome']?.toString() ?? '';
+                              final text = faturadoControllers[nome]?.text ?? '';
+                              final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+                              if (val != 0) qm[nome] = val;
+                            }
+                            try {
+                              final supabase = Supabase.instance.client;
+                              await supabase
+                                  .from('bombeios')
+                                  .update({'quantidades_faturadas': qm.isNotEmpty ? qm : null})
+                                  .eq('id', _bombeioLocal!['id']);
+                              // Atualiza o objeto local com a nova propriedade
+                              setState(() {
+                                if (qm.isNotEmpty) {
+                                  _bombeioLocal!['quantidades_faturadas'] = qm;
+                                } else {
+                                  _bombeioLocal!.remove('quantidades_faturadas');
+                                }
+                              });
+                            } catch (e) {
+                              debugPrint('Erro ao salvar quantidades_faturadas: $e');
+                            }
+                          }
+                          Navigator.of(context).pop(true);
+                        },
+                        child: const Text('SALVAR'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result == true) {
+      // opcional: marcar que há faturamento preenchido
+    }
   }
 
   Future<void> _salvarBombeio({
@@ -707,6 +859,18 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         'volumes_solicitados': volumes,
         'total_bombeio': total,
         'qtd_faturada': qtdFaturadaFinal,
+        'quantidades_faturadas': ((){
+          final Map<String, double> qm = {};
+          for (var d in _distribuidoras) {
+            final nome = d['nome']?.toString() ?? '';
+            if (selecionadas[nome] == true) {
+              final text = faturadoControllers[nome]?.text ?? '';
+              final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+              if (val != 0) qm[nome] = val;
+            }
+          }
+          return qm.isNotEmpty ? qm : null;
+        })(),
       };
 
       if (_bombeioLocal != null) {
@@ -1898,27 +2062,37 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: TextField(
-                          controller: _qtdFaturadaCtrl,
-                          keyboardType: TextInputType.number,
-                          readOnly: _isReadOnly,
-                          onChanged: (_) =>
-                              setState(() => _atualizarCalculos()),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(7),
-                            ThousandSeparatorInputFormatter(),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _qtdFaturadaCtrl,
+                                readOnly: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'Faturado (L)',
+                                  border: OutlineInputBorder(),
+                                  isDense: true,
+                                  floatingLabelBehavior: FloatingLabelBehavior.always,
+                                ),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 38,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: _isReadOnly
+                                    ? null
+                                    : () => _abrirDialogFaturadoDistribuidoras(),
+                                icon: const Icon(Icons.edit, size: 20),
+                                tooltip: 'Editar faturado por distribuidora',
+                              ),
+                            ),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: 'Faturado (L)',
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                          ),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
                         ),
                       ),
                       const SizedBox(width: 8),

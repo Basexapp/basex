@@ -1230,6 +1230,49 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                       ),
                                     ),
                                   ),
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: 150,
+                                    height: 40,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        // TODO: Implementar edição do bombeio
+                                        // Por enquanto, apenas exibe mensagem
+                                        _showMessageDialog(
+                                          'Funcionalidade em desenvolvimento',
+                                          title: 'Editar Bombeio',
+                                        );
+                                      },
+                                      icon: const Icon(Icons.edit, size: 18),
+                                      label: const Text('Editar bombeio'),
+                                      style: ButtonStyle(
+                                        backgroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              Colors.orange[50]!,
+                                            ),
+                                        foregroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              const Color(0xFFE65100),
+                                            ),
+                                        padding: WidgetStateProperty.all(
+                                          const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                        ),
+                                        shape: WidgetStateProperty.all(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(6),
+                                            side: const BorderSide(
+                                              color: Color(0xFFE65100),
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                        elevation: WidgetStateProperty.all(0),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               )
                             else if (!_isReadOnly)
@@ -1393,6 +1436,49 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             borderRadius: BorderRadius.circular(6),
                                             side: const BorderSide(
                                               color: Color(0xFF0D47A1),
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                        ),
+                                        elevation: WidgetStateProperty.all(0),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  SizedBox(
+                                    width: 150,
+                                    height: 40,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        // TODO: Implementar edição do bombeio
+                                        // Por enquanto, apenas exibe mensagem
+                                        _showMessageDialog(
+                                          'Funcionalidade em desenvolvimento',
+                                          title: 'Editar Bombeio',
+                                        );
+                                      },
+                                      icon: const Icon(Icons.edit, size: 18),
+                                      label: const Text('Editar bombeio'),
+                                      style: ButtonStyle(
+                                        backgroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              Colors.orange[50]!,
+                                            ),
+                                        foregroundColor:
+                                            WidgetStateProperty.all<Color>(
+                                              const Color(0xFFE65100),
+                                            ),
+                                        padding: WidgetStateProperty.all(
+                                          const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                        ),
+                                        shape: WidgetStateProperty.all(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(6),
+                                            side: const BorderSide(
+                                              color: Color(0xFFE65100),
                                               width: 1.2,
                                             ),
                                           ),
