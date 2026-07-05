@@ -924,7 +924,14 @@ class CaclBombeioDialog extends StatelessWidget {
         ElevatedButton.icon(
           onPressed: () async {
             try {
-              final doc = await CACLPdf.gerar(dadosFormulario: dados);
+              // Normalizar campos que podem ser mapas para evitar imprimir o map inteiro
+              final dadosParaPdf = Map<String, dynamic>.from(dados);
+              // `tanque` no PDF deve ser a referência do tanque, não o objeto inteiro
+              dadosParaPdf['tanque'] = tanque ?? dadosParaPdf['tanque']?.toString();
+              // `produto` no PDF deve ser o nome do produto
+              dadosParaPdf['produto'] = produto ?? dadosParaPdf['produto']?.toString();
+
+              final doc = await CACLPdf.gerar(dadosFormulario: dadosParaPdf);
               final bytes = await doc.save();
               await Printing.sharePdf(bytes: bytes, filename: 'cacl_bombeio.pdf');
 

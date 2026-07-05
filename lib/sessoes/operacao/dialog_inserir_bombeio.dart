@@ -673,15 +673,18 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       for (var d in _distribuidoras) {
         final nome = d['nome']?.toString() ?? '';
         if (selecionadas[nome] == true) {
-          final val =
-              double.tryParse(
+          final val = double.tryParse(
                 (controllers[nome]?.text ?? '')
                     .replaceAll('.', '')
                     .replaceAll(',', '.'),
               ) ??
               0;
-          volumes[nome] = val;
-          total += val;
+          // Não incluir participantes com quantidade zero — zero significa
+          // que não participa do bombeio.
+          if (val != 0) {
+            volumes[nome] = val;
+            total += val;
+          }
         }
       }
 
