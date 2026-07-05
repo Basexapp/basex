@@ -62,160 +62,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
     }
   }
 
-  @override
-  void dispose() {
-    try {
-      routeObserver.unsubscribe(this);
-    } catch (_) {}
-    super.dispose();
-  }
-
-  @override
-  void didPopNext() {
-    // Voltou para esta página — recarrega informações do bombeio
-    _reloadBombeio();
-  }
-
-  Future<void> _reloadBombeio() async {
-    try {
-      final supabase = Supabase.instance.client;
-        final String? bombeioId =
-          _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
-        if (bombeioId?.isEmpty ?? true) return;
-
-      final resp = await supabase
-          .from('bombeios')
-          .select('''
-        id,
-        num_controle,
-        data,
-        horario,
-        medicao_inicial_id,
-        medicao_final_id,
-        volumes_solicitados,
-        total_bombeio,
-        tanque_id,
-        qtd_faturada,
-        tanques!bombeios_tanque_id_fkey (
-          referencia,
-          produto_id,
-          produtos (
-            nome
-          )
-        ),
-        medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
-          id,
-          num_controle,
-          data,
-          horario,
-          volume_ambiente,
-          volume_20
-        ),
-        medicao_final:medicoes!bombeios_medicao_final_id_fkey (
-          id,
-          num_controle,
-          data,
-          horario,
-          volume_ambiente,
-          volume_20
-        ),
-        rateio
-      ''')
-          .eq('id', bombeioId!)
-          .maybeSingle();
-
-      if (resp == null) return;
-
-      // Reconstrói mapa local similar ao que o parent monta
-      final tanquesArr =
-          resp['tanques!bombeios_tanque_id_fkey'] ?? resp['tanques'];
-      final tanques = tanquesArr is List
-          ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null)
-          : tanquesArr;
-      final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
-      final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
-
-      double totalSolicitado = 0;
-      List<Map<String, dynamic>> participantes = [];
-      final rawVols = resp['volumes_solicitados'];
-      if (rawVols != null) {
-        if (rawVols is Map) {
-          rawVols.forEach((key, value) {
-            double sol = double.tryParse(value.toString()) ?? 0;
-            totalSolicitado += sol;
-            participantes.add({
-              'nome': key?.toString() ?? '',
-              'solicitado': sol,
-            });
-          });
-        } else if (rawVols is List) {
-          for (var v in rawVols) {
-            if (v is Map) {
-              double sol =
-                  double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
-              participantes.add({'nome': v['nome'] ?? '', 'solicitado': sol});
-              totalSolicitado += sol;
-            }
-          }
-        }
-      }
-
-      final medFinalArr = resp['medicao_final'];
-      final medFinal = medFinalArr is List
-          ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null)
-          : medFinalArr;
-      final medIniArr = resp['medicao_inicial'];
-      final medIni = medIniArr is List
-          ? (medIniArr.isNotEmpty ? medIniArr[0] : null)
-          : medIniArr;
-
-      double volAmbIni =
-          double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
-      double vol20Ini =
-          double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
-      double volAmbFin =
-          double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
-      double vol20Fin =
-          double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
-
-      double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
-      double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
-
-      final novo = {
-        'id': resp['id'],
-        'tanque_id': resp['tanque_id'],
-        'data': DateTime.tryParse(resp['data'] ?? '') ?? DateTime.now(),
-        'produto': produto,
-        'tanque': tanqueNome,
-        'horario_inicial':
-            resp['horario']?.toString().substring(0, 5) ?? '--:--',
-        'horario_final':
-            medFinal?['horario']?.toString().substring(0, 5) ?? '--:--',
-        'numero_controle': resp['num_controle'] ?? 'S/N',
-        'volume_total':
-            double.tryParse(resp['total_bombeio']?.toString() ?? '0') ?? 0,
-        'volume_solicitado': totalSolicitado,
-        'participantes': participantes,
-        'recebido_amb': recebidoAmb,
-        'recebido_20': recebido20,
-        'qtd_faturada': resp['qtd_faturada'],
-        'medicao_inicial': medIni,
-        'medicao_final': medFinal,
-        'rateio': resp['rateio'],
-      };
-
-      if (mounted) {
-        setState(() {
-          _bombeio = novo;
-        });
-        // também atualiza flag de rateio
-        await _verificarRateioExistente();
-      }
-    } catch (e) {
-      debugPrint('Erro ao recarregar bombeio: $e');
-    }
-  }
-
   Future<void> _verificarRateioExistente() async {
     try {
       final supabase = Supabase.instance.client;
@@ -1112,6 +958,30 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                       ),
                                     ),
                                   ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      'FATURADO',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      'SOBRA/PERDA',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1253,6 +1123,30 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                               fontWeight: FontWeight.w900,
                                               color:
                                                   colors[index % colors.length],
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            '', // Placeholder for FATURADO
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF455A64),
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Text(
+                                            '', // Placeholder for SOBRA/PERDA
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF455A64),
                                             ),
                                           ),
                                         ),
