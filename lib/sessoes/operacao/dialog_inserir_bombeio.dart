@@ -162,8 +162,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       _medicaoFinalSalva = b['medicao_final'];
       _atualizarCalculos();
 
-      if (b['qtd_faturada'] != null) {
-        _qtdFaturadaCtrl.text = _fmt.format((b['qtd_faturada'] as num).toInt());
+      if (b['qtd_total_faturada'] != null) {
+        _qtdFaturadaCtrl.text = _fmt.format((b['qtd_total_faturada'] as num).toInt());
       }
 
       // Se ambas as medições existem, manter valores carregados e cálculos
@@ -220,7 +220,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         final double percentual = (dif / faturado) * 100;
 
         _difFaturadoCtrl.text =
-            '${_fmt.format(dif.toInt())} L | ${percentual.toStringAsFixed(2).replaceAll('.', ',')}%';
+          '${_fmt.format(dif.toInt())} L    |    ${percentual.toStringAsFixed(2).replaceAll('.', ',')}%';
         _difColor = dif < 0 ? Colors.red : const Color(0xFF0D47A1);
       } else {
         _difFaturadoCtrl.text = '';
@@ -941,7 +941,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         'medicao_final_id': _medicaoFinalSalva?['id'],
         'volumes_solicitados': volumes,
         'total_bombeio': total,
-        'qtd_faturada': qtdFaturadaFinal,
+        'qtd_total_faturada': qtdFaturadaFinal,
         'quantidades_faturadas': ((){
           final Map<String, double> qm = {};
           for (var d in _distribuidoras) {
@@ -1201,7 +1201,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         // indicando se devemos abrir a tela de detalhes (o chamador fará a navegação
         // usando o contexto correto).
         if (fecharDialog) {
-          final qtdFaturada = _bombeioLocal?['qtd_faturada'];
+          final qtdFaturada = _bombeioLocal?['qtd_total_faturada'];
           final bool temQtdFaturada =
               qtdFaturada != null &&
               qtdFaturada.toString().trim().isNotEmpty &&
@@ -1422,7 +1422,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     Color color, {
     bool isFinal = false,
   }) {
-    final bool podeEditar = !_isReadOnly && _bombeioLocal?['qtd_faturada'] == null;
+    final bool podeEditar = !_isReadOnly && _bombeioLocal?['qtd_total_faturada'] == null;
 
     // Resolve referência do tanque para exibição (lógica simples e leve):
     String tanqueDisplay = '-';
@@ -2108,10 +2108,13 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(
+                      SizedBox(
+                        width: 145,
                         child: TextField(
                           controller: _recebidaAmbCtrl,
                           readOnly: true,
+                          textAlign: TextAlign.center,
+                          textAlignVertical: TextAlignVertical.center,
                           decoration: const InputDecoration(
                             labelText: 'Rcb. (amb)',
                             border: OutlineInputBorder(),
@@ -2126,10 +2129,13 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Expanded(
+                      SizedBox(
+                        width: 145,
                         child: TextField(
                           controller: _recebida20Ctrl,
                           readOnly: true,
+                          textAlign: TextAlign.center,
+                          textAlignVertical: TextAlignVertical.center,
                           decoration: const InputDecoration(
                             labelText: 'Rcb. (20ºC)',
                             border: OutlineInputBorder(),
@@ -2144,13 +2150,16 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Expanded(
+                      SizedBox(
+                        width: 165,
                         child: Row(
                           children: [
                             Expanded(
                               child: TextField(
                                 controller: _qtdFaturadaCtrl,
                                 readOnly: true,
+                                textAlign: TextAlign.center,
+                                textAlignVertical: TextAlignVertical.center,
                                 decoration: const InputDecoration(
                                   labelText: 'Faturado (L)',
                                   border: OutlineInputBorder(),
@@ -2172,8 +2181,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                     minWidth: 20,
                                     minHeight: 20,
                                   ),
-                                  onPressed: () =>
-                                      _abrirDialogFaturadoDistribuidoras(),
+                                  onPressed: () => _abrirDialogFaturadoDistribuidoras(),
                                   icon: const Icon(Icons.edit, size: 16),
                                   tooltip: 'Editar faturado por distribuidora',
                                 ),
@@ -2183,9 +2191,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: TextField(
+                          child: TextField(
                           controller: _difFaturadoCtrl,
                           readOnly: true,
+                          textAlign: TextAlign.center,
+                          textAlignVertical: TextAlignVertical.center,
                           decoration: const InputDecoration(
                             labelText: 'Dif. fat/rcb (20º)',
                             border: OutlineInputBorder(),

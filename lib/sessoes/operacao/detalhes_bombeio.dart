@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../login_page.dart';
 import '../../main.dart';
@@ -27,6 +28,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
   final NumberFormat _fmt = NumberFormat.decimalPattern('pt_BR');
   bool? _rateioRealizado;
   late Map<String, dynamic> _bombeio;
+  bool _isLoadingBombeio = false;
+  String? _lastFetchId;
 
   UsuarioAtual? get user => UsuarioAtual.instance;
 
@@ -63,7 +66,13 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
   void initState() {
     super.initState();
     _bombeio = Map<String, dynamic>.from(widget.bombeio);
+    
     _verificarRateioExistente();
+    // ensure we load fresh data (and trigger post-fetch debug prints)
+    final id = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
+    if (id != null && id.isNotEmpty) {
+      _carregarBombeioPorId(id);
+    }
   }
 
   @override
@@ -73,6 +82,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
     if (route != null) {
       routeObserver.subscribe(this, route as ModalRoute<dynamic>);
     }
+  }
+
+  @override
+  void dispose() {
+    try {
+      routeObserver.unsubscribe(this);
+    } catch (_) {}
+    super.dispose();
   }
 
   Future<void> _verificarRateioExistente() async {
@@ -90,6 +107,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         if (mounted) setState(() => _rateioRealizado = exists);
         return;
       }
+      
 
       final String? tanqueId = _bombeio['tanque_id']?.toString();
       if (tanqueId?.isEmpty ?? true) {
@@ -127,6 +145,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
   Future<void> _carregarBombeioPorId(dynamic id) async {
     if (id == null) return;
+    // guard para evitar chamadas concorrentes/duplicadas
+    _lastFetchId ??= '';
+    if (_isLoadingBombeio == true && _lastFetchId == id.toString()) {
+      return;
+    }
+    _isLoadingBombeio = true;
+    _lastFetchId = id.toString();
+    
     try {
       final supabase = Supabase.instance.client;
       final resp = await supabase
@@ -142,7 +168,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         volumes_solicitados,
         total_bombeio,
         tanque_id,
-        qtd_faturada,
+        qtd_total_faturada,
+        quantidades_faturadas,
         tanques!bombeios_tanque_id_fkey (
           referencia,
           produto_id,
@@ -171,7 +198,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           .maybeSingle();
 
       if (resp == null) return;
+      
       final item = resp;
+      // immediate post-fetch debug: show raw quantidades_faturadas value
+      
       final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
       final tanques = tanquesArr is List
           ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null)
@@ -197,6 +227,37 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
               totalSolicitado += sol;
             }
           }
+        }
+      }
+      // parse quantidades_faturadas (jsonb) into Map<String,double>
+      Map<String, double> quantidadesFaturadasMap = {};
+      final rawFaturado = item['quantidades_faturadas'];
+      if (rawFaturado != null) {
+        try {
+          if (rawFaturado is Map) {
+            rawFaturado.forEach((k, v) {
+              final double val = double.tryParse(v?.toString() ?? '0') ?? 0;
+              if (val != 0) quantidadesFaturadasMap[k?.toString() ?? ''] = val;
+            });
+          } else if (rawFaturado is String) {
+            final parsed = jsonDecode(rawFaturado);
+            if (parsed is Map) {
+              parsed.forEach((k, v) {
+                final double val = double.tryParse(v?.toString() ?? '0') ?? 0;
+                if (val != 0) quantidadesFaturadasMap[k?.toString() ?? ''] = val;
+              });
+            }
+          } else if (rawFaturado is List) {
+            for (var v in rawFaturado) {
+              if (v is Map) {
+                final nome = v['nome']?.toString() ?? '';
+                final double val = double.tryParse(v['faturado']?.toString() ?? v['quantidade']?.toString() ?? '0') ?? 0;
+                if (val != 0) quantidadesFaturadasMap[nome] = val;
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Erro ao parsear quantidades_faturadas: $e');
         }
       }
 
@@ -240,9 +301,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
         'volume_solicitado': totalSolicitado,
         'participantes': participantes,
+        'quantidades_faturadas': quantidadesFaturadasMap,
         'recebido_amb': recebidoAmb,
         'recebido_20': recebido20,
-        'qtd_faturada': item['qtd_faturada'],
+        'qtd_total_faturada': item['qtd_total_faturada'],
         'medicao_inicial': medIni,
         'medicao_final': medFinal,
       };
@@ -252,9 +314,11 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         _bombeio = bombeioParaDetalhes;
       });
       await _verificarRateioExistente();
+      
     } catch (e) {
       debugPrint('Erro ao recarregar bombeio: $e');
     }
+    _isLoadingBombeio = false;
   }
 
   Future<void> _showMessageDialog(String message, {String? title}) async {
@@ -1245,27 +1309,85 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         ),
                                         Expanded(
                                           flex: 2,
-                                          child: Text(
-                                            '',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF455A64),
-                                            ),
-                                          ),
+                                          child: Builder(builder: (context) {
+                                            double faturadoVal = 0;
+                                            final qmap = _bombeio['quantidades_faturadas'];
+                                            final nomeKey = p['nome']?.toString() ?? '';
+                                            // lookup quantidades_faturadas for this participante
+                                            if (qmap is Map) {
+                                              // direct key
+                                              if (qmap.containsKey(nomeKey)) {
+                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                              } else {
+                                                // try exact string keys
+                                                for (var k in qmap.keys) {
+                                                    if (k.toString() == nomeKey) {
+                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    break;
+                                                  }
+                                                }
+                                                // try case-insensitive
+                                                if (faturadoVal == 0) {
+                                                  for (var k in qmap.keys) {
+                                                    if (k.toString().toLowerCase() == nomeKey.toLowerCase()) {
+                                                      faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                      break;
+                                                    }
+                                                  }
+                                                }
+                                                // try numeric keys (id) mapping
+                                                if (faturadoVal == 0) {
+                                                  for (var k in qmap.keys) {
+                                                    final ks = k.toString();
+                                                    if (ks.length == 36 && ks.contains('-')) {
+                                                      // possible uuid-like key found; value available in qmap[k]
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            
+                                            return Text(
+                                              faturadoVal > 0 ? '${_fmt.format(faturadoVal.toInt())} L' : '-',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF455A64),
+                                              ),
+                                            );
+                                          }),
                                         ),
                                         Expanded(
                                           flex: 2,
-                                          child: Text(
-                                            '',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF455A64),
-                                            ),
-                                          ),
+                                          child: Builder(builder: (context) {
+                                            double faturadoVal = 0;
+                                            final qmap = _bombeio['quantidades_faturadas'];
+                                            final nomeKey = p['nome']?.toString() ?? '';
+                                            if (qmap is Map) {
+                                              if (qmap.containsKey(nomeKey)) {
+                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                              } else {
+                                                for (var k in qmap.keys) {
+                                                  if (k.toString() == nomeKey) {
+                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    break;
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            final sobra = rec20Part - faturadoVal;
+                                            final sobraColor = sobra < 0 ? Colors.red : Colors.green[700];
+                                            return Text(
+                                              faturadoVal > 0 ? '${_fmt.format(sobra.toInt())} L' : '-',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: sobraColor,
+                                              ),
+                                            );
+                                          }),
                                         ),
                                       ],
                                     ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
 import '../../login_page.dart';
 import '../../main.dart';
 import 'dialog_inserir_bombeio.dart';
@@ -250,7 +251,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
         volumes_solicitados,
         total_bombeio,
         tanque_id,
-        qtd_faturada,
+        qtd_total_faturada,
         tanques!bombeios_tanque_id_fkey (
           referencia,
           produto_id,
@@ -325,7 +326,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
           status = 'Definindo quantidades';
         } else if (item['medicao_final_id'] == null) {
           status = 'Em andamento';
-        } else if (item['qtd_faturada'] == null) {
+        } else if (item['qtd_total_faturada'] == null) {
           status = 'Aguardando informações';
         } else {
           // Antes era 'Concluído' — agora distingue se houve rateio
@@ -403,7 +404,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
           'participantes': participantes,
           'recebido_amb': recebidoAmb,
           'recebido_20': recebido20,
-          'qtd_faturada': item['qtd_faturada'],
+          'qtd_total_faturada': item['qtd_total_faturada'],
           'medicao_inicial_id': item['medicao_inicial_id'],
           'medicao_final_id': item['medicao_final_id'],
           'medicao_inicial': medIni,
@@ -478,9 +479,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
   Future<void> _abrirDetalhesPorId(dynamic id) async {
     if (id == null) return;
     try {
-      final resp = await _supabase
-          .from('bombeios')
-          .select('''
+        final resp = await _supabase
+            .from('bombeios')
+            .select('''
         id,
         rateio,
         num_controle,
@@ -490,8 +491,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
         medicao_final_id,
         volumes_solicitados,
         total_bombeio,
+          quantidades_faturadas,
         tanque_id,
-        qtd_faturada,
+        qtd_total_faturada,
         tanques!bombeios_tanque_id_fkey (
           referencia,
           produto_id,
@@ -597,10 +599,36 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
         'participantes': participantes,
         'recebido_amb': recebidoAmb,
         'recebido_20': recebido20,
-        'qtd_faturada': item['qtd_faturada'],
+        'quantidades_faturadas': {},
+        'qtd_total_faturada': item['qtd_total_faturada'],
         'medicao_inicial': medIni,
         'medicao_final': medFinal,
       };
+
+      // parse quantidades_faturadas if present
+      try {
+        final rawFaturado = item['quantidades_faturadas'];
+        if (rawFaturado != null) {
+          Map<String, double> qmap = {};
+          if (rawFaturado is Map) {
+            rawFaturado.forEach((k, v) {
+              final double val = double.tryParse(v?.toString() ?? '0') ?? 0;
+              if (val != 0) qmap[k?.toString() ?? ''] = val;
+            });
+          } else if (rawFaturado is String) {
+            final parsed = jsonDecode(rawFaturado);
+            if (parsed is Map) {
+              parsed.forEach((k, v) {
+                final double val = double.tryParse(v?.toString() ?? '0') ?? 0;
+                if (val != 0) qmap[k?.toString() ?? ''] = val;
+              });
+            }
+          }
+          bombeioParaDetalhes['quantidades_faturadas'] = qmap;
+        }
+      } catch (e) {
+        debugPrint('Erro ao parsear quantidades_faturadas (prefetch): $e');
+      }
 
       if (!mounted) return;
       setState(() {
@@ -672,7 +700,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
   }
 
   bool _podeAbrirDetalhes(Map<String, dynamic> item) {
-    final qtdFaturada = item['qtd_faturada'];
+    final qtdFaturada = item['qtd_total_faturada'];
     final bool temQtdFaturada =
         qtdFaturada != null &&
         qtdFaturada.toString().trim().isNotEmpty &&
@@ -905,10 +933,8 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
               return InkWell(
                 onTap: () async {
                   if (_podeAbrirDetalhes(item)) {
-                    setState(() {
-                      _bombeioSelecionado = item;
-                      _mostrarRateio = true;
-                    });
+                              // prefetch full bombeio (incluindo quantidades_faturadas) before showing detalhes
+                              await _abrirDetalhesPorId(item['id']);
                   } else {
                     final result = await DialogInserirBombeio.show(
                       context,
