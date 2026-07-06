@@ -327,7 +327,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
         } else if (item['medicao_final_id'] == null) {
           status = 'Em andamento';
         } else if (item['qtd_total_faturada'] == null) {
-          status = 'Aguardando informações';
+          status = 'Concluído, aguardando informações';
         } else {
           // Antes era 'Concluído' — agora distingue se houve rateio
           // Considera rateio realizado apenas se o valor for estritamente boolean true
@@ -694,7 +694,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
     if (status == 'Finalizado com rateio') return Colors.green;
     if (status == 'Aguardando rateio') return Colors.orange;
     if (status == 'Em andamento') return Colors.orange;
-    if (status == 'Aguardando informações') return Colors.purple;
+    if (status == 'Concluído, aguardando informações') return Colors.purple;
     if (status == 'Definindo quantidades') return Colors.blue;
     return Colors.grey;
   }
@@ -1365,7 +1365,7 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
                       ...const [
                         'Definindo quantidades',
                         'Em andamento',
-                        'Aguardando informações',
+                        'Concluído, aguardando informações',
                         'Aguardando rateio',
                         'Finalizado com rateio',
                       ].map(

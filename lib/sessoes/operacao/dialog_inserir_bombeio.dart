@@ -868,7 +868,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     );
 
     if (result == true) {
-      // opcional: marcar que há faturamento preenchido
+      // opcional: marcar que há faturamento preenchido.
     }
   }
 
@@ -991,36 +991,54 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               : (DateTime.tryParse(_bombeioLocal?['data']?.toString() ?? '')?.toIso8601String() ?? DateTime.now().toIso8601String());
 
           final List<Map<String, dynamic>> inserts = [];
+          // Resolve company ids in batch to avoid many round-trips.
+          final List<String> keys = volumes.keys.map((k) => k.toString()).toList();
+          final Map<String, String?> resolved = {};
+
+          // First, treat values that look like UUIDs as already-resolved IDs
+          for (var k in keys) {
+            if (k.length == 36 && k.contains('-')) {
+              resolved[k] = k;
+            }
+          }
+
+          // For the remaining keys, query empresas in a single request (matching nome, nome_dois, nome_abrev)
+          final List<String> toLookup = keys.where((k) => !(resolved.containsKey(k) && resolved[k] != null)).toList();
+          if (toLookup.isNotEmpty) {
+            try {
+              // Build OR query parts for each field
+              final List<String> orParts = [];
+              for (var v in toLookup) {
+                final escaped = v.replaceAll("'", "\\'");
+                orParts.add("nome.eq.$escaped");
+                orParts.add("nome_dois.eq.$escaped");
+                orParts.add("nome_abrev.eq.$escaped");
+              }
+              final String orQuery = orParts.join(',');
+              final List<dynamic> empresasResp = await supabase
+                  .from('empresas')
+                  .select('id, nome, nome_dois, nome_abrev')
+                  .or(orQuery);
+
+              for (var emp in empresasResp) {
+                final id = emp['id']?.toString();
+                final nome = (emp['nome'] ?? '')?.toString();
+                final nome2 = (emp['nome_dois'] ?? '')?.toString();
+                final abrev = (emp['nome_abrev'] ?? '')?.toString();
+                if (nome != null && nome.isNotEmpty) resolved[nome] = id;
+                if (nome2 != null && nome2.isNotEmpty) resolved[nome2] = id;
+                if (abrev != null && abrev.isNotEmpty) resolved[abrev] = id;
+              }
+            } catch (e) {
+              debugPrint('Erro ao resolver empresas em lote: $e');
+            }
+          }
+
+          // Build rows for upsert/insert
           for (var e in volumes.entries) {
             final nomeRaw = e.key.toString();
             final solicit = (e.value as double?) ?? 0.0;
-
-            String? empresaIdResolved;
-            final looksLikeUuid = nomeRaw.length == 36 && nomeRaw.contains('-');
-            if (looksLikeUuid) {
-              empresaIdResolved = nomeRaw;
-            } else if (nomeRaw.isNotEmpty) {
-              try {
-                var emp = await supabase
-                    .from('empresas')
-                    .select('id')
-                    .eq('nome', nomeRaw)
-                    .maybeSingle();
-                emp ??= await supabase
-                    .from('empresas')
-                    .select('id')
-                    .eq('nome_dois', nomeRaw)
-                    .maybeSingle();
-                emp ??= await supabase
-                    .from('empresas')
-                    .select('id')
-                    .eq('nome_abrev', nomeRaw)
-                    .maybeSingle();
-                empresaIdResolved = emp?['id']?.toString();
-              } catch (_) {
-                empresaIdResolved = null;
-              }
-            }
+            final empresaIdResolved = resolved.containsKey(nomeRaw) ? resolved[nomeRaw] : null;
 
             final row = buildRateioMovimentacaoRow(
               tanqueId: tanqueId,
@@ -1033,50 +1051,72 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               terminalId: terminalId,
             );
 
-            // Tenta atualizar registro existente por bombeio_id + empresa_id
-            bool updated = false;
-            try {
-              final bombeioId = _bombeioLocal?['id']?.toString();
-              if (bombeioId != null && bombeioId.isNotEmpty) {
-                if (empresaIdResolved != null && empresaIdResolved.isNotEmpty) {
-                  final resp = await supabase
-                      .from('movimentacoes_tanque')
-                      .update(row)
-                      .eq('bombeio_id', bombeioId)
-                      .eq('empresa_id', empresaIdResolved)
-                      .select();
-                  if (resp.isNotEmpty) {
-                    updated = true;
-                  }
-                } else {
-                  // empresa_id não resolvida: tenta achar registro existente com bombeio_id e empresa_id NULL
-                    final found = await supabase
-                      .from('movimentacoes_tanque')
-                      .select('id')
-                      .eq('bombeio_id', bombeioId)
-                      .filter('empresa_id', 'is', 'null')
-                      .limit(1);
-                  if (found.isNotEmpty) {
-                    final id = found[0]['id'];
-                    await supabase
-                        .from('movimentacoes_tanque')
-                        .update(row)
-                        .eq('id', id);
-                    updated = true;
-                  }
-                }
-              }
-            } catch (_) {
-              updated = false;
-            }
-
-            if (!updated) {
-              inserts.add(row);
-            }
+            inserts.add(row);
           }
 
-          if (inserts.isNotEmpty) {
-            await supabase.from('movimentacoes_tanque').insert(inserts);
+          // Perform a single upsert (update existing by bombaio_id+empresa_id or insert new)
+          try {
+            if (inserts.isNotEmpty) {
+              // First, fetch existing movimentacoes_tanque for this bombeio
+              final String bombeioIdStr = _bombeioLocal?['id']?.toString() ?? '';
+              List<dynamic> existing = [];
+              try {
+                existing = await supabase
+                    .from('movimentacoes_tanque')
+                    .select('id,empresa_id')
+                    .eq('bombeio_id', bombeioIdStr);
+              } catch (e) {
+                debugPrint('Erro ao buscar movimentacoes existentes: $e');
+              }
+
+              // Build lookup by empresa_id (when present) or empresa_nome
+              final Map<String, Map<String, dynamic>> existingMap = {};
+              for (var ex in existing) {
+                final key = (ex['empresa_id'] != null && ex['empresa_id'].toString().isNotEmpty)
+                    ? ex['empresa_id'].toString()
+                    : '';
+                existingMap[key] = Map<String, dynamic>.from(ex);
+              }
+
+              // Separate rows to update vs rows to insert
+              final List<Map<String, dynamic>> toInsert = [];
+              final List<Future> updateFutures = [];
+
+              for (var row in inserts) {
+                final String key = (row['empresa_id'] != null && row['empresa_id'].toString().isNotEmpty)
+                    ? row['empresa_id'].toString()
+                    : (row['empresa_nome']?.toString() ?? '');
+
+                if (existingMap.containsKey(key)) {
+                  final existingId = existingMap[key]!['id'];
+                  // Update existing row by id
+                  updateFutures.add(
+                    supabase.from('movimentacoes_tanque').update(row).eq('id', existingId),
+                  );
+                } else {
+                  toInsert.add(row);
+                }
+              }
+
+              // Run updates in parallel, then insert new ones
+              if (updateFutures.isNotEmpty) {
+                try {
+                  await Future.wait(updateFutures);
+                } catch (e) {
+                  debugPrint('Erro ao atualizar movimentacoes_tanque: $e');
+                }
+              }
+
+              if (toInsert.isNotEmpty) {
+                try {
+                  await supabase.from('movimentacoes_tanque').insert(toInsert);
+                } catch (e) {
+                  debugPrint('Erro ao inserir movimentacoes_tanque: $e');
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint('Erro geral ao inserir movimentacoes_tanque: $e');
           }
         }
       } catch (e) {

@@ -535,6 +535,17 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
     );
 
     if (confirmado == true) {
+      // Mostrar diálogo de carregamento enquanto processa o rateio automático
+      if (mounted) {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Dialog(
+            backgroundColor: Colors.transparent,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
       try {
         final supabase = Supabase.instance.client;
 
@@ -671,39 +682,59 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             }
           }
 
-          if (updatedCount > 0) {
-            if (bombeioId?.isNotEmpty == true) {
-              try {
-                await supabase
-                    .from('bombeios')
-                    .update({'rateio': true})
-                    .eq('id', bombeioId!);
-              } catch (e) {
-                debugPrint('Erro ao marcar bombeio.rateio: $e');
+            if (updatedCount > 0) {
+              if (bombeioId?.isNotEmpty == true) {
+                try {
+                  await supabase
+                      .from('bombeios')
+                      .update({'rateio': true})
+                      .eq('id', bombeioId!);
+                } catch (e) {
+                  debugPrint('Erro ao marcar bombeio.rateio: $e');
+                }
               }
-            }
 
+              // Fechar spinner antes de mostrar o diálogo de sucesso
+              try {
+                if (mounted) Navigator.of(context, rootNavigator: true).pop();
+              } catch (_) {}
+
+              if (mounted) {
+                setState(() => _rateioRealizado = true);
+                await _showMessageDialog('Rateio automático realizado');
+              }
+            } else {
             if (mounted) {
-              setState(() => _rateioRealizado = true);
-              await _showMessageDialog('Rateio automático realizado');
-            }
-          } else {
-            if (mounted) {
+              // Fechar spinner antes de mostrar aviso
+              try {
+                if (mounted) Navigator.of(context, rootNavigator: true).pop();
+              } catch (_) {}
+
               await _showMessageDialog(
                 'Nenhum participante para atualizar',
                 title: 'Aviso',
               );
             }
           }
-        } else {
-          if (mounted) {
-            await _showMessageDialog(
-              'Nenhum participante para inserir',
-              title: 'Aviso',
-            );
+          } else {
+            if (mounted) {
+              // Fechar spinner antes de mostrar aviso
+              try {
+                if (mounted) Navigator.of(context, rootNavigator: true).pop();
+              } catch (_) {}
+
+              await _showMessageDialog(
+                'Nenhum participante para inserir',
+                title: 'Aviso',
+              );
+            }
           }
-        }
       } catch (e) {
+        // Fechar spinner em caso de erro
+        try {
+          if (mounted) Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {}
+
         if (mounted) {
           await _showMessageDialog('Erro ao inserir rateio: $e', title: 'Erro');
         }
