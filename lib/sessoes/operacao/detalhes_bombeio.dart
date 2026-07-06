@@ -32,6 +32,19 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
   bool get _isReadOnly => user?.empresaId?.isNotEmpty ?? false;
 
+  // Helper seguro para extrair double de um mapa
+  double _getDoubleSafe(Map<String, dynamic> map, String key, {double defaultValue = 0.0}) {
+    final value = map[key];
+    if (value == null) return defaultValue;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      return double.tryParse(value.replaceAll(',', '.')) ?? defaultValue;
+    }
+    return defaultValue;
+  }
+
   String _formatarData(DateTime? data) => data == null
       ? '-'
       : "${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}";
@@ -49,7 +62,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
   @override
   void initState() {
     super.initState();
-    // mantém uma cópia local que podemos atualizar ao retornar para a rota
     _bombeio = Map<String, dynamic>.from(widget.bombeio);
     _verificarRateioExistente();
   }
@@ -66,8 +78,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
   Future<void> _verificarRateioExistente() async {
     try {
       final supabase = Supabase.instance.client;
-      // Preferência: verificar pelo próprio bombeio — se existir campo `rateio` não-nulo,
-      // considera-se rateio realizado.
       final String? bombeioId =
           _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
       if (bombeioId?.isNotEmpty == true) {
@@ -76,20 +86,17 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             .select('rateio')
             .eq('id', bombeioId!)
             .maybeSingle();
-        // Considera rateio realizado apenas se o valor for estritamente boolean true
         final exists = bom?['rateio'] == true;
         if (mounted) setState(() => _rateioRealizado = exists);
         return;
       }
 
-      // Fallback (compatibilidade): caso não haja id do bombeio, verifica por tanque+data
       final String? tanqueId = _bombeio['tanque_id']?.toString();
       if (tanqueId?.isEmpty ?? true) {
         if (mounted) setState(() => _rateioRealizado = false);
         return;
       }
 
-      // determina intervalo do dia da data do bombeio
       final dynamic rawData = _bombeio['data'];
       DateTime dia;
       if (rawData is DateTime) {
@@ -114,8 +121,139 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       final exists = resp.isNotEmpty;
       if (mounted) setState(() => _rateioRealizado = exists);
     } catch (e) {
-      // falhar silent; não bloquear interface
       debugPrint('Erro ao verificar rateio existente: $e');
+    }
+  }
+
+  Future<void> _carregarBombeioPorId(dynamic id) async {
+    if (id == null) return;
+    try {
+      final supabase = Supabase.instance.client;
+      final resp = await supabase
+          .from('bombeios')
+          .select('''
+        id,
+        rateio,
+        num_controle,
+        data,
+        horario,
+        medicao_inicial_id,
+        medicao_final_id,
+        volumes_solicitados,
+        total_bombeio,
+        tanque_id,
+        qtd_faturada,
+        tanques!bombeios_tanque_id_fkey (
+          referencia,
+          produto_id,
+          produtos (
+            nome
+          )
+        ),
+        medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
+        ),
+        medicao_final:medicoes!bombeios_medicao_final_id_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
+        )
+      ''')
+          .eq('id', id)
+          .maybeSingle();
+
+      if (resp == null) return;
+      final item = resp;
+      final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
+      final tanques = tanquesArr is List
+          ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null)
+          : tanquesArr;
+      final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
+      final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
+
+      double totalSolicitado = 0;
+      List<Map<String, dynamic>> participantes = [];
+      final rawVols = item['volumes_solicitados'];
+      if (rawVols != null) {
+        if (rawVols is Map) {
+          rawVols.forEach((key, value) {
+            double sol = double.tryParse(value.toString()) ?? 0;
+            totalSolicitado += sol;
+            participantes.add({'nome': key?.toString() ?? '', 'solicitado': sol});
+          });
+        } else if (rawVols is List) {
+          for (var v in rawVols) {
+            if (v is Map) {
+              double sol = double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
+              participantes.add({'nome': v['nome'] ?? '', 'solicitado': sol});
+              totalSolicitado += sol;
+            }
+          }
+        }
+      }
+
+      final medFinalArr = item['medicao_final'];
+      final medFinal = medFinalArr is List
+          ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null)
+          : medFinalArr;
+      final hFinal = medFinal?['horario']?.toString().substring(0, 5) ?? '--:--';
+
+      final medIniArr = item['medicao_inicial'];
+      final medIni = medIniArr is List
+          ? (medIniArr.isNotEmpty ? medIniArr[0] : null)
+          : medIniArr;
+
+      double volAmbIni =
+          double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Ini =
+          double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbFin =
+          double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Fin =
+          double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
+
+      double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
+      double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
+
+      final Map<String, dynamic> bombeioParaDetalhes = {
+        'id': item['id'],
+        'bombeio_id': item['id'],
+        'rateio': item['rateio'],
+        'tanque_id': item['tanque_id'],
+        'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
+        'produto': produto,
+        'tanque': tanqueNome,
+        'horario_inicial':
+            item['horario']?.toString().substring(0, 5) ?? '--:--',
+        'horario_final': hFinal,
+        'numero_controle': item['num_controle'] ?? 'S/N',
+        'status': '',
+        'volume_total':
+            double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
+        'volume_solicitado': totalSolicitado,
+        'participantes': participantes,
+        'recebido_amb': recebidoAmb,
+        'recebido_20': recebido20,
+        'qtd_faturada': item['qtd_faturada'],
+        'medicao_inicial': medIni,
+        'medicao_final': medFinal,
+      };
+
+      if (!mounted) return;
+      setState(() {
+        _bombeio = bombeioParaDetalhes;
+      });
+      await _verificarRateioExistente();
+    } catch (e) {
+      debugPrint('Erro ao recarregar bombeio: $e');
     }
   }
 
@@ -333,7 +471,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
     );
 
     if (confirmado == true) {
-      // Executa inserts na tabela movimentacoes_tanque para cada participante
       try {
         final supabase = Supabase.instance.client;
 
@@ -342,7 +479,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           throw Exception('tanque_id ausente no bombeio');
         }
 
-        // Obter produto_id: pode estar presente em widget.bombeio['produto_id']
         String? produtoId = _bombeio['produto_id']?.toString();
         if (produtoId?.isEmpty ?? true) {
           final tanq = await supabase
@@ -358,10 +494,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             : (_bombeio['data']?.toString() ??
                   DateTime.now().toIso8601String());
 
-        final recebidoAmb =
-            double.tryParse(_bombeio['recebido_amb']?.toString() ?? '0') ?? 0;
-        final recebido20 =
-            double.tryParse(_bombeio['recebido_20']?.toString() ?? '0') ?? 0;
+        final recebidoAmb = _getDoubleSafe(_bombeio, 'recebido_amb');
+        final recebido20 = _getDoubleSafe(_bombeio, 'recebido_20');
 
         final participantes = (_bombeio['participantes'] is List)
             ? List<Map<String, dynamic>>.from(_bombeio['participantes'])
@@ -369,8 +503,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
         double totalSolicitado = 0;
         for (var p in participantes) {
-          totalSolicitado +=
-              double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
+          totalSolicitado += _getDoubleSafe(p, 'solicitado');
         }
 
         final usuario = UsuarioAtual.instance;
@@ -381,21 +514,17 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         final List<Map<String, dynamic>> inserts = [];
 
         for (var p in participantes) {
-          final solicit =
-              double.tryParse(p['solicitado']?.toString() ?? '0') ?? 0;
+          final solicit = _getDoubleSafe(p, 'solicitado');
           final peso = totalSolicitado > 0 ? (solicit / totalSolicitado) : 0;
           final entradaAmb = (recebidoAmb * peso).round();
           final entradaVinte = (recebido20 * peso).round();
 
-          // Resolve empresa_id: se nome parecer UUID, usa direto; senão busca por nome
           String? empresaId;
           final nomeRaw = p['nome']?.toString() ?? '';
-          // Simpler UUID check: verifica comprimento 36 e hífens
           final looksLikeUuid = nomeRaw.length == 36 && nomeRaw.contains('-');
           if (looksLikeUuid) {
             empresaId = nomeRaw;
           } else if (nomeRaw.isNotEmpty) {
-            // tenta achar pela coluna nome, nome_dois ou nome_abrev
             var emp = await supabase
                 .from('empresas')
                 .select('id')
@@ -429,7 +558,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         }
 
         if (inserts.isNotEmpty) {
-          // Atualiza apenas a coluna `entrada_vinte` das movimentações já existentes
           int updatedCount = 0;
           for (var row in inserts) {
             try {
@@ -450,7 +578,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                     updatedCount += resp.length;
                   }
                 } else {
-                  // empresa_id não informado: procura movimentação com bombeio_id e empresa_id IS NULL
                   final found = await supabase
                       .from('movimentacoes_tanque')
                       .select('id')
@@ -480,8 +607,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             }
           }
 
-            if (updatedCount > 0) {
-            // Marca o bombeio como rateado se tivermos o id do bombeio
+          if (updatedCount > 0) {
             if (bombeioId?.isNotEmpty == true) {
               try {
                 await supabase
@@ -567,7 +693,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       ),
       child: Row(
         children: [
-          // Título reduzido e ícone
           SizedBox(
             width: 55,
             child: Column(
@@ -591,7 +716,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           const SizedBox(width: 8),
           Container(height: 24, width: 1, color: color.withOpacity(0.2)),
           const SizedBox(width: 12),
-          // Informações na mesma linha
           Expanded(
             child: Row(
               children: [
@@ -666,16 +790,17 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
   @override
   Widget build(BuildContext context) {
-    final double totalSolicitado = _bombeio['volume_solicitado'];
-    final double recebidoAmb = (_bombeio['recebido_amb'] ?? 0).toDouble();
-    final double recebido20 = (_bombeio['recebido_20'] ?? 0).toDouble();
+    // Extração segura dos valores
+    final double totalSolicitado = _getDoubleSafe(_bombeio, 'volume_solicitado');
+    final double recebidoAmb = _getDoubleSafe(_bombeio, 'recebido_amb');
+    final double recebido20 = _getDoubleSafe(_bombeio, 'recebido_20');
+    
     final List<Map<String, dynamic>> participantes =
-        List<Map<String, dynamic>>.from(_bombeio['participantes']);
+        List<Map<String, dynamic>>.from(_bombeio['participantes'] ?? []);
 
-    // Ordenando da que mais participou para a que menos participou (pelo volume solicitado)
     participantes.sort(
       (a, b) =>
-          (b['solicitado'] as double).compareTo(a['solicitado'] as double),
+          (_getDoubleSafe(b, 'solicitado')).compareTo(_getDoubleSafe(a, 'solicitado')),
     );
 
     return Scaffold(
@@ -708,12 +833,12 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildHeaderMicroItem('CONTROLE', _bombeio['numero_controle']),
-                _buildHeaderMicroItem('PRODUTO', _bombeio['produto']),
+                _buildHeaderMicroItem('CONTROLE', _bombeio['numero_controle']?.toString() ?? '-'),
+                _buildHeaderMicroItem('PRODUTO', _bombeio['produto']?.toString() ?? '-'),
                 _buildHeaderMicroItem('DATA', _formatarData(_bombeio['data'])),
                 _buildHeaderMicroItem(
                   'HORÁRIO',
-                  '${_bombeio['horario_inicial']} - ${_bombeio['horario_final']}',
+                  '${_bombeio['horario_inicial'] ?? '-'} - ${_bombeio['horario_final'] ?? '-'}',
                 ),
               ],
             ),
@@ -726,7 +851,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- MEDIÇÕES ---
                   const Text(
                     'Medições',
                     style: TextStyle(
@@ -753,7 +877,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                     ),
                   const SizedBox(height: 80),
 
-                  // --- SEÇÃO INFERIOR: DISTRIBUIÇÃO E RATEIO LADO A LADO ---
                   const Center(
                     child: Text(
                       'DISTRIBUIÇÃO E RATEIO',
@@ -770,7 +893,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // LADO ESQUERDO: RESUMO E GRÁFICO
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -848,20 +970,17 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                       (i) {
                                         final p = participantes[i];
                                         final colors = [
-                                          const Color(
-                                            0xFF0D47A1,
-                                          ), // Azul Escuro
-                                          const Color(0xFFD32F2F), // Vermelho
-                                          const Color(0xFF388E3C), // Verde
-                                          const Color(
-                                            0xFFFBC02D,
-                                          ), // Amarelo/Dourado
+                                          const Color(0xFF0D47A1),
+                                          const Color(0xFFD32F2F),
+                                          const Color(0xFF388E3C),
+                                          const Color(0xFFFBC02D),
                                         ];
+                                        final solicitado = _getDoubleSafe(p, 'solicitado');
                                         return PieChartSectionData(
                                           color: colors[i % colors.length],
-                                          value: p['solicitado'],
+                                          value: solicitado,
                                           title:
-                                              '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((p['solicitado'] / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
+                                              '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((solicitado / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
                                           radius: 50,
                                           titleStyle: const TextStyle(
                                             fontSize: 10,
@@ -888,12 +1007,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
                       const SizedBox(width: 40),
 
-                      // LADO DIREITO: TABELA DE RATEIO
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Tabela de distribuição fixa
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Row(
@@ -990,13 +1107,12 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                             ...participantes.asMap().entries.map((entry) {
                               final index = entry.key;
                               final p = entry.value;
+                              final solicitado = _getDoubleSafe(p, 'solicitado');
                               double peso = totalSolicitado > 0
-                                  ? (p['solicitado'] / totalSolicitado)
+                                  ? (solicitado / totalSolicitado)
                                   : 0;
                               double recAmbPart = recebidoAmb * peso;
                               double rec20Part = recebido20 * peso;
-                              double percent =
-                                  peso; // O percentual do rateio é baseado no solicitado
 
                               final colors = [
                                 const Color(0xFF0D47A1),
@@ -1057,7 +1173,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                                             2,
                                                           ),
                                                       child: LinearProgressIndicator(
-                                                        value: percent,
+                                                        value: peso,
                                                         backgroundColor:
                                                             Colors.grey[100],
                                                         valueColor:
@@ -1080,7 +1196,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         Expanded(
                                           flex: 1,
                                           child: Text(
-                                            '${(percent * 100).toStringAsFixed(1)}%',
+                                            '${(peso * 100).toStringAsFixed(1)}%',
                                             textAlign: TextAlign.center,
                                             style: const TextStyle(
                                               fontSize: 13,
@@ -1092,7 +1208,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         Expanded(
                                           flex: 2,
                                           child: Text(
-                                            '${_fmt.format(p['solicitado'].toInt())} L',
+                                            '${_fmt.format(solicitado.toInt())} L',
                                             textAlign: TextAlign.center,
                                             style: const TextStyle(
                                               fontSize: 13,
@@ -1130,7 +1246,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         Expanded(
                                           flex: 2,
                                           child: Text(
-                                            '', // Placeholder for FATURADO
+                                            '',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
                                               fontSize: 13,
@@ -1142,7 +1258,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         Expanded(
                                           flex: 2,
                                           child: Text(
-                                            '', // Placeholder for SOBRA/PERDA
+                                            '',
                                             textAlign: TextAlign.center,
                                             style: TextStyle(
                                               fontSize: 13,
@@ -1159,9 +1275,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                               );
                             }),
 
-                            // Botões de rateio adicionados abaixo da tabela
                             const SizedBox(height: 24),
-                            // Enquanto não sabemos se o rateio foi realizado, não renderiza nenhum botão
                             if (_rateioRealizado == null)
                               const Center(
                                 child: SizedBox(width: 200, height: 40),
@@ -1237,18 +1351,21 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     height: 40,
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
-                                        // Abre o diálogo de inserir/editar bombeio com dados preenchidos
                                         try {
                                           final result = await DialogInserirBombeio.show(
                                             context,
                                             bombeio: _bombeio,
                                           );
-                                          // Se houve modificação (result não-nulo), atualiza estado local
-                                          if (result != null && mounted) {
-                                            setState(() {
-                                              _bombeio = Map<String, dynamic>.from(result);
-                                              _rateioRealizado = result['rateio'] == true;
-                                            });
+                                          if (result is Map<String, dynamic>) {
+                                            final id = result['id'] ?? result['bombeio_id'];
+                                            if (id != null) {
+                                              await _carregarBombeioPorId(id);
+                                            } else if (mounted) {
+                                              setState(() {
+                                                _bombeio = Map<String, dynamic>.from(result);
+                                                _rateioRealizado = result['rateio'] == true;
+                                              });
+                                            }
                                           }
                                         } catch (e) {
                                           await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
@@ -1461,17 +1578,21 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     height: 40,
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
-                                        // Abre o diálogo de inserir/editar bombeio com dados preenchidos
                                         try {
                                           final result = await DialogInserirBombeio.show(
                                             context,
                                             bombeio: _bombeio,
                                           );
-                                          if (result != null && mounted) {
-                                            setState(() {
-                                              _bombeio = Map<String, dynamic>.from(result);
-                                              _rateioRealizado = result['rateio'] == true;
-                                            });
+                                          if (result is Map<String, dynamic>) {
+                                            final id = result['id'] ?? result['bombeio_id'];
+                                            if (id != null) {
+                                              await _carregarBombeioPorId(id);
+                                            } else if (mounted) {
+                                              setState(() {
+                                                _bombeio = Map<String, dynamic>.from(result);
+                                                _rateioRealizado = result['rateio'] == true;
+                                              });
+                                            }
                                           }
                                         } catch (e) {
                                           await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');

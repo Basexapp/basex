@@ -82,8 +82,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   String valorAntigoData = '';
   bool dataInvalida = false;
   bool salvando = false;
-  bool _initialQtdFaturadaEmpty = true;
-  bool _initialBothMedicoesExist = false;
   Map<String, dynamic>? _medicaoInicialSalva;
   Map<String, dynamic>? _medicaoFinalSalva;
   Color _difColor = const Color(0xFF0D47A1);
@@ -166,11 +164,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
       if (b['qtd_faturada'] != null) {
         _qtdFaturadaCtrl.text = _fmt.format((b['qtd_faturada'] as num).toInt());
-        _initialQtdFaturadaEmpty = false;
       }
 
+      // Se ambas as medições existem, manter valores carregados e cálculos
       if (_medicaoInicialSalva != null && _medicaoFinalSalva != null) {
-        _initialBothMedicoesExist = true;
+        // flags removidas — nada extra necessário aqui
       }
     }
 
