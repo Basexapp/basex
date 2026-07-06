@@ -11,6 +11,19 @@ class CaclBombeioDialog extends StatelessWidget {
   /// Busca um `bombeio` completo no banco (Supabase) e abre o diálogo.
   static Future<void> showById(BuildContext context, String bombeioId) async {
     try {
+      // Mostrar diálogo de carregamento central enquanto busca os dados
+      if (context.mounted) {
+        showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Dialog(
+            backgroundColor: Colors.transparent,
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        );
+      }
       final supabase = Supabase.instance.client;
 
       // 1) Buscar o bombeio
@@ -110,14 +123,38 @@ class CaclBombeioDialog extends StatelessWidget {
 
       // 6) Finalmente abre o diálogo com dados completos
       if (!context.mounted) {
+        // Fechar possível diálogo de carregamento antes de sair
+        try {
+          Navigator.of(context, rootNavigator: true).pop();
+        } catch (_) {}
         return;
       }
+
+      // Fechar diálogo de carregamento antes de abrir o resultado
+      try {
+        Navigator.of(context, rootNavigator: true).pop();
+      } catch (_) {}
+
       return show(context, bombeio: combined);
     } catch (e) {
+      // Fechar possível diálogo de carregamento em caso de erro
+      try {
+        if (context.mounted) Navigator.of(context, rootNavigator: true).pop();
+      } catch (_) {}
+
       if (!context.mounted) {
         return;
       }
-      await showDialog<void>(context: context, builder: (_) => AlertDialog(title: const Text('Erro'), content: Text('Erro ao carregar bombeio: $e'), actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))]));
+      await showDialog<void>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Erro'),
+          content: Text('Erro ao carregar bombeio: $e'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))
+          ],
+        ),
+      );
     }
   }
 
