@@ -702,113 +702,167 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return Dialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          child: SizedBox(
-            width: 520,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Quantidade faturada por distribuidora', style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      ...participantes.map((d) {
-                        final nome = d['nome']?.toString() ?? '';
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: faturadoControllers[nome],
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [ FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(7), ThousandSeparatorInputFormatter() ],
-                                  decoration: InputDecoration(labelText: nome, border: const OutlineInputBorder(), isDense: true, floatingLabelBehavior: FloatingLabelBehavior.always),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 36,
-                                height: 36,
-                                child: IconButton(
-                                  padding: EdgeInsets.zero,
-                                  tooltip: 'Zerar',
-                                  onPressed: () {
-                                    faturadoControllers[nome]?.text = '';
-                                  },
-                                  icon: const Icon(Icons.delete_outline, size: 20),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('CANCELAR')),
-                      const SizedBox(width: 8),
-                      ElevatedButton(
-                        onPressed: () async {
-                          // soma valores e atualiza campo principal
-                          double total = 0;
-                          for (var d in participantes) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final double totalFaturado = participantes.fold<double>(0, (sum, d) {
+              final nome = d['nome']?.toString() ?? '';
+              final text = faturadoControllers[nome]?.text ?? '';
+              final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+              return sum + val;
+            });
+
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              child: SizedBox(
+                width: 200,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Quantidade faturada por distribuidora', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 12),
+                          ...participantes.map((d) {
                             final nome = d['nome']?.toString() ?? '';
-                            final text = faturadoControllers[nome]?.text ?? '';
-                            final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
-                            total += val;
-                          }
-                          setState(() {
-                            _qtdFaturadaCtrl.text = _fmt.format(total.toInt());
-                            _atualizarCalculos();
-                          });
-                          // Se já existe um bombeio salvo, persiste quantidades_faturadas imediatamente
-                          if (_bombeioLocal != null) {
-                            final Map<String, double> qm = {};
-                            for (var d in participantes) {
-                              final nome = d['nome']?.toString() ?? '';
-                              final text = faturadoControllers[nome]?.text ?? '';
-                              final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
-                              if (val != 0) qm[nome] = val;
-                            }
-                            try {
-                              final supabase = Supabase.instance.client;
-                              await supabase
-                                  .from('bombeios')
-                                  .update({'quantidades_faturadas': qm.isNotEmpty ? qm : null})
-                                  .eq('id', _bombeioLocal!['id']);
-                              // Atualiza o objeto local com a nova propriedade
-                              setState(() {
-                                if (qm.isNotEmpty) {
-                                  _bombeioLocal!['quantidades_faturadas'] = qm;
-                                } else {
-                                  _bombeioLocal!.remove('quantidades_faturadas');
-                                }
-                              });
-                            } catch (e) {
-                              debugPrint('Erro ao salvar quantidades_faturadas: $e');
-                            }
-                          }
-                          Navigator.of(context).pop(true);
-                        },
-                        child: const Text('SALVAR'),
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: faturadoControllers[nome],
+                                      keyboardType: TextInputType.number,
+                                      inputFormatters: [ FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(7), ThousandSeparatorInputFormatter() ],
+                                      onChanged: (_) => setDialogState(() {}),
+                                      decoration: InputDecoration(labelText: nome, border: const OutlineInputBorder(), isDense: true, floatingLabelBehavior: FloatingLabelBehavior.always),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 36,
+                                    height: 36,
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      tooltip: 'Zerar',
+                                      onPressed: () {
+                                        faturadoControllers[nome]?.text = '';
+                                        setDialogState(() {});
+                                      },
+                                      icon: const Icon(Icons.delete_outline, size: 20),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 8),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Total faturado: ${_fmt.format(totalFaturado.toInt())} L',
+                                    style: const TextStyle(
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Total receb. a 20ºC: ${_fmt.format((_recebida20Ctrl.text.isEmpty ? 0 : double.tryParse(_recebida20Ctrl.text.replaceAll('.', '').replaceAll(',', '.')) ?? 0).toInt())} L',
+                                    style: const TextStyle(
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFF0D47A1),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              textStyle: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            child: const Text('CANCELAR'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () async {
+                              // soma valores e atualiza campo principal
+                              double total = 0;
+                              for (var d in participantes) {
+                                final nome = d['nome']?.toString() ?? '';
+                                final text = faturadoControllers[nome]?.text ?? '';
+                                final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+                                total += val;
+                              }
+                              setState(() {
+                                _qtdFaturadaCtrl.text = _fmt.format(total.toInt());
+                                _atualizarCalculos();
+                              });
+                              // Se já existe um bombeio salvo, persiste quantidades_faturadas imediatamente
+                              if (_bombeioLocal != null) {
+                                final Map<String, double> qm = {};
+                                for (var d in participantes) {
+                                  final nome = d['nome']?.toString() ?? '';
+                                  final text = faturadoControllers[nome]?.text ?? '';
+                                  final val = double.tryParse(text.replaceAll('.', '').replaceAll(',', '.')) ?? 0;
+                                  if (val != 0) qm[nome] = val;
+                                }
+                                try {
+                                  final supabase = Supabase.instance.client;
+                                  await supabase
+                                      .from('bombeios')
+                                      .update({'quantidades_faturadas': qm.isNotEmpty ? qm : null})
+                                      .eq('id', _bombeioLocal!['id']);
+                                  // Atualiza o objeto local com a nova propriedade
+                                  setState(() {
+                                    if (qm.isNotEmpty) {
+                                      _bombeioLocal!['quantidades_faturadas'] = qm;
+                                    } else {
+                                      _bombeioLocal!.remove('quantidades_faturadas');
+                                    }
+                                  });
+                                } catch (e) {
+                                  debugPrint('Erro ao salvar quantidades_faturadas: $e');
+                                }
+                              }
+                              Navigator.of(context).pop(true);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0D47A1),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: const Text('SALVAR'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
@@ -2109,18 +2163,21 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            SizedBox(
-                              width: 38,
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                onPressed: _isReadOnly
-                                    ? null
-                                    : () => _abrirDialogFaturadoDistribuidoras(),
-                                icon: const Icon(Icons.edit, size: 20),
-                                tooltip: 'Editar faturado por distribuidora',
+                            if (!_isReadOnly)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 4),
+                                child: IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 20,
+                                    minHeight: 20,
+                                  ),
+                                  onPressed: () =>
+                                      _abrirDialogFaturadoDistribuidoras(),
+                                  icon: const Icon(Icons.edit, size: 16),
+                                  tooltip: 'Editar faturado por distribuidora',
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
