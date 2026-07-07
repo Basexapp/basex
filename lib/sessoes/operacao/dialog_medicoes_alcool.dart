@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter/services.dart';
 import '../../login_page.dart';
 
 class DialogMedicoesAlcool extends StatefulWidget {
@@ -1047,6 +1048,12 @@ class _DialogMedicoesAlcoolState extends State<DialogMedicoesAlcool> {
               valorAntigo = v;
             }
           },
+          inputFormatters: (label.contains('Alt. cm') || label.contains('Alt. mm'))
+              ? <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                  if (label.contains('Alt. cm')) LengthLimitingTextInputFormatter(4),
+                ]
+              : null,
           keyboardType:
               maxLength != null ||
                   label.contains('Temp') ||

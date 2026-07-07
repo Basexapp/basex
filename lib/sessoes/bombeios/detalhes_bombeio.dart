@@ -1164,7 +1164,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                 children: [
                                   const SizedBox(width: 8),
                                   Expanded(
-                                    flex: 3,
+                                    flex: 2,
                                     child: Text(
                                       'DISTRIBUIDORA',
                                       textAlign: TextAlign.left,
@@ -1276,9 +1276,9 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     ),
                                     child: Row(
                                       children: [
-                                        Expanded(
-                                          flex: 3,
-                                          child: Row(
+                                          Expanded(
+                                            flex: 2,
+                                            child: Row(
                                             children: [
                                               Container(
                                                 width: 8,
@@ -1367,16 +1367,36 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         ),
                                         Expanded(
                                           flex: 2,
-                                          child: Text(
-                                            '${_fmt.format(rec20Part.toInt())} L',
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w900,
-                                              color:
-                                                  colors[index % colors.length],
-                                            ),
-                                          ),
+                                          child: Builder(builder: (context) {
+                                            double faturadoVal = 0;
+                                            final qmap = _bombeio['quantidades_faturadas'];
+                                            final nomeKey = p['nome']?.toString() ?? '';
+                                            if (qmap is Map) {
+                                              if (qmap.containsKey(nomeKey)) {
+                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                              } else {
+                                                for (var k in qmap.keys) {
+                                                  if (k.toString() == nomeKey) {
+                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    break;
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            final sobraTotal = recebido20 - totalFaturado;
+                                            final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
+                                            final sobra = (sobraTotal * perc).roundToDouble();
+                                            final exibido = (faturadoVal + sobra).roundToDouble();
+                                            return Text(
+                                              faturadoVal > 0 ? '${_fmt.format(exibido.toInt())} L' : '-',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w900,
+                                                color: colors[index % colors.length],
+                                              ),
+                                            );
+                                          }),
                                         ),
                                         Expanded(
                                           flex: 2,
@@ -1478,7 +1498,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                                 }
                                               }
                                             }
-                                            final sobra = rec20Part - faturadoVal;
+                                            // nova lógica: sobra total = recebido20 - totalFaturado
+                                            final sobraTotal = recebido20 - totalFaturado;
+                                            final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
+                                            final sobra = (sobraTotal * perc).roundToDouble();
                                             final sobraColor = sobra < 0 ? Colors.red : Colors.green[700];
                                             return Text(
                                               faturadoVal > 0 ? '${_fmt.format(sobra.toInt())} L' : '-',
@@ -1499,6 +1522,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                               );
                             }),
 
+                            const Divider(height: 2, thickness: 1, color: Colors.black),
+
                             const SizedBox(height: 10),
                             // Totals row
                             Container(
@@ -1506,7 +1531,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                               child: Row(
                                 children: [
                                   const Expanded(
-                                    flex: 3,
+                                    flex: 2,
                                     child: Text(
                                       'TOTAL',
                                       style: TextStyle(
