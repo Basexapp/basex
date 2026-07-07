@@ -676,7 +676,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
               }
 
               if (!didUpdate) {
-                debugPrint('Nenhuma movimentacao encontrada para atualizar (bombeio:${bombeioId}, empresa:${empresaId})');
+                debugPrint('Nenhuma movimentacao encontrada para atualizar (bombeio:$bombeioId, empresa:$empresaId)');
               }
             } catch (e) {
               debugPrint('Erro ao atualizar movimentacoes_tanque: $e');
@@ -740,6 +740,92 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           await _showMessageDialog('Erro ao inserir rateio: $e', title: 'Erro');
         }
       }
+    }
+  }
+
+  Future<void> _cancelarBombeio() async {
+    final bombeioId = _bombeio['id']?.toString();
+    if (bombeioId == null || bombeioId.isEmpty) return;
+
+    final confirmar = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
+        ),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        title: const Text(
+          'Cancelar bombeio',
+          style: TextStyle(color: Color.fromARGB(255, 65, 54, 49)),
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Tem certeza que quer prosseguir com o cancelamento do bombeio?'),
+            SizedBox(height: 8),
+            Text(
+              'Essa ação também cancelará as medições realizadas, atreladas a este bombeio.',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text('Voltar'),
+          ),
+          SizedBox(
+            height: 40,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                  if (states.contains(WidgetState.hovered)) {
+                    return const Color.fromARGB(255, 65, 54, 49);
+                  }
+                  return Colors.black;
+                }),
+                foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                padding: WidgetStateProperty.all(
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                ),
+                shape: WidgetStateProperty.all(
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                ),
+                side: WidgetStateProperty.all(
+                  const BorderSide(color: Color(0xFFFFB341), width: 1.6),
+                ),
+                elevation: WidgetStateProperty.all(1),
+              ),
+              child: const Text('Sim, cancelar.'),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      final supabase = Supabase.instance.client;
+      await supabase.from('bombeios').delete().eq('id', bombeioId);
+
+      if (!mounted) return;
+      
+      // Fecha a página de detalhes e volta para a lista
+      widget.onVoltar();
+      
+    } catch (e) {
+      if (!mounted) return;
+      await _showMessageDialog('Erro ao cancelar bombeio: $e', title: 'Erro');
     }
   }
 
@@ -884,6 +970,26 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
     );
   }
 
+  Widget _buildCancelButtonSmall() {
+    return SizedBox(
+      width: 44,
+      height: 36,
+      child: ElevatedButton(
+        onPressed: _cancelarBombeio,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red.shade600,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(6),
+            side: BorderSide(color: Colors.red.shade800, width: 1.0),
+          ),
+          padding: EdgeInsets.zero,
+          elevation: 2,
+        ),
+        child: const Icon(Icons.close, color: Colors.white, size: 20),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Extração segura dos valores
@@ -971,1023 +1077,1031 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         ),
         centerTitle: true,
       ),
-      body: Column(
+      body: Stack(
         children: [
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 10, 80, 10),
-            color: const Color(0xFFFBFBFB),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildHeaderMicroItem('CONTROLE', _bombeio['numero_controle']?.toString() ?? '-'),
-                _buildHeaderMicroItem('PRODUTO', _bombeio['produto']?.toString() ?? '-'),
-                _buildHeaderMicroItem('DATA', _formatarData(_bombeio['data'])),
-                _buildHeaderMicroItem(
-                  'HORÁRIO',
-                  '${_bombeio['horario_inicial'] ?? '-'} - ${_bombeio['horario_final'] ?? '-'}',
+          Column(
+            children: [
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 10, 80, 10),
+                color: const Color(0xFFFBFBFB),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildHeaderMicroItem('CONTROLE', _bombeio['numero_controle']?.toString() ?? '-'),
+                    _buildHeaderMicroItem('PRODUTO', _bombeio['produto']?.toString() ?? '-'),
+                    _buildHeaderMicroItem('DATA', _formatarData(_bombeio['data'])),
+                    _buildHeaderMicroItem(
+                      'HORÁRIO',
+                      '${_bombeio['horario_inicial'] ?? '-'} - ${_bombeio['horario_final'] ?? '-'}',
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Divider(height: 1),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Medições',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0D47A1),
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_bombeio['medicao_inicial'] != null)
-                    _buildMedicaoDisplay(
-                      _bombeio['medicao_inicial'],
-                      'MEDIÇÃO INICIAL',
-                      const Color(0xFF0D47A1),
-                    ),
-                  if (_bombeio['medicao_inicial'] != null)
-                    const SizedBox(height: 8),
-                  if (_bombeio['medicao_final'] != null)
-                    _buildMedicaoDisplay(
-                      _bombeio['medicao_final'],
-                      'MEDIÇÃO FINAL',
-                      Colors.green.shade700,
-                    ),
-                  const SizedBox(height: 80),
-
-                  const Center(
-                    child: Text(
-                      'DISTRIBUIÇÃO E RATEIO',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  Row(
+              ),
+              const SizedBox(height: 4),
+              const Divider(height: 1),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
+                      const Text(
+                        'Medições',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF0D47A1),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_bombeio['medicao_inicial'] != null)
+                        _buildMedicaoDisplay(
+                          _bombeio['medicao_inicial'],
+                          'MEDIÇÃO INICIAL',
+                          const Color(0xFF0D47A1),
+                        ),
+                      if (_bombeio['medicao_inicial'] != null)
+                        const SizedBox(height: 8),
+                      if (_bombeio['medicao_final'] != null)
+                        _buildMedicaoDisplay(
+                          _bombeio['medicao_final'],
+                          'MEDIÇÃO FINAL',
+                          Colors.green.shade700,
+                        ),
+                      const SizedBox(height: 80),
+
+                      const Center(
+                        child: Text(
+                          'DISTRIBUIÇÃO E RATEIO',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0D47A1),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.center,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Text(
-                                    'TOTAL SOLICITADO',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey,
-                                    ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        'TOTAL SOLICITADO',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_fmt.format(totalSolicitado.toInt())} L',
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF455A64),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'TOTAL RECEBIDO (AMB)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_fmt.format(recebidoAmb.toInt())} L',
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF0D47A1),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'TOTAL RECEBIDO (20ºC)',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_fmt.format(recebido20.toInt())} L',
+                                        style: const TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                          color: Color(0xFF388E3C),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${_fmt.format(totalSolicitado.toInt())} L',
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF455A64),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'TOTAL RECEBIDO (AMB)',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${_fmt.format(recebidoAmb.toInt())} L',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF0D47A1),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'TOTAL RECEBIDO (20ºC)',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${_fmt.format(recebido20.toInt())} L',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                      color: Color(0xFF388E3C),
+                                  const SizedBox(width: 30),
+                                  SizedBox(
+                                    width: 180,
+                                    height: 180,
+                                    child: PieChart(
+                                      PieChartData(
+                                        sectionsSpace: 2,
+                                        centerSpaceRadius: 40,
+                                        sections: List.generate(
+                                          participantes.length,
+                                          (i) {
+                                            final p = participantes[i];
+                                            final colors = [
+                                              const Color(0xFF0D47A1),
+                                              const Color(0xFFD32F2F),
+                                              const Color(0xFF388E3C),
+                                              const Color(0xFFFBC02D),
+                                            ];
+                                            final solicitado = _getDoubleSafe(p, 'solicitado');
+                                            return PieChartSectionData(
+                                              color: colors[i % colors.length],
+                                              value: solicitado,
+                                              title:
+                                                  '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((solicitado / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
+                                              radius: 50,
+                                              titleStyle: const TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.white,
+                                                shadows: [
+                                                  Shadow(
+                                                    color: Colors.black45,
+                                                    blurRadius: 2,
+                                                  ),
+                                                ],
+                                              ),
+                                              titlePositionPercentageOffset: 0.55,
+                                            );
+                                          },
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ],
-                              ),
-                              const SizedBox(width: 30),
-                              SizedBox(
-                                width: 180,
-                                height: 180,
-                                child: PieChart(
-                                  PieChartData(
-                                    sectionsSpace: 2,
-                                    centerSpaceRadius: 40,
-                                    sections: List.generate(
-                                      participantes.length,
-                                      (i) {
-                                        final p = participantes[i];
-                                        final colors = [
-                                          const Color(0xFF0D47A1),
-                                          const Color(0xFFD32F2F),
-                                          const Color(0xFF388E3C),
-                                          const Color(0xFFFBC02D),
-                                        ];
-                                        final solicitado = _getDoubleSafe(p, 'solicitado');
-                                        return PieChartSectionData(
-                                          color: colors[i % colors.length],
-                                          value: solicitado,
-                                          title:
-                                              '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((solicitado / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
-                                          radius: 50,
-                                          titleStyle: const TextStyle(
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                            shadows: [
-                                              Shadow(
-                                                color: Colors.black45,
-                                                blurRadius: 2,
-                                              ),
-                                            ],
-                                          ),
-                                          titlePositionPercentageOffset: 0.55,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
 
-                      const SizedBox(width: 40),
+                          const SizedBox(width: 40),
 
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'DISTRIBUIDORA',
-                                      textAlign: TextAlign.left,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          'DISTRIBUIDORA',
+                                          textAlign: TextAlign.left,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 1,
-                                    child: Text(
-                                      'QTD. SOLICITADA',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
+                                      Expanded(
+                                        flex: 1,
+                                        child: Text(
+                                          'QTD. SOLICITADA',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'RECEB. (AMB)',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF455A64),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          'RECEB. (AMB)',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF455A64),
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'FATURADO',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          'FATURADO',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 1,
-                                    child: Text(
-                                      'PARTICIP. %',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
+                                      Expanded(
+                                        flex: 1,
+                                        child: Text(
+                                          'PARTICIP. %',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'SOBRA/PERDA',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          'SOBRA/PERDA',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'RECEB. (20ºC)',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          'RECEB. (20ºC)',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey[700],
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            ...participantes.asMap().entries.map((entry) {
-                              final index = entry.key;
-                              final p = entry.value;
-                              final solicitado = _getDoubleSafe(p, 'solicitado');
-                              double peso = totalSolicitado > 0
-                                  ? (solicitado / totalSolicitado)
-                                  : 0;
-                              double recAmbPart = recebidoAmb * peso;
-                              
-                              final colors = [
-                                const Color(0xFF0D47A1),
-                                const Color(0xFFD32F2F),
-                                const Color(0xFF388E3C),
-                                const Color(0xFFFBC02D),
-                              ];
+                                ),
+                                const Divider(height: 1),
+                                ...participantes.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final p = entry.value;
+                                  final solicitado = _getDoubleSafe(p, 'solicitado');
+                                  double peso = totalSolicitado > 0
+                                      ? (solicitado / totalSolicitado)
+                                      : 0;
+                                  double recAmbPart = recebidoAmb * peso;
+                                  
+                                  final colors = [
+                                    const Color(0xFF0D47A1),
+                                    const Color(0xFFD32F2F),
+                                    const Color(0xFF388E3C),
+                                    const Color(0xFFFBC02D),
+                                  ];
 
-                              return Column(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 14,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                          Expanded(
-                                            flex: 2,
-                                            child: Row(
-                                            children: [
-                                              Container(
-                                                width: 8,
-                                                height: 8,
-                                                margin: const EdgeInsets.only(
-                                                  right: 12,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      colors[index %
-                                                          colors.length],
-                                                  shape: BoxShape.circle,
-                                                ),
-                                              ),
+                                  return Column(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        child: Row(
+                                          children: [
                                               Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      p['nome']
-                                                          .toString()
-                                                          .toUpperCase(),
-                                                      style: const TextStyle(
-                                                        fontSize: 13,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: Color(
-                                                          0xFF263238,
-                                                        ),
-                                                      ),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
+                                                flex: 2,
+                                                child: Row(
+                                                children: [
+                                                  Container(
+                                                    width: 8,
+                                                    height: 8,
+                                                    margin: const EdgeInsets.only(
+                                                      right: 12,
                                                     ),
-                                                    const SizedBox(height: 6),
-                                                    ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            2,
-                                                          ),
-                                                      child: LinearProgressIndicator(
-                                                        value: peso,
-                                                        backgroundColor:
-                                                            Colors.grey[100],
-                                                        valueColor:
-                                                            AlwaysStoppedAnimation<
-                                                              Color
-                                                            >(
-                                                              colors[index %
-                                                                  colors
-                                                                      .length],
+                                                    decoration: BoxDecoration(
+                                                      color:
+                                                          colors[index %
+                                                              colors.length],
+                                                      shape: BoxShape.circle,
+                                                    ),
+                                                  ),
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment.start,
+                                                      children: [
+                                                        Text(
+                                                          p['nome']
+                                                              .toString()
+                                                              .toUpperCase(),
+                                                          style: const TextStyle(
+                                                            fontSize: 13,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: Color(
+                                                              0xFF263238,
                                                             ),
-                                                        minHeight: 3,
-                                                      ),
+                                                          ),
+                                                          overflow:
+                                                              TextOverflow.ellipsis,
+                                                        ),
+                                                        const SizedBox(height: 6),
+                                                        ClipRRect(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                2,
+                                                              ),
+                                                          child: LinearProgressIndicator(
+                                                            value: peso,
+                                                            backgroundColor:
+                                                                Colors.grey[100],
+                                                            valueColor:
+                                                                AlwaysStoppedAnimation<
+                                                                  Color
+                                                                >(
+                                                                  colors[index %
+                                                                      colors
+                                                                          .length],
+                                                                ),
+                                                            minHeight: 3,
+                                                          ),
+                                                        ),
+                                                      ],
                                                     ),
-                                                  ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 1,
+                                              child: Text(
+                                                '${_fmt.format(solicitado.toInt())} L',
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Color(0xFF455A64),
                                                 ),
                                               ),
-                                            ],
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 1,
-                                          child: Text(
-                                            '${_fmt.format(solicitado.toInt())} L',
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF455A64),
                                             ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Text(
+                                                '${_fmt.format(recAmbPart.toInt())} L',
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF455A64),
+                                                ),
+                                              ),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Builder(builder: (context) {
+                                                double faturadoVal = 0;
+                                                final qmap = _bombeio['quantidades_faturadas'];
+                                                final nomeKey = p['nome']?.toString() ?? '';
+                                                // lookup quantidades_faturadas for this participante
+                                                if (qmap is Map) {
+                                                  // direct key
+                                                  if (qmap.containsKey(nomeKey)) {
+                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                  } else {
+                                                    // try exact string keys
+                                                    for (var k in qmap.keys) {
+                                                        if (k.toString() == nomeKey) {
+                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                        break;
+                                                      }
+                                                    }
+                                                    // try case-insensitive
+                                                    if (faturadoVal == 0) {
+                                                      for (var k in qmap.keys) {
+                                                        if (k.toString().toLowerCase() == nomeKey.toLowerCase()) {
+                                                          faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                          break;
+                                                        }
+                                                      }
+                                                    }
+                                                    // try numeric keys (id) mapping
+                                                    if (faturadoVal == 0) {
+                                                      for (var k in qmap.keys) {
+                                                        final ks = k.toString();
+                                                        if (ks.length == 36 && ks.contains('-')) {
+                                                          // possible uuid-like key found; value available in qmap[k]
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                                
+                                                return Text(
+                                                  faturadoVal > 0 ? '${_fmt.format(faturadoVal.toInt())} L' : '-',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF455A64),
+                                                  ),
+                                                );
+                                              }),
+                                            ),
+                                            // percentual sobre total faturado
+                                            Expanded(
+                                              flex: 1,
+                                              child: Builder(builder: (context) {
+                                                double faturadoVal = 0;
+                                                final qmap = _bombeio['quantidades_faturadas'];
+                                                final nomeKey = p['nome']?.toString() ?? '';
+                                                if (qmap is Map) {
+                                                  if (qmap.containsKey(nomeKey)) {
+                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                  } else {
+                                                    for (var k in qmap.keys) {
+                                                      if (k.toString() == nomeKey) {
+                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                        break;
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                                final perc = totalFaturado > 0 ? ((faturadoVal / totalFaturado) * 100) : 0;
+                                                return Text(
+                                                  faturadoVal > 0 ? '${perc.toStringAsFixed(1)}%' : '-',
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color(0xFF455A64),
+                                                  ),
+                                                );
+                                              }),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Builder(builder: (context) {
+                                                double faturadoVal = 0;
+                                                final qmap = _bombeio['quantidades_faturadas'];
+                                                final nomeKey = p['nome']?.toString() ?? '';
+                                                if (qmap is Map) {
+                                                  if (qmap.containsKey(nomeKey)) {
+                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                  } else {
+                                                    for (var k in qmap.keys) {
+                                                      if (k.toString() == nomeKey) {
+                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                        break;
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                                // nova lógica: sobra total = recebido20 - totalFaturado
+                                                final sobraTotal = recebido20 - totalFaturado;
+                                                final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
+                                                final sobra = (sobraTotal * perc).roundToDouble();
+                                                final sobraColor = sobra < 0 ? Colors.red : Colors.green[700];
+                                                return Text(
+                                                  faturadoVal > 0 ? '${_fmt.format(sobra.toInt())} L' : '-',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: sobraColor,
+                                                  ),
+                                                );
+                                              }),
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: Builder(builder: (context) {
+                                                double faturadoVal = 0;
+                                                final qmap = _bombeio['quantidades_faturadas'];
+                                                final nomeKey = p['nome']?.toString() ?? '';
+                                                if (qmap is Map) {
+                                                  if (qmap.containsKey(nomeKey)) {
+                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                  } else {
+                                                    for (var k in qmap.keys) {
+                                                      if (k.toString() == nomeKey) {
+                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                        break;
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                                final sobraTotal = recebido20 - totalFaturado;
+                                                final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
+                                                final sobra = (sobraTotal * perc).roundToDouble();
+                                                final exibido = (faturadoVal + sobra).roundToDouble();
+                                                return Text(
+                                                  faturadoVal > 0 ? '${_fmt.format(exibido.toInt())} L' : '-',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: colors[index % colors.length],
+                                                  ),
+                                                );
+                                              }),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const Divider(height: 1),
+                                    ],
+                                  );
+                                }),
+
+                                const Divider(height: 2, thickness: 1, color: Colors.black),
+
+                                const SizedBox(height: 10),
+                                // Totals row
+                                Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  child: Row(
+                                    children: [
+                                      const Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          'TOTAL',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color(0xFF263238),
                                           ),
                                         ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Text(
-                                            '${_fmt.format(recAmbPart.toInt())} L',
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
+                                      ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: Text(
+                                          '${_fmt.format(totalSolicitado.toInt())} L',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF455A64),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          '${_fmt.format(recebidoAmb.toInt())} L',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF455A64),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          '${_fmt.format(totalFaturado.toInt())} L',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF455A64),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 1,
+                                        child: Text(
+                                          totalFaturado > 0 ? '100%' : '-',
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF455A64),
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          totalSobraPerda != 0 ? '${_fmt.format(totalSobraPerda.toInt())} L' : '-',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.green[700],
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(
+                                          '${_fmt.format(recebido20.toInt())} L',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w900,
+                                            color: Color(0xFF388E3C),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Espaço de 50px entre a linha de totalizadores e os botões
+                                const SizedBox(height: 50),
+                                // Botões de comando
+                                if (_rateioRealizado == null)
+                                  const Center(
+                                    child: SizedBox(width: 200, height: 40),
+                                  )
+                                else if (_rateioRealizado == true)
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        height: 40,
+                                        width: 200,
+                                        alignment: Alignment.center,
+                                        decoration: BoxDecoration(
+                                          color: Colors.grey.shade100,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: const Color(0xFFFFB341),
+                                            width: 1.6,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Rateio realizado',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            color: Color.fromARGB(255, 65, 54, 49),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 150,
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () async {
+                                            final id = _bombeio['id']?.toString();
+                                            if (id == null || id.isEmpty) return;
+                                            await CaclBombeioDialog.showById(context, id);
+                                          },
+                                          icon: const Icon(Icons.calculate, size: 18),
+                                          label: const Text('CACL'),
+                                          style: ButtonStyle(
+                                            backgroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  Colors.blue[50]!,
+                                                ),
+                                            foregroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  const Color(0xFF0D47A1),
+                                                ),
+                                            padding: WidgetStateProperty.all(
+                                              const EdgeInsets.symmetric(
+                                                vertical: 8,
+                                                horizontal: 12,
+                                              ),
+                                            ),
+                                            shape: WidgetStateProperty.all(
+                                              RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(6),
+                                                side: const BorderSide(
+                                                  color: Color(0xFF0D47A1),
+                                                  width: 1.2,
+                                                ),
+                                              ),
+                                            ),
+                                            elevation: WidgetStateProperty.all(0),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 150,
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () async {
+                                            try {
+                                              // se rateio já ocorreu ou usuário é readOnly, abrir em modo somente leitura
+                                              final readOnlyMode = (_rateioRealizado == true) || _isReadOnly;
+                                              final result = await DialogInserirBombeio.show(
+                                                context,
+                                                bombeio: _bombeio,
+                                                // DialogInserirBombeio aceita readOnly (handled below)
+                                                readOnly: readOnlyMode,
+                                              );
+                                              if (result is Map<String, dynamic>) {
+                                                final id = result['id'] ?? result['bombeio_id'];
+                                                if (id != null) {
+                                                  await _carregarBombeioPorId(id);
+                                                } else if (mounted) {
+                                                  setState(() {
+                                                    _bombeio = Map<String, dynamic>.from(result);
+                                                    _rateioRealizado = result['rateio'] == true;
+                                                  });
+                                                }
+                                              }
+                                            } catch (e) {
+                                              await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
+                                            }
+                                          },
+                                          icon: Icon((_rateioRealizado == true || _isReadOnly) ? Icons.info_outline : Icons.edit, size: 18),
+                                          label: Text((_rateioRealizado == true || _isReadOnly) ? 'Detalhes' : 'Editar bombeio'),
+                                          style: ButtonStyle(
+                                            backgroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  Colors.orange[50]!,
+                                                ),
+                                            foregroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  const Color(0xFFE65100),
+                                                ),
+                                            padding: WidgetStateProperty.all(
+                                              const EdgeInsets.symmetric(
+                                                vertical: 8,
+                                                horizontal: 12,
+                                              ),
+                                            ),
+                                            shape: WidgetStateProperty.all(
+                                              RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(6),
+                                                side: const BorderSide(
+                                                  color: Color(0xFFE65100),
+                                                  width: 1.2,
+                                                ),
+                                              ),
+                                            ),
+                                            elevation: WidgetStateProperty.all(0),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      _buildCancelButtonSmall(),
+                                    ],
+                                  )
+                                else if (!_isReadOnly)
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 180,
+                                        height: 40,
+                                        child: ElevatedButton(
+                                          onPressed: () =>
+                                              _showRateioAutomaticoDialog(),
+                                          style: ButtonStyle(
+                                            backgroundColor:
+                                                WidgetStateProperty.resolveWith<
+                                                  Color?
+                                                >((states) {
+                                                  if (states.contains(
+                                                    WidgetState.hovered,
+                                                  )) {
+                                                    return const Color.fromARGB(
+                                                      255,
+                                                      65,
+                                                      54,
+                                                      49,
+                                                    );
+                                                  
+                                                  }
+                                                  return Colors.black;
+                                                }),
+                                            foregroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  Colors.white,
+                                                ),
+                                            padding: WidgetStateProperty.all(
+                                              const EdgeInsets.symmetric(
+                                                vertical: 8,
+                                                horizontal: 12,
+                                              ),
+                                            ),
+                                            shape: WidgetStateProperty.all(
+                                              RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(
+                                                  6,
+                                                ),
+                                              ),
+                                            ),
+                                            side: WidgetStateProperty.all(
+                                              const BorderSide(
+                                                color: Color(0xFFFFBD59),
+                                                width: 1.6,
+                                              ),
+                                            ),
+                                            elevation: WidgetStateProperty.all(1),
+                                          ),
+                                          child: const Text(
+                                            'RATEIO AUTOMÁTICO',
+                                            style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w700,
-                                              color: Color(0xFF455A64),
+                                              letterSpacing: 0.8,
                                             ),
                                           ),
                                         ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Builder(builder: (context) {
-                                            double faturadoVal = 0;
-                                            final qmap = _bombeio['quantidades_faturadas'];
-                                            final nomeKey = p['nome']?.toString() ?? '';
-                                            // lookup quantidades_faturadas for this participante
-                                            if (qmap is Map) {
-                                              // direct key
-                                              if (qmap.containsKey(nomeKey)) {
-                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
-                                              } else {
-                                                // try exact string keys
-                                                for (var k in qmap.keys) {
-                                                    if (k.toString() == nomeKey) {
-                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
-                                                    break;
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 180,
+                                        height: 40,
+                                        child: ElevatedButton(
+                                          onPressed: () async {
+                                            await _showMessageDialog(
+                                              'Não disponível',
+                                            );
+                                          },
+                                          style: ButtonStyle(
+                                            backgroundColor:
+                                                WidgetStateProperty.resolveWith<
+                                                  Color?
+                                                >((states) {
+                                                  if (states.contains(
+                                                    WidgetState.hovered,
+                                                  )) {
+                                                    return const Color.fromARGB(
+                                                      255,
+                                                      65,
+                                                      54,
+                                                      49,
+                                                    );
                                                   }
-                                                }
-                                                // try case-insensitive
-                                                if (faturadoVal == 0) {
-                                                  for (var k in qmap.keys) {
-                                                    if (k.toString().toLowerCase() == nomeKey.toLowerCase()) {
-                                                      faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
-                                                      break;
-                                                    }
-                                                  }
-                                                }
-                                                // try numeric keys (id) mapping
-                                                if (faturadoVal == 0) {
-                                                  for (var k in qmap.keys) {
-                                                    final ks = k.toString();
-                                                    if (ks.length == 36 && ks.contains('-')) {
-                                                      // possible uuid-like key found; value available in qmap[k]
-                                                    }
-                                                  }
+                                                  return Colors.black;
+                                                }),
+                                            foregroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  Colors.white,
+                                                ),
+                                            padding: WidgetStateProperty.all(
+                                              const EdgeInsets.symmetric(
+                                                vertical: 8,
+                                                horizontal: 12,
+                                              ),
+                                            ),
+                                            shape: WidgetStateProperty.all(
+                                              RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(
+                                                  6,
+                                                ),
+                                              ),
+                                            ),
+                                            side: WidgetStateProperty.all(
+                                              const BorderSide(
+                                                color: Color.fromARGB(
+                                                  255,
+                                                  255,
+                                                  179,
+                                                  65,
+                                                ),
+                                                width: 1.6,
+                                              ),
+                                            ),
+                                            elevation: WidgetStateProperty.all(1),
+                                          ),
+                                          child: const Text(
+                                            'RATEIO MANUAL',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 150,
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () async {
+                                            final id = _bombeio['id']?.toString();
+                                            if (id == null || id.isEmpty) return;
+                                            await CaclBombeioDialog.showById(context, id);
+                                          },
+                                          icon: const Icon(Icons.calculate, size: 18),
+                                          label: const Text('CACL'),
+                                          style: ButtonStyle(
+                                            backgroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  Colors.blue[50]!,
+                                                ),
+                                            foregroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  const Color(0xFF0D47A1),
+                                                ),
+                                            padding: WidgetStateProperty.all(
+                                              const EdgeInsets.symmetric(
+                                                vertical: 8,
+                                                horizontal: 12,
+                                              ),
+                                            ),
+                                            shape: WidgetStateProperty.all(
+                                              RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(6),
+                                                side: const BorderSide(
+                                                  color: Color(0xFF0D47A1),
+                                                  width: 1.2,
+                                                ),
+                                              ),
+                                            ),
+                                            elevation: WidgetStateProperty.all(0),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      SizedBox(
+                                        width: 150,
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () async {
+                                            try {
+                                              final readOnlyMode = (_rateioRealizado == true) || _isReadOnly;
+                                              final result = await DialogInserirBombeio.show(
+                                                context,
+                                                bombeio: _bombeio,
+                                                readOnly: readOnlyMode,
+                                              );
+                                              if (result is Map<String, dynamic>) {
+                                                final id = result['id'] ?? result['bombeio_id'];
+                                                if (id != null) {
+                                                  await _carregarBombeioPorId(id);
+                                                } else if (mounted) {
+                                                  setState(() {
+                                                    _bombeio = Map<String, dynamic>.from(result);
+                                                    _rateioRealizado = result['rateio'] == true;
+                                                  });
                                                 }
                                               }
+                                            } catch (e) {
+                                              await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
                                             }
-                                            
-                                            return Text(
-                                              faturadoVal > 0 ? '${_fmt.format(faturadoVal.toInt())} L' : '-',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF455A64),
+                                          },
+                                          icon: Icon((_rateioRealizado == true || _isReadOnly) ? Icons.info_outline : Icons.edit, size: 18),
+                                          label: Text((_rateioRealizado == true || _isReadOnly) ? 'Detalhes' : 'Editar bombeio'),
+                                          style: ButtonStyle(
+                                            backgroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  Colors.orange[50]!,
+                                                ),
+                                            foregroundColor:
+                                                WidgetStateProperty.all<Color>(
+                                                  const Color(0xFFE65100),
+                                                ),
+                                            padding: WidgetStateProperty.all(
+                                              const EdgeInsets.symmetric(
+                                                vertical: 8,
+                                                horizontal: 12,
                                               ),
-                                            );
-                                          }),
-                                        ),
-                                        // percentual sobre total faturado
-                                        Expanded(
-                                          flex: 1,
-                                          child: Builder(builder: (context) {
-                                            double faturadoVal = 0;
-                                            final qmap = _bombeio['quantidades_faturadas'];
-                                            final nomeKey = p['nome']?.toString() ?? '';
-                                            if (qmap is Map) {
-                                              if (qmap.containsKey(nomeKey)) {
-                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
-                                              } else {
-                                                for (var k in qmap.keys) {
-                                                  if (k.toString() == nomeKey) {
-                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
-                                                    break;
-                                                  }
-                                                }
-                                              }
-                                            }
-                                            final perc = totalFaturado > 0 ? ((faturadoVal / totalFaturado) * 100) : 0;
-                                            return Text(
-                                              faturadoVal > 0 ? '${perc.toStringAsFixed(1)}%' : '-',
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                                color: Color(0xFF455A64),
+                                            ),
+                                            shape: WidgetStateProperty.all(
+                                              RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(6),
+                                                side: const BorderSide(
+                                                  color: Color(0xFFE65100),
+                                                  width: 1.2,
+                                                ),
                                               ),
-                                            );
-                                          }),
+                                            ),
+                                            elevation: WidgetStateProperty.all(0),
+                                          ),
                                         ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Builder(builder: (context) {
-                                            double faturadoVal = 0;
-                                            final qmap = _bombeio['quantidades_faturadas'];
-                                            final nomeKey = p['nome']?.toString() ?? '';
-                                            if (qmap is Map) {
-                                              if (qmap.containsKey(nomeKey)) {
-                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
-                                              } else {
-                                                for (var k in qmap.keys) {
-                                                  if (k.toString() == nomeKey) {
-                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
-                                                    break;
-                                                  }
-                                                }
-                                              }
-                                            }
-                                            // nova lógica: sobra total = recebido20 - totalFaturado
-                                            final sobraTotal = recebido20 - totalFaturado;
-                                            final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
-                                            final sobra = (sobraTotal * perc).roundToDouble();
-                                            final sobraColor = sobra < 0 ? Colors.red : Colors.green[700];
-                                            return Text(
-                                              faturadoVal > 0 ? '${_fmt.format(sobra.toInt())} L' : '-',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w600,
-                                                color: sobraColor,
-                                              ),
-                                            );
-                                          }),
-                                        ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Builder(builder: (context) {
-                                            double faturadoVal = 0;
-                                            final qmap = _bombeio['quantidades_faturadas'];
-                                            final nomeKey = p['nome']?.toString() ?? '';
-                                            if (qmap is Map) {
-                                              if (qmap.containsKey(nomeKey)) {
-                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
-                                              } else {
-                                                for (var k in qmap.keys) {
-                                                  if (k.toString() == nomeKey) {
-                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
-                                                    break;
-                                                  }
-                                                }
-                                              }
-                                            }
-                                            final sobraTotal = recebido20 - totalFaturado;
-                                            final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
-                                            final sobra = (sobraTotal * perc).roundToDouble();
-                                            final exibido = (faturadoVal + sobra).roundToDouble();
-                                            return Text(
-                                              faturadoVal > 0 ? '${_fmt.format(exibido.toInt())} L' : '-',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w900,
-                                                color: colors[index % colors.length],
-                                              ),
-                                            );
-                                          }),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const Divider(height: 1),
-                                ],
-                              );
-                            }),
-
-                            const Divider(height: 2, thickness: 1, color: Colors.black),
-
-                            const SizedBox(height: 10),
-                            // Totals row
-                            Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              child: Row(
-                                children: [
-                                  const Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'TOTAL',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF263238),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                  Expanded(
-                                    flex: 1,
-                                    child: Text(
-                                      '${_fmt.format(totalSolicitado.toInt())} L',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF455A64),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      '${_fmt.format(recebidoAmb.toInt())} L',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                        color: Color(0xFF455A64),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      '${_fmt.format(totalFaturado.toInt())} L',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF455A64),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 1,
-                                    child: Text(
-                                      totalFaturado > 0 ? '100%' : '-',
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF455A64),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      totalSobraPerda != 0 ? '${_fmt.format(totalSobraPerda.toInt())} L' : '-',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.green[700],
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      '${_fmt.format(recebido20.toInt())} L',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                        color: Color(0xFF388E3C),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                                const SizedBox(height: 16),
+                              ],
                             ),
-                            // Espaço de 50px entre a linha de totalizadores e os botões
-                            const SizedBox(height: 50),
-                            // Botões de comando
-                            if (_rateioRealizado == null)
-                              const Center(
-                                child: SizedBox(width: 200, height: 40),
-                              )
-                            else if (_rateioRealizado == true)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    height: 40,
-                                    width: 200,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.shade100,
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(
-                                        color: const Color(0xFFFFB341),
-                                        width: 1.6,
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'Rateio realizado',
-                                      style: TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w800,
-                                        color: Color.fromARGB(255, 65, 54, 49),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 150,
-                                    height: 40,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () async {
-                                        final id = _bombeio['id']?.toString();
-                                        if (id == null || id.isEmpty) return;
-                                        await CaclBombeioDialog.showById(context, id);
-                                      },
-                                      icon: const Icon(Icons.calculate, size: 18),
-                                      label: const Text('CACL'),
-                                      style: ButtonStyle(
-                                        backgroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              Colors.blue[50]!,
-                                            ),
-                                        foregroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              const Color(0xFF0D47A1),
-                                            ),
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
-                                        ),
-                                        shape: WidgetStateProperty.all(
-                                          RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
-                                            side: const BorderSide(
-                                              color: Color(0xFF0D47A1),
-                                              width: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        elevation: WidgetStateProperty.all(0),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 150,
-                                    height: 40,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () async {
-                                        try {
-                                          // se rateio já ocorreu ou usuário é readOnly, abrir em modo somente leitura
-                                          final readOnlyMode = (_rateioRealizado == true) || _isReadOnly;
-                                          final result = await DialogInserirBombeio.show(
-                                            context,
-                                            bombeio: _bombeio,
-                                            // DialogInserirBombeio aceita readOnly (handled below)
-                                            readOnly: readOnlyMode,
-                                          );
-                                          if (result is Map<String, dynamic>) {
-                                            final id = result['id'] ?? result['bombeio_id'];
-                                            if (id != null) {
-                                              await _carregarBombeioPorId(id);
-                                            } else if (mounted) {
-                                              setState(() {
-                                                _bombeio = Map<String, dynamic>.from(result);
-                                                _rateioRealizado = result['rateio'] == true;
-                                              });
-                                            }
-                                          }
-                                        } catch (e) {
-                                          await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
-                                        }
-                                      },
-                                      icon: Icon((_rateioRealizado == true || _isReadOnly) ? Icons.info_outline : Icons.edit, size: 18),
-                                      label: Text((_rateioRealizado == true || _isReadOnly) ? 'Detalhes' : 'Editar bombeio'),
-                                      style: ButtonStyle(
-                                        backgroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              Colors.orange[50]!,
-                                            ),
-                                        foregroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              const Color(0xFFE65100),
-                                            ),
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
-                                        ),
-                                        shape: WidgetStateProperty.all(
-                                          RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
-                                            side: const BorderSide(
-                                              color: Color(0xFFE65100),
-                                              width: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        elevation: WidgetStateProperty.all(0),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            else if (!_isReadOnly)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 180,
-                                    height: 40,
-                                    child: ElevatedButton(
-                                      onPressed: () =>
-                                          _showRateioAutomaticoDialog(),
-                                      style: ButtonStyle(
-                                        backgroundColor:
-                                            WidgetStateProperty.resolveWith<
-                                              Color?
-                                            >((states) {
-                                              if (states.contains(
-                                                WidgetState.hovered,
-                                              )) {
-                                                return const Color.fromARGB(
-                                                  255,
-                                                  65,
-                                                  54,
-                                                  49,
-                                                );
-                                              }
-                                              return Colors.black;
-                                            }),
-                                        foregroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              Colors.white,
-                                            ),
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
-                                        ),
-                                        shape: WidgetStateProperty.all(
-                                          RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                          ),
-                                        ),
-                                        side: WidgetStateProperty.all(
-                                          const BorderSide(
-                                            color: Color(0xFFFFBD59),
-                                            width: 1.6,
-                                          ),
-                                        ),
-                                        elevation: WidgetStateProperty.all(1),
-                                      ),
-                                      child: const Text(
-                                        'RATEIO AUTOMÁTICO',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 180,
-                                    height: 40,
-                                    child: ElevatedButton(
-                                      onPressed: () async {
-                                        await _showMessageDialog(
-                                          'Não disponível',
-                                        );
-                                      },
-                                      style: ButtonStyle(
-                                        backgroundColor:
-                                            WidgetStateProperty.resolveWith<
-                                              Color?
-                                            >((states) {
-                                              if (states.contains(
-                                                WidgetState.hovered,
-                                              )) {
-                                                return const Color.fromARGB(
-                                                  255,
-                                                  65,
-                                                  54,
-                                                  49,
-                                                );
-                                              }
-                                              return Colors.black;
-                                            }),
-                                        foregroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              Colors.white,
-                                            ),
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
-                                        ),
-                                        shape: WidgetStateProperty.all(
-                                          RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              6,
-                                            ),
-                                          ),
-                                        ),
-                                        side: WidgetStateProperty.all(
-                                          const BorderSide(
-                                            color: Color.fromARGB(
-                                              255,
-                                              255,
-                                              179,
-                                              65,
-                                            ),
-                                            width: 1.6,
-                                          ),
-                                        ),
-                                        elevation: WidgetStateProperty.all(1),
-                                      ),
-                                      child: const Text(
-                                        'RATEIO MANUAL',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.8,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 150,
-                                    height: 40,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () async {
-                                        final id = _bombeio['id']?.toString();
-                                        if (id == null || id.isEmpty) return;
-                                        await CaclBombeioDialog.showById(context, id);
-                                      },
-                                      icon: const Icon(Icons.calculate, size: 18),
-                                      label: const Text('CACL'),
-                                      style: ButtonStyle(
-                                        backgroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              Colors.blue[50]!,
-                                            ),
-                                        foregroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              const Color(0xFF0D47A1),
-                                            ),
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
-                                        ),
-                                        shape: WidgetStateProperty.all(
-                                          RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
-                                            side: const BorderSide(
-                                              color: Color(0xFF0D47A1),
-                                              width: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        elevation: WidgetStateProperty.all(0),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  SizedBox(
-                                    width: 150,
-                                    height: 40,
-                                    child: ElevatedButton.icon(
-                                      onPressed: () async {
-                                        try {
-                                          final readOnlyMode = (_rateioRealizado == true) || _isReadOnly;
-                                          final result = await DialogInserirBombeio.show(
-                                            context,
-                                            bombeio: _bombeio,
-                                            readOnly: readOnlyMode,
-                                          );
-                                          if (result is Map<String, dynamic>) {
-                                            final id = result['id'] ?? result['bombeio_id'];
-                                            if (id != null) {
-                                              await _carregarBombeioPorId(id);
-                                            } else if (mounted) {
-                                              setState(() {
-                                                _bombeio = Map<String, dynamic>.from(result);
-                                                _rateioRealizado = result['rateio'] == true;
-                                              });
-                                            }
-                                          }
-                                        } catch (e) {
-                                          await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
-                                        }
-                                      },
-                                      icon: Icon((_rateioRealizado == true || _isReadOnly) ? Icons.info_outline : Icons.edit, size: 18),
-                                      label: Text((_rateioRealizado == true || _isReadOnly) ? 'Detalhes' : 'Editar bombeio'),
-                                      style: ButtonStyle(
-                                        backgroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              Colors.orange[50]!,
-                                            ),
-                                        foregroundColor:
-                                            WidgetStateProperty.all<Color>(
-                                              const Color(0xFFE65100),
-                                            ),
-                                        padding: WidgetStateProperty.all(
-                                          const EdgeInsets.symmetric(
-                                            vertical: 8,
-                                            horizontal: 12,
-                                          ),
-                                        ),
-                                        shape: WidgetStateProperty.all(
-                                          RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(6),
-                                            side: const BorderSide(
-                                              color: Color(0xFFE65100),
-                                              width: 1.2,
-                                            ),
-                                          ),
-                                        ),
-                                        elevation: WidgetStateProperty.all(0),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            const SizedBox(height: 16),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
+          // botão de cancelar foi inserido inline nas linhas de comando
         ],
       ),
     );
