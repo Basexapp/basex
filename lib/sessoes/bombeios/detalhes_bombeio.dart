@@ -1203,18 +1203,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                   Expanded(
                                     flex: 2,
                                     child: Text(
-                                      'RECEB. (20ºC)',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
                                       'FATURADO',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
@@ -1240,6 +1228,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     flex: 2,
                                     child: Text(
                                       'SOBRA/PERDA',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      'RECEB. (20ºC)',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
@@ -1371,39 +1371,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             double faturadoVal = 0;
                                             final qmap = _bombeio['quantidades_faturadas'];
                                             final nomeKey = p['nome']?.toString() ?? '';
-                                            if (qmap is Map) {
-                                              if (qmap.containsKey(nomeKey)) {
-                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
-                                              } else {
-                                                for (var k in qmap.keys) {
-                                                  if (k.toString() == nomeKey) {
-                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
-                                                    break;
-                                                  }
-                                                }
-                                              }
-                                            }
-                                            final sobraTotal = recebido20 - totalFaturado;
-                                            final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
-                                            final sobra = (sobraTotal * perc).roundToDouble();
-                                            final exibido = (faturadoVal + sobra).roundToDouble();
-                                            return Text(
-                                              faturadoVal > 0 ? '${_fmt.format(exibido.toInt())} L' : '-',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.w900,
-                                                color: colors[index % colors.length],
-                                              ),
-                                            );
-                                          }),
-                                        ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Builder(builder: (context) {
-                                            double faturadoVal = 0;
-                                            final qmap = _bombeio['quantidades_faturadas'];
-                                            final nomeKey = p['nome']?.toString() ?? '';
                                             // lookup quantidades_faturadas for this participante
                                             if (qmap is Map) {
                                               // direct key
@@ -1514,6 +1481,39 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             );
                                           }),
                                         ),
+                                        Expanded(
+                                          flex: 2,
+                                          child: Builder(builder: (context) {
+                                            double faturadoVal = 0;
+                                            final qmap = _bombeio['quantidades_faturadas'];
+                                            final nomeKey = p['nome']?.toString() ?? '';
+                                            if (qmap is Map) {
+                                              if (qmap.containsKey(nomeKey)) {
+                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                              } else {
+                                                for (var k in qmap.keys) {
+                                                  if (k.toString() == nomeKey) {
+                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    break;
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            final sobraTotal = recebido20 - totalFaturado;
+                                            final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
+                                            final sobra = (sobraTotal * perc).roundToDouble();
+                                            final exibido = (faturadoVal + sobra).roundToDouble();
+                                            return Text(
+                                              faturadoVal > 0 ? '${_fmt.format(exibido.toInt())} L' : '-',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w900,
+                                                color: colors[index % colors.length],
+                                              ),
+                                            );
+                                          }),
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -1568,18 +1568,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                   Expanded(
                                     flex: 2,
                                     child: Text(
-                                      '${_fmt.format(recebido20.toInt())} L',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w900,
-                                        color: Color(0xFF388E3C),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
                                       '${_fmt.format(totalFaturado.toInt())} L',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
@@ -1610,6 +1598,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700,
                                         color: Colors.green[700],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      '${_fmt.format(recebido20.toInt())} L',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF388E3C),
                                       ),
                                     ),
                                   ),
