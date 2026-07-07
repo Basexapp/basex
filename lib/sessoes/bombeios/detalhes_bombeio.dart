@@ -67,6 +67,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
     super.initState();
     _bombeio = Map<String, dynamic>.from(widget.bombeio);
     
+    _rateioRealizado = (widget.bombeio['rateio'] == true);
     _verificarRateioExistente();
     // ensure we load fresh data (and trigger post-fetch debug prints)
     final id = _bombeio['id']?.toString() ?? _bombeio['bombeio_id']?.toString();
@@ -1259,8 +1260,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                   ? (solicitado / totalSolicitado)
                                   : 0;
                               double recAmbPart = recebidoAmb * peso;
-                              double rec20Part = recebido20 * peso;
-
+                              
                               final colors = [
                                 const Color(0xFF0D47A1),
                                 const Color(0xFFD32F2F),
