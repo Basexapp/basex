@@ -5,9 +5,9 @@ import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import '../../login_page.dart';
-import 'dialog_medicoes_gasol.dart';
-import 'dialog_medicoes_alcool.dart';
-import 'rateio_payload.dart';
+import '../operacao/dialog_medicoes_gasol.dart';
+import '../operacao/dialog_medicoes_alcool.dart';
+import '../operacao/rateio_payload.dart';
 
 class ThousandSeparatorInputFormatter extends TextInputFormatter {
   @override

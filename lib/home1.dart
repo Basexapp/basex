@@ -39,7 +39,7 @@ import 'sessoes/almoxerifado/frascos_amostras.dart';
 import 'sessoes/almoxerifado/filtro_estoque_frascos.dart';
 import 'sessoes/operacao/estoque_produto.dart';
 import 'sessoes/operacao/filtro_estoque_produto.dart';
-import 'sessoes/operacao/gestao_bombeios.dart';
+import 'sessoes/bombeios/gestao_bombeios.dart';
 import 'sessoes/operacao/resultados.dart';
 import 'sessoes/estoques/controle_descargas.dart';
 import 'sessoes/bombeios/ordem_bombeio.dart';

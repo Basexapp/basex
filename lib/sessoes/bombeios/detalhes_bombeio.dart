@@ -6,8 +6,8 @@ import '../../login_page.dart';
 import '../../main.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dialog_inserir_bombeio.dart';
-import 'rateio_payload.dart';
-import 'cacl_bombeio.dart';
+import '../operacao/rateio_payload.dart';
+import '../operacao/cacl_bombeio.dart';
 
 class DetalhesBombeioPage extends StatefulWidget {
   final Map<String, dynamic> bombeio;
@@ -898,6 +898,58 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           (_getDoubleSafe(b, 'solicitado')).compareTo(_getDoubleSafe(a, 'solicitado')),
     );
 
+    // compute totals for the table (used by totals row and percent column)
+    double totalFaturado = 0;
+    final qmapGlobal = _bombeio['quantidades_faturadas'];
+    for (var p in participantes) {
+      // faturado lookup
+      double faturadoTmp = 0;
+      final nomeKeyTmp = p['nome']?.toString() ?? '';
+      if (qmapGlobal is Map) {
+        if (qmapGlobal.containsKey(nomeKeyTmp)) {
+          faturadoTmp = double.tryParse(qmapGlobal[nomeKeyTmp]?.toString() ?? '0') ?? 0;
+        } else {
+          for (var k in qmapGlobal.keys) {
+            if (k.toString().toLowerCase() == nomeKeyTmp.toLowerCase()) {
+              faturadoTmp = double.tryParse(qmapGlobal[k]?.toString() ?? '0') ?? 0;
+              break;
+            }
+          }
+        }
+      }
+      totalFaturado += faturadoTmp;
+    }
+
+    // calcular total de sobra/perda (rec20Part - faturado) por participante
+    double totalSobraPerda = 0;
+    for (var p in participantes) {
+      final solicitado = _getDoubleSafe(p, 'solicitado');
+      double peso = totalSolicitado > 0 ? (solicitado / totalSolicitado) : 0;
+      double rec20Part = recebido20 * peso;
+
+      double faturadoVal = 0;
+      final qmap = _bombeio['quantidades_faturadas'];
+      final nomeKey = p['nome']?.toString() ?? '';
+      if (qmap is Map) {
+        if (qmap.containsKey(nomeKey)) {
+          faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+        } else {
+          for (var k in qmap.keys) {
+            if (k.toString() == nomeKey) {
+              faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+              break;
+            }
+            if (faturadoVal == 0 && k.toString().toLowerCase() == nomeKey.toLowerCase()) {
+              faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+              break;
+            }
+          }
+        }
+      }
+      final sobra = rec20Part - faturadoVal;
+      if (faturadoVal > 0) totalSobraPerda += sobra;
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -1126,19 +1178,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                   Expanded(
                                     flex: 1,
                                     child: Text(
-                                      '%',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    flex: 2,
-                                    child: Text(
-                                      'SOLICITADO',
+                                      'Qtd. solicitada',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
@@ -1175,6 +1215,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     flex: 2,
                                     child: Text(
                                       'FATURADO',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey[700],
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      '%',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
@@ -1291,18 +1343,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         Expanded(
                                           flex: 1,
                                           child: Text(
-                                            '${(peso * 100).toStringAsFixed(1)}%',
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w600,
-                                              color: Color(0xFF455A64),
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          flex: 2,
-                                          child: Text(
                                             '${_fmt.format(solicitado.toInt())} L',
                                             textAlign: TextAlign.center,
                                             style: const TextStyle(
@@ -1389,6 +1429,37 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             );
                                           }),
                                         ),
+                                        // percentual sobre total faturado
+                                        Expanded(
+                                          flex: 1,
+                                          child: Builder(builder: (context) {
+                                            double faturadoVal = 0;
+                                            final qmap = _bombeio['quantidades_faturadas'];
+                                            final nomeKey = p['nome']?.toString() ?? '';
+                                            if (qmap is Map) {
+                                              if (qmap.containsKey(nomeKey)) {
+                                                faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                              } else {
+                                                for (var k in qmap.keys) {
+                                                  if (k.toString() == nomeKey) {
+                                                    faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    break;
+                                                  }
+                                                }
+                                              }
+                                            }
+                                            final perc = totalFaturado > 0 ? ((faturadoVal / totalFaturado) * 100) : 0;
+                                            return Text(
+                                              faturadoVal > 0 ? '${perc.toStringAsFixed(1)}%' : '-',
+                                              textAlign: TextAlign.center,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: Color(0xFF455A64),
+                                              ),
+                                            );
+                                          }),
+                                        ),
                                         Expanded(
                                           flex: 2,
                                           child: Builder(builder: (context) {
@@ -1428,7 +1499,101 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                               );
                             }),
 
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 10),
+                            // Totals row
+                            Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                children: [
+                                  const Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      'TOTAL',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF263238),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      '${_fmt.format(totalSolicitado.toInt())} L',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF455A64),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      '${_fmt.format(recebidoAmb.toInt())} L',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF0D47A1),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      '${_fmt.format(recebido20.toInt())} L',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF388E3C),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      '${_fmt.format(totalFaturado.toInt())} L',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF455A64),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 1,
+                                    child: Text(
+                                      totalFaturado > 0 ? '100%' : '-',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF455A64),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      totalSobraPerda != 0 ? '${_fmt.format(totalSobraPerda.toInt())} L' : '-',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.green[700],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Espaço de 50px entre a linha de totalizadores e os botões
+                            const SizedBox(height: 50),
+                            // Botões de comando
                             if (_rateioRealizado == null)
                               const Center(
                                 child: SizedBox(width: 200, height: 40),
