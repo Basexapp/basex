@@ -874,11 +874,11 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         const SizedBox(height: 4),
         Text(
           value,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF0D47A1),
-          ),
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700,
+                                              color: Color(0xFF455A64),
+                                            ),
         ),
       ],
     );
@@ -1179,7 +1179,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                   Expanded(
                                     flex: 1,
                                     child: Text(
-                                      'Qtd. solicitada',
+                                      'QTD. SOLICITADA',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
@@ -1196,7 +1196,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.grey[700],
+                                        color: Color(0xFF455A64),
                                       ),
                                     ),
                                   ),
@@ -1215,7 +1215,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                   Expanded(
                                     flex: 1,
                                     child: Text(
-                                      '%',
+                                      'PARTICIP. %',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
                                         fontSize: 11,
@@ -1357,11 +1357,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           child: Text(
                                             '${_fmt.format(recAmbPart.toInt())} L',
                                             textAlign: TextAlign.center,
-                                            style: TextStyle(
+                                            style: const TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.w700,
-                                              color:
-                                                  colors[index % colors.length],
+                                              color: Color(0xFF455A64),
                                             ),
                                           ),
                                         ),
@@ -1561,7 +1560,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                       style: TextStyle(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w900,
-                                        color: Color(0xFF0D47A1),
+                                        color: Color(0xFF455A64),
                                       ),
                                     ),
                                   ),
@@ -1695,9 +1694,13 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
                                         try {
+                                          // se rateio já ocorreu ou usuário é readOnly, abrir em modo somente leitura
+                                          final readOnlyMode = (_rateioRealizado == true) || _isReadOnly;
                                           final result = await DialogInserirBombeio.show(
                                             context,
                                             bombeio: _bombeio,
+                                            // DialogInserirBombeio aceita readOnly (handled below)
+                                            readOnly: readOnlyMode,
                                           );
                                           if (result is Map<String, dynamic>) {
                                             final id = result['id'] ?? result['bombeio_id'];
@@ -1714,8 +1717,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
                                         }
                                       },
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      label: const Text('Editar bombeio'),
+                                      icon: Icon((_rateioRealizado == true || _isReadOnly) ? Icons.info_outline : Icons.edit, size: 18),
+                                      label: Text((_rateioRealizado == true || _isReadOnly) ? 'Detalhes' : 'Editar bombeio'),
                                       style: ButtonStyle(
                                         backgroundColor:
                                             WidgetStateProperty.all<Color>(
@@ -1922,9 +1925,11 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
                                         try {
+                                          final readOnlyMode = (_rateioRealizado == true) || _isReadOnly;
                                           final result = await DialogInserirBombeio.show(
                                             context,
                                             bombeio: _bombeio,
+                                            readOnly: readOnlyMode,
                                           );
                                           if (result is Map<String, dynamic>) {
                                             final id = result['id'] ?? result['bombeio_id'];
@@ -1941,8 +1946,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           await _showMessageDialog('Erro ao abrir editor: $e', title: 'Erro');
                                         }
                                       },
-                                      icon: const Icon(Icons.edit, size: 18),
-                                      label: const Text('Editar bombeio'),
+                                      icon: Icon((_rateioRealizado == true || _isReadOnly) ? Icons.info_outline : Icons.edit, size: 18),
+                                      label: Text((_rateioRealizado == true || _isReadOnly) ? 'Detalhes' : 'Editar bombeio'),
                                       style: ButtonStyle(
                                         backgroundColor:
                                             WidgetStateProperty.all<Color>(

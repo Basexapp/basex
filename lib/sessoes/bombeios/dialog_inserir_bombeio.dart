@@ -32,15 +32,17 @@ class ThousandSeparatorInputFormatter extends TextInputFormatter {
 
 class DialogInserirBombeio extends StatefulWidget {
   final Map<String, dynamic>? bombeio;
-  const DialogInserirBombeio({super.key, this.bombeio});
+  final bool? readOnly;
+  const DialogInserirBombeio({super.key, this.bombeio, this.readOnly});
 
   static Future<Map<String, dynamic>?> show(
     BuildContext context, {
     Map<String, dynamic>? bombeio,
+    bool? readOnly,
   }) {
     return showDialog(
       context: context,
-      builder: (context) => DialogInserirBombeio(bombeio: bombeio),
+      builder: (context) => DialogInserirBombeio(bombeio: bombeio, readOnly: readOnly),
     );
   }
 
@@ -94,6 +96,9 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   bool get _isReadOnly =>
       user?.empresaId != null && user!.empresaId!.isNotEmpty;
 
+  // Effective readOnly state combining user company and explicit param
+  bool get _effectiveReadOnly => (widget.readOnly == true) || _isReadOnly;
+
   bool get _validarBasico {
     // 1. Data válida
     if (!_isDataValida(dataCtrl.text)) return false;
@@ -127,7 +132,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     // Permite salvar em qualquer situação, exceto quando o diálogo é somente leitura
     // (usuário com empresaId). Mantemos a proteção contra múltiplos salvamentos
     // verificando a flag `salvando`.
-    if (_isReadOnly) return false;
+    if (_effectiveReadOnly) return false;
     if (salvando) return false;
     return true;
   }
@@ -1462,7 +1467,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     Color color, {
     bool isFinal = false,
   }) {
-    final bool podeEditar = !_isReadOnly && _bombeioLocal?['qtd_total_faturada'] == null;
+    final bool podeEditar = !_effectiveReadOnly && _bombeioLocal?['qtd_total_faturada'] == null;
 
     // Resolve referência do tanque para exibição (lógica simples e leve):
     String tanqueDisplay = '-';
@@ -1620,7 +1625,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       controller: dataCtrl,
                       focusNode: _dataFocusNode,
                       keyboardType: TextInputType.number,
-                      readOnly: _temMedicoes || _isReadOnly,
+                      readOnly: _temMedicoes || _effectiveReadOnly,
                       style: TextStyle(
                         color: dataInvalida ? Colors.red : Colors.black87,
                       ),
@@ -1684,7 +1689,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     child: TextField(
                       controller: horarioCtrl,
                       keyboardType: TextInputType.number,
-                      readOnly: _temMedicoes || _isReadOnly,
+                      readOnly: _temMedicoes || _effectiveReadOnly,
                       onChanged: (v) {
                         String formatado = _aplicarMascaraHorario(
                           v,
@@ -1749,7 +1754,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                           ),
                         );
                       }).toList(),
-                      onChanged: (_temMedicoes || _isReadOnly)
+                      onChanged: (_temMedicoes || _effectiveReadOnly)
                           ? null
                           : (val) {
                               setState(() {
@@ -1819,7 +1824,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     selected: isSelected,
                     selectedColor: const Color(0xFF0D47A1),
                     checkmarkColor: Colors.white,
-                    onSelected: (_temMedicoes || _isReadOnly)
+                    onSelected: (_temMedicoes || _effectiveReadOnly)
                         ? null
                         : (val) {
                             setState(() {
@@ -1859,7 +1864,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                     child: TextField(
                                       controller: controllers[nome],
                                       keyboardType: TextInputType.number,
-                                      readOnly: _temMedicoes || _isReadOnly,
+                                      readOnly: _temMedicoes || _effectiveReadOnly,
                                       onChanged: (_) => setState(() {}),
                                       inputFormatters: [
                                         FilteringTextInputFormatter.digitsOnly,
@@ -2006,7 +2011,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 const SizedBox(height: 12),
                 if (selecionadas.values.any((v) => v))
                   ElevatedButton.icon(
-                    onPressed: _isReadOnly
+                    onPressed: _effectiveReadOnly
                         ? null
                         : (_validarBasico &&
                               totalGeral.round() !=
@@ -2016,17 +2021,17 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     icon: const Icon(Icons.save, size: 18),
                     label: const Text('Salvar quantidades'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _isReadOnly
+                      backgroundColor: _effectiveReadOnly
                           ? Colors.grey[300]
                           : Colors.blue[50],
-                      foregroundColor: _isReadOnly
+                      foregroundColor: _effectiveReadOnly
                           ? Colors.grey[600]
                           : const Color(0xFF0D47A1),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: _isReadOnly
+                          color: _effectiveReadOnly
                               ? Colors.grey[400]!
                               : const Color(0xFF0D47A1),
                         ),
@@ -2042,23 +2047,23 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 const SizedBox(height: 16),
                 if (_medicaoInicialSalva == null)
                   ElevatedButton.icon(
-                    onPressed: (_temQuantidadesSalvas && !_isReadOnly)
+                    onPressed: (_temQuantidadesSalvas && !_effectiveReadOnly)
                         ? () => _abrirDialogOInserirMedicao(isFinal: false)
                         : null,
                     icon: const Icon(Icons.straighten, size: 18),
                     label: const Text('Inserir medição inicial'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: (_isReadOnly || !_temQuantidadesSalvas)
+                      backgroundColor: (_effectiveReadOnly || !_temQuantidadesSalvas)
                           ? Colors.grey[300]
                           : Colors.grey[200],
-                      foregroundColor: (_isReadOnly || !_temQuantidadesSalvas)
+                      foregroundColor: (_effectiveReadOnly || !_temQuantidadesSalvas)
                           ? Colors.grey[600]
                           : const Color(0xFF0D47A1),
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                         side: BorderSide(
-                          color: (_isReadOnly || !_temQuantidadesSalvas)
+                          color: (_effectiveReadOnly || !_temQuantidadesSalvas)
                               ? Colors.grey[400]!
                               : const Color(0xFF0D47A1),
                         ),
@@ -2088,23 +2093,23 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   if (_medicaoFinalSalva == null) ...[
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
-                      onPressed: _isReadOnly
+                      onPressed: _effectiveReadOnly
                           ? null
                           : () => _abrirDialogOInserirMedicao(isFinal: true),
                       icon: const Icon(Icons.straighten, size: 18),
                       label: const Text('Inserir medição final'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isReadOnly
+                        backgroundColor: _effectiveReadOnly
                             ? Colors.grey[300]
                             : Colors.orange[50],
-                        foregroundColor: _isReadOnly
+                        foregroundColor: _effectiveReadOnly
                             ? Colors.grey[600]
                             : Colors.orange[900],
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                           side: BorderSide(
-                            color: _isReadOnly
+                            color: _effectiveReadOnly
                                 ? Colors.grey[400]!
                                 : Colors.orange[900]!,
                           ),
@@ -2212,7 +2217,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                                 ),
                               ),
                             ),
-                            if (!_isReadOnly)
+                            if (!_effectiveReadOnly)
                               Padding(
                                 padding: const EdgeInsets.only(left: 4),
                                 child: IconButton(
