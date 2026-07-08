@@ -56,6 +56,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   UsuarioAtual? get user => UsuarioAtual.instance;
 
   Map<String, dynamic>? _bombeioLocal;
+  String? _originalFaturadoStr;
   double _totalVolumesNoInicio = 0;
 
   // Variáveis globais baseadas no usuário
@@ -155,19 +156,19 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
   // Detecta se o campo 'Faturado' já tem valor (texto ou valor salvo no bombeio)
   bool get _faturadoPreenchido {
-    final txt = _qtdFaturadaCtrl.text.replaceAll('.', '').replaceAll(',', '.').trim();
-    if (txt.isNotEmpty) {
+    final current = _qtdFaturadaCtrl.text.trim();
+    // If there was an original saved value and controller still equals it -> treat as filled
+    if (_originalFaturadoStr != null) {
+      if (current != _originalFaturadoStr) return false; // user edited -> allow save
+      final txt = current.replaceAll('.', '').replaceAll(',', '.');
       final v = double.tryParse(txt) ?? 0;
-      if (v > 0) return true;
+      return v > 0;
     }
-    final qf = _bombeioLocal?['qtd_total_faturada'];
-    if (qf != null) {
-      try {
-        final vf = (qf is num) ? qf.toDouble() : double.tryParse(qf.toString().replaceAll(',', '.')) ?? 0;
-        if (vf > 0) return true;
-      } catch (_) {}
-    }
-    return false;
+
+    // No original saved value: use controller content
+    final txt = current.replaceAll('.', '').replaceAll(',', '.');
+    final v = double.tryParse(txt) ?? 0;
+    return v > 0;
   }
 
   @override
@@ -207,6 +208,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
       if (b['qtd_total_faturada'] != null) {
         _qtdFaturadaCtrl.text = _fmt.format((b['qtd_total_faturada'] as num).toInt());
+        _originalFaturadoStr = _qtdFaturadaCtrl.text.trim();
       }
 
       // Se ambas as medições existem, manter valores carregados e cálculos
@@ -228,7 +230,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       _fetchMedicaoFullIfNeeded(_medicaoFinalSalva2, true, true);
     });
     _fetchDistribuidoras();
-    _qtdFaturadaCtrl.addListener(_atualizarCalculos);
+    _qtdFaturadaCtrl.addListener(() {
+      _atualizarCalculos();
+      if (mounted) setState(() {});
+    });
     _dataFocusNode.addListener(() {
       if (!_dataFocusNode.hasFocus) {
         _validarData(dataCtrl.text);
