@@ -56,7 +56,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   UsuarioAtual? get user => UsuarioAtual.instance;
 
   Map<String, dynamic>? _bombeioLocal;
-  String? _originalFaturadoStr;
   double _totalVolumesNoInicio = 0;
 
   // Variáveis globais baseadas no usuário
@@ -157,22 +156,17 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   // Detecta se o campo 'Faturado' já tem valor (texto ou valor salvo no bombeio)
   bool get _faturadoPreenchido {
     final txt = _qtdFaturadaCtrl.text.replaceAll('.', '').replaceAll(',', '.').trim();
-    // If original value existed and controller remains equal to it, treat as filled
-    if (_originalFaturadoStr != null) {
-      if (_qtdFaturadaCtrl.text.trim() != _originalFaturadoStr) {
-        // user edited the field -> allow saving
-        return false;
-      }
-      final v = double.tryParse(txt) ?? 0;
-      return v > 0;
-    }
-
-    // No original saved value; use controller content
     if (txt.isNotEmpty) {
       final v = double.tryParse(txt) ?? 0;
-      return v > 0;
+      if (v > 0) return true;
     }
-
+    final qf = _bombeioLocal?['qtd_total_faturada'];
+    if (qf != null) {
+      try {
+        final vf = (qf is num) ? qf.toDouble() : double.tryParse(qf.toString().replaceAll(',', '.')) ?? 0;
+        if (vf > 0) return true;
+      } catch (_) {}
+    }
     return false;
   }
 
@@ -213,7 +207,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
       if (b['qtd_total_faturada'] != null) {
         _qtdFaturadaCtrl.text = _fmt.format((b['qtd_total_faturada'] as num).toInt());
-        _originalFaturadoStr = _qtdFaturadaCtrl.text;
       }
 
       // Se ambas as medições existem, manter valores carregados e cálculos
