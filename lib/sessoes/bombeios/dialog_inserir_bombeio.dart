@@ -56,6 +56,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   UsuarioAtual? get user => UsuarioAtual.instance;
 
   Map<String, dynamic>? _bombeioLocal;
+  String? _originalFaturadoStr;
   double _totalVolumesNoInicio = 0;
 
   // Variáveis globais baseadas no usuário
@@ -98,6 +99,18 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   bool get _isReadOnly =>
       user?.empresaId != null && user!.empresaId!.isNotEmpty;
 
+  // Arredondamento consistente: mantém 4 casas decimais.
+  // Se o 5º dígito após a vírgula for <=4, trunca (arredonda para menos), caso contrário arredonda para mais.
+  double _round4(double v) {
+    final sign = v < 0 ? -1 : 1;
+    final absv = v.abs();
+    final scaled5 = (absv * 100000).floor();
+    final fifth = scaled5 % 10;
+    final four = (absv * 10000).floor();
+    final resultFour = (fifth > 4) ? (four + 1) : four;
+    return sign * (resultFour / 10000.0);
+  }
+
   // Effective readOnly state combining user company and explicit param
   bool get _effectiveReadOnly => (widget.readOnly == true) || _isReadOnly;
 
@@ -136,7 +149,31 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     // verificando a flag `salvando`.
     if (_effectiveReadOnly) return false;
     if (salvando) return false;
+    // Se o campo 'Faturado' já estiver preenchido, não permitir salvar pelo diálogo
+    if (_faturadoPreenchido) return false;
     return true;
+  }
+
+  // Detecta se o campo 'Faturado' já tem valor (texto ou valor salvo no bombeio)
+  bool get _faturadoPreenchido {
+    final txt = _qtdFaturadaCtrl.text.replaceAll('.', '').replaceAll(',', '.').trim();
+    // If original value existed and controller remains equal to it, treat as filled
+    if (_originalFaturadoStr != null) {
+      if (_qtdFaturadaCtrl.text.trim() != _originalFaturadoStr) {
+        // user edited the field -> allow saving
+        return false;
+      }
+      final v = double.tryParse(txt) ?? 0;
+      return v > 0;
+    }
+
+    // No original saved value; use controller content
+    if (txt.isNotEmpty) {
+      final v = double.tryParse(txt) ?? 0;
+      return v > 0;
+    }
+
+    return false;
   }
 
   @override
@@ -176,6 +213,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
       if (b['qtd_total_faturada'] != null) {
         _qtdFaturadaCtrl.text = _fmt.format((b['qtd_total_faturada'] as num).toInt());
+        _originalFaturadoStr = _qtdFaturadaCtrl.text;
       }
 
       // Se ambas as medições existem, manter valores carregados e cálculos
@@ -250,7 +288,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         0;
 
     if (faturado > 0 && _qtdFaturadaCtrl.text.isNotEmpty) {
-      final double dif = recebido20 - faturado;
+      final double difRaw = recebido20 - faturado;
+      final double dif = _round4(difRaw);
       final double percentual = faturado != 0 ? (dif / faturado) * 100 : 0;
 
       _difFaturadoCtrl.text =

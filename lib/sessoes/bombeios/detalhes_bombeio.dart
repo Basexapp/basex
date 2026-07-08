@@ -35,6 +35,18 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
   bool get _isReadOnly => user?.empresaId?.isNotEmpty ?? false;
 
+  // Arredondamento consistente: mantém 4 casas decimais.
+  // Se o 5º dígito após a vírgula for <=4, trunca (arredonda para menos), caso contrário arredonda para mais.
+  double _round4(double v) {
+    final sign = v < 0 ? -1 : 1;
+    final absv = v.abs();
+    final scaled5 = (absv * 100000).floor(); // inclui 5th digit
+    final fifth = scaled5 % 10;
+    final four = (absv * 10000).floor();
+    final resultFour = (fifth > 4) ? (four + 1) : four;
+    return sign * (resultFour / 10000.0);
+  }
+
   // Helper seguro para extrair double de um mapa
   double _getDoubleSafe(Map<String, dynamic> map, String key, {double defaultValue = 0.0}) {
     final value = map[key];
@@ -166,12 +178,22 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         horario,
         medicao_inicial_id,
         medicao_final_id,
+        medicao_inicial_id_2,
+        medicao_final_id_2,
+        tanque_id_2,
         volumes_solicitados,
         total_bombeio,
         tanque_id,
         qtd_total_faturada,
         quantidades_faturadas,
         tanques!bombeios_tanque_id_fkey (
+          referencia,
+          produto_id,
+          produtos (
+            nome
+          )
+        ),
+        tanque2:tanques!bombeios_tanque_id_2_fkey (
           referencia,
           produto_id,
           produtos (
@@ -193,6 +215,22 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           horario,
           volume_ambiente,
           volume_20
+        ),
+        medicao_inicial_2:medicoes!bombeios_medicao_inicial_id_2_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
+        ),
+        medicao_final_2:medicoes!bombeios_medicao_final_id_2_fkey (
+          id,
+          num_controle,
+          data,
+          horario,
+          volume_ambiente,
+          volume_20
         )
       ''')
           .eq('id', id)
@@ -201,14 +239,22 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       if (resp == null) return;
       
       final item = resp;
-      // immediate post-fetch debug: show raw quantidades_faturadas value
       
+      // Tanque 1
       final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
       final tanques = tanquesArr is List
           ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null)
           : tanquesArr;
       final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
       final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
+      
+      // Tanque 2
+      final tanque2Arr = item['tanque2'] ?? item['tanques!bombeios_tanque_id_2_fkey'];
+      final tanque2 = tanque2Arr is List
+          ? (tanque2Arr.isNotEmpty ? tanque2Arr[0] : null)
+          : tanque2Arr;
+      final produto2 = tanque2?['produtos']?['nome'] ?? '';
+      final tanqueNome2 = tanque2?['referencia'] ?? '';
 
       double totalSolicitado = 0;
       List<Map<String, dynamic>> participantes = [];
@@ -230,6 +276,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           }
         }
       }
+      
       // parse quantidades_faturadas (jsonb) into Map<String,double>
       Map<String, double> quantidadesFaturadasMap = {};
       final rawFaturado = item['quantidades_faturadas'];
@@ -262,6 +309,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         }
       }
 
+      // Medições do tanque 1
       final medFinalArr = item['medicao_final'];
       final medFinal = medFinalArr is List
           ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null)
@@ -285,21 +333,35 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
       double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
 
+      // Medições do tanque 2
+      final medFinal2Arr = item['medicao_final_2'];
+      final medFinal2 = medFinal2Arr is List
+          ? (medFinal2Arr.isNotEmpty ? medFinal2Arr[0] : null)
+          : medFinal2Arr;
+      final hFinal2 = medFinal2?['horario']?.toString().substring(0, 5) ?? '--:--';
+
+      final medIni2Arr = item['medicao_inicial_2'];
+      final medIni2 = medIni2Arr is List
+          ? (medIni2Arr.isNotEmpty ? medIni2Arr[0] : null)
+          : medIni2Arr;
+
       final Map<String, dynamic> bombeioParaDetalhes = {
         'id': item['id'],
         'bombeio_id': item['id'],
         'rateio': item['rateio'],
         'tanque_id': item['tanque_id'],
+        'tanque_id_2': item['tanque_id_2'],
         'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
         'produto': produto,
+        'produto_2': produto2,
         'tanque': tanqueNome,
-        'horario_inicial':
-            item['horario']?.toString().substring(0, 5) ?? '--:--',
+        'tanque_2': tanqueNome2,
+        'horario_inicial': item['horario']?.toString().substring(0, 5) ?? '--:--',
         'horario_final': hFinal,
+        'horario_final_2': hFinal2,
         'numero_controle': item['num_controle'] ?? 'S/N',
         'status': '',
-        'volume_total':
-            double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
+        'volume_total': double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
         'volume_solicitado': totalSolicitado,
         'participantes': participantes,
         'quantidades_faturadas': quantidadesFaturadasMap,
@@ -308,6 +370,12 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         'qtd_total_faturada': item['qtd_total_faturada'],
         'medicao_inicial': medIni,
         'medicao_final': medFinal,
+        'medicao_inicial_2': medIni2,
+        'medicao_final_2': medFinal2,
+        'medicao_inicial_id': item['medicao_inicial_id'],
+        'medicao_final_id': item['medicao_final_id'],
+        'medicao_inicial_id_2': item['medicao_inicial_id_2'],
+        'medicao_final_id_2': item['medicao_final_id_2'],
       };
 
       if (!mounted) return;
@@ -994,8 +1062,35 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
   Widget build(BuildContext context) {
     // Extração segura dos valores
     final double totalSolicitado = _getDoubleSafe(_bombeio, 'volume_solicitado');
-    final double recebidoAmb = _getDoubleSafe(_bombeio, 'recebido_amb');
-    final double recebido20 = _getDoubleSafe(_bombeio, 'recebido_20');
+
+    // Calcular recebidos somando medições finais e subtraindo iniciais dos dois tanques
+    double medIniAmb1 = 0;
+    double medFinAmb1 = 0;
+    double medIniAmb2 = 0;
+    double medFinAmb2 = 0;
+
+    double medIni20_1 = 0;
+    double medFin20_1 = 0;
+    double medIni20_2 = 0;
+    double medFin20_2 = 0;
+
+    final medIni = _bombeio['medicao_inicial'] as Map<String, dynamic>?;
+    final medFin = _bombeio['medicao_final'] as Map<String, dynamic>?;
+    final medIni2 = _bombeio['medicao_inicial_2'] as Map<String, dynamic>?;
+    final medFin2 = _bombeio['medicao_final_2'] as Map<String, dynamic>?;
+
+    medIniAmb1 = _getDoubleSafe(medIni ?? {}, 'volume_ambiente');
+    medFinAmb1 = _getDoubleSafe(medFin ?? {}, 'volume_ambiente');
+    medIniAmb2 = _getDoubleSafe(medIni2 ?? {}, 'volume_ambiente');
+    medFinAmb2 = _getDoubleSafe(medFin2 ?? {}, 'volume_ambiente');
+
+    medIni20_1 = _getDoubleSafe(medIni ?? {}, 'volume_20');
+    medFin20_1 = _getDoubleSafe(medFin ?? {}, 'volume_20');
+    medIni20_2 = _getDoubleSafe(medIni2 ?? {}, 'volume_20');
+    medFin20_2 = _getDoubleSafe(medFin2 ?? {}, 'volume_20');
+
+    final double recebidoAmb = (medFinAmb1 - medIniAmb1) + (medFinAmb2 - medIniAmb2);
+    final double recebido20 = (medFin20_1 - medIni20_1) + (medFin20_2 - medIni20_2);
     
     final List<Map<String, dynamic>> participantes =
         List<Map<String, dynamic>>.from(_bombeio['participantes'] ?? []);
@@ -1053,7 +1148,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           }
         }
       }
-      final sobra = rec20Part - faturadoVal;
+      final sobraRaw = rec20Part - faturadoVal;
+      final sobra = _round4(sobraRaw);
       if (faturadoVal > 0) totalSobraPerda += sobra;
     }
 
@@ -1120,7 +1216,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                       if (_bombeio['medicao_inicial'] != null)
                         _buildMedicaoDisplay(
                           _bombeio['medicao_inicial'],
-                          'MEDIÇÃO INICIAL',
+                          'MEDIÇÃO INICIAL - TANQUE 1',
                           const Color(0xFF0D47A1),
                         ),
                       if (_bombeio['medicao_inicial'] != null)
@@ -1128,8 +1224,24 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                       if (_bombeio['medicao_final'] != null)
                         _buildMedicaoDisplay(
                           _bombeio['medicao_final'],
-                          'MEDIÇÃO FINAL',
-                          Colors.green.shade700,
+                          'MEDIÇÃO FINAL - TANQUE 1',
+                          Colors.orange[900]!,
+                        ),
+                      if (_bombeio['medicao_final'] != null)
+                        const SizedBox(height: 8),
+                      if (_bombeio['medicao_inicial_2'] != null)
+                        _buildMedicaoDisplay(
+                          _bombeio['medicao_inicial_2'],
+                          'MEDIÇÃO INICIAL - TANQUE 2',
+                          const Color(0xFF0D47A1),
+                        ),
+                      if (_bombeio['medicao_inicial_2'] != null)
+                        const SizedBox(height: 8),
+                      if (_bombeio['medicao_final_2'] != null)
+                        _buildMedicaoDisplay(
+                          _bombeio['medicao_final_2'],
+                          'MEDIÇÃO FINAL - TANQUE 2',
+                          Colors.orange[900]!,
                         ),
                       const SizedBox(height: 80),
 
@@ -1576,7 +1688,8 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                                 final sobraTotal = recebido20 - totalFaturado;
                                                 final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
                                                 final sobra = (sobraTotal * perc).roundToDouble();
-                                                final sobraColor = sobra < 0 ? Colors.red : Colors.green[700];
+                                                // Mostrar SOBRA/PERDA em roxo para a coluna (não altera título/total)
+                                                final sobraColor = const Color(0xFF6A1B9A);
                                                 return Text(
                                                   faturadoVal > 0 ? '${_fmt.format(sobra.toInt())} L' : '-',
                                                   textAlign: TextAlign.center,
@@ -1653,10 +1766,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         child: Text(
                                           '${_fmt.format(totalSolicitado.toInt())} L',
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xFF455A64),
+                                            color: Colors.grey[700],
                                           ),
                                         ),
                                       ),
@@ -1668,7 +1781,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xFF455A64),
+                                            color: Colors.grey[700],
                                           ),
                                         ),
                                       ),
@@ -1680,7 +1793,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xFF455A64),
+                                            color: Colors.grey[700],
                                           ),
                                         ),
                                       ),
@@ -1689,10 +1802,10 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         child: Text(
                                           totalFaturado > 0 ? '100%' : '-',
                                           textAlign: TextAlign.center,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xFF455A64),
+                                            color: Colors.grey[700],
                                           ),
                                         ),
                                       ),
@@ -1704,7 +1817,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w700,
-                                            color: Colors.green[700],
+                                            color: Colors.grey[700],
                                           ),
                                         ),
                                       ),
@@ -1716,7 +1829,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                           style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w900,
-                                            color: Color(0xFF388E3C),
+                                            color: Colors.grey[700],
                                           ),
                                         ),
                                       ),
