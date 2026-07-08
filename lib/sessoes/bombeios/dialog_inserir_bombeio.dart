@@ -65,8 +65,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
   List<Map<String, dynamic>> _tanques = [];
   Map<String, dynamic>? _selectedTanque;
-  String _produtoNome = '';
-  final TextEditingController _produtoCtrl = TextEditingController();
+  Map<String, dynamic>? _selectedTanque2;
+  // Produto fields removed from UI; derive product info from selected tanque when needed.
   // Distribuidoras carregadas do banco (empresa.id + empresas.nome_dois)
   List<Map<String, dynamic>> _distribuidoras = [];
   Map<String, bool> selecionadas = {};
@@ -86,10 +86,12 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   bool salvando = false;
   Map<String, dynamic>? _medicaoInicialSalva;
   Map<String, dynamic>? _medicaoFinalSalva;
+  Map<String, dynamic>? _medicaoInicialSalva2;
+  Map<String, dynamic>? _medicaoFinalSalva2;
   Color _difColor = const Color(0xFF0D47A1);
 
   bool get _temMedicoes =>
-      _medicaoInicialSalva != null || _medicaoFinalSalva != null;
+      _medicaoInicialSalva != null || _medicaoFinalSalva != null || _medicaoInicialSalva2 != null || _medicaoFinalSalva2 != null;
 
   bool get _temQuantidadesSalvas => _totalVolumesNoInicio > 0;
 
@@ -165,6 +167,11 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
       _medicaoInicialSalva = b['medicao_inicial'];
       _medicaoFinalSalva = b['medicao_final'];
+      
+      // Carregar medições do segundo tanque se existirem
+      _medicaoInicialSalva2 = b['medicao_inicial_2'];
+      _medicaoFinalSalva2 = b['medicao_final_2'];
+      
       _atualizarCalculos();
 
       if (b['qtd_total_faturada'] != null) {
@@ -186,6 +193,8 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       // Após carregar tanques, tenta buscar medições completas caso falte tanque_id
       _fetchMedicaoFullIfNeeded(_medicaoInicialSalva, false);
       _fetchMedicaoFullIfNeeded(_medicaoFinalSalva, true);
+      _fetchMedicaoFullIfNeeded(_medicaoInicialSalva2, false, true);
+      _fetchMedicaoFullIfNeeded(_medicaoFinalSalva2, true, true);
     });
     _fetchDistribuidoras();
     _qtdFaturadaCtrl.addListener(_atualizarCalculos);
@@ -197,6 +206,10 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   }
 
   void _atualizarCalculos() {
+    // Somar medições completas de ambos os tanques (quando existirem)
+    double recebidoAmb = 0.0;
+    double recebido20 = 0.0;
+
     if (_medicaoInicialSalva != null && _medicaoFinalSalva != null) {
       final double ambIni =
           (_medicaoInicialSalva!['volume_ambiente'] as num?)?.toDouble() ?? 0;
@@ -207,38 +220,53 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       final double v20Fin =
           (_medicaoFinalSalva!['volume_20'] as num?)?.toDouble() ?? 0;
 
-      final double recebidoAmb = ambFin - ambIni;
-      final double recebido20 = v20Fin - v20Ini;
+      recebidoAmb += ambFin - ambIni;
+      recebido20 += v20Fin - v20Ini;
+    }
 
-      _recebidaAmbCtrl.text = _fmt.format(recebidoAmb.toInt());
-      _recebida20Ctrl.text = _fmt.format(recebido20.toInt());
+    if (_medicaoInicialSalva2 != null && _medicaoFinalSalva2 != null) {
+      final double ambIni2 =
+          (_medicaoInicialSalva2!['volume_ambiente'] as num?)?.toDouble() ?? 0;
+      final double ambFin2 =
+          (_medicaoFinalSalva2!['volume_ambiente'] as num?)?.toDouble() ?? 0;
+      final double v20Ini2 =
+          (_medicaoInicialSalva2!['volume_20'] as num?)?.toDouble() ?? 0;
+      final double v20Fin2 =
+          (_medicaoFinalSalva2!['volume_20'] as num?)?.toDouble() ?? 0;
 
-      // Cálculo da diferença faturado/recebido
-      final double faturado =
-          double.tryParse(
-            _qtdFaturadaCtrl.text.replaceAll('.', '').replaceAll(',', '.'),
-          ) ??
-          0;
+      recebidoAmb += ambFin2 - ambIni2;
+      recebido20 += v20Fin2 - v20Ini2;
+    }
 
-      if (faturado > 0 && _qtdFaturadaCtrl.text.isNotEmpty) {
-        final double dif = recebido20 - faturado;
-        final double percentual = (dif / faturado) * 100;
+    // Atualiza campos na UI
+    _recebidaAmbCtrl.text = _fmt.format(recebidoAmb.toInt());
+    _recebida20Ctrl.text = _fmt.format(recebido20.toInt());
 
-        _difFaturadoCtrl.text =
+    // Cálculo da diferença faturado/recebido usando o total agregado a 20°C
+    final double faturado =
+        double.tryParse(
+          _qtdFaturadaCtrl.text.replaceAll('.', '').replaceAll(',', '.'),
+        ) ??
+        0;
+
+    if (faturado > 0 && _qtdFaturadaCtrl.text.isNotEmpty) {
+      final double dif = recebido20 - faturado;
+      final double percentual = faturado != 0 ? (dif / faturado) * 100 : 0;
+
+      _difFaturadoCtrl.text =
           '${_fmt.format(dif.toInt())} L    |    ${percentual.toStringAsFixed(2).replaceAll('.', ',')}%';
-        _difColor = dif < 0 ? Colors.red : const Color(0xFF0D47A1);
-      } else {
-        _difFaturadoCtrl.text = '';
-        _difColor = const Color(0xFF0D47A1);
-      }
+      _difColor = dif < 0 ? Colors.red : const Color(0xFF0D47A1);
+    } else {
+      _difFaturadoCtrl.text = '';
+      _difColor = const Color(0xFF0D47A1);
+    }
 
-      if (mounted) {
-        setState(() {});
-      }
+    if (mounted) {
+      setState(() {});
     }
   }
 
-  Future<void> _fetchMedicaoFullIfNeeded(Map<String, dynamic>? med, bool isFinal) async {
+  Future<void> _fetchMedicaoFullIfNeeded(Map<String, dynamic>? med, bool isFinal, [bool isSecond = false]) async {
     if (med == null) return;
     try {
       final id = med['id']?.toString();
@@ -247,14 +275,26 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       final supabase = Supabase.instance.client;
       final full = await supabase.from('medicoes').select().eq('id', id).maybeSingle();
       if (full != null) {
-        if (isFinal) {
-          setState(() {
-            _medicaoFinalSalva = Map<String, dynamic>.from(full);
-          });
+        if (isSecond) {
+          if (isFinal) {
+            setState(() {
+              _medicaoFinalSalva2 = Map<String, dynamic>.from(full);
+            });
+          } else {
+            setState(() {
+              _medicaoInicialSalva2 = Map<String, dynamic>.from(full);
+            });
+          }
         } else {
-          setState(() {
-            _medicaoInicialSalva = Map<String, dynamic>.from(full);
-          });
+          if (isFinal) {
+            setState(() {
+              _medicaoFinalSalva = Map<String, dynamic>.from(full);
+            });
+          } else {
+            setState(() {
+              _medicaoInicialSalva = Map<String, dynamic>.from(full);
+            });
+          }
         }
         _atualizarCalculos();
       } else {
@@ -297,16 +337,19 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         setState(() {
           _tanques = tanquesList;
           if (_bombeioLocal != null && _bombeioLocal!['tanque_id'] != null) {
-            try {
+              try {
               _selectedTanque = _tanques.firstWhere(
                 (t) => t['id'] == _bombeioLocal!['tanque_id'],
               );
-              var prod = _selectedTanque?['produtos'];
-              if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
-              _produtoNome = (prod is Map)
-                  ? (prod['nome_dois'] ?? prod['nome'] ?? '')
-                  : '';
-              _produtoCtrl.text = _produtoNome;
+                  // selected tanque restored from saved bombeio; product name is derivable
+            } catch (_) {}
+          }
+          // Restaurar segundo tanque se existir no bombeio
+          if (_bombeioLocal != null && _bombeioLocal!['tanque_id_2'] != null) {
+            try {
+              _selectedTanque2 = _tanques.firstWhere(
+                (t) => t['id'] == _bombeioLocal!['tanque_id_2'],
+              );
             } catch (_) {}
           }
         });
@@ -314,6 +357,101 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     } catch (e) {
       debugPrint('Erro ao buscar tanques: $e');
     }
+  }
+
+  String? _getProdutoIdFromTanque(Map<String, dynamic>? tanque) {
+    if (tanque == null) return null;
+    final pid = tanque['produto_id'];
+    if (pid != null) return pid.toString();
+    var prod = tanque['produtos'];
+    if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
+    if (prod is Map) return prod['id']?.toString();
+    return null;
+  }
+
+  bool get _produtosDiferentes {
+    final p1 = _getProdutoIdFromTanque(_selectedTanque);
+    final p2 = _getProdutoIdFromTanque(_selectedTanque2);
+    if (p1 == null || p2 == null) return false;
+    return p1 != p2;
+  }
+
+  bool get _mesmoTanque {
+    final t1 = _selectedTanque?['id']?.toString();
+    final t2 = _selectedTanque2?['id']?.toString();
+    if (t1 == null || t2 == null) return false;
+    return t1 == t2;
+  }
+
+  bool _deveMostrarBotaoInicial(Map<String, dynamic>? tanque) {
+    if (tanque == null) return false;
+    if (_selectedTanque2 == null) {
+      // Caso com 1 tanque: mostra botão se não tiver medição inicial
+      return _medicaoInicialSalva == null;
+    } else {
+      // Caso com 2 tanques: verifica qual tanque é
+      if (tanque == _selectedTanque) {
+        return _medicaoInicialSalva == null;
+      } else if (tanque == _selectedTanque2) {
+        return _medicaoInicialSalva2 == null;
+      }
+      return false;
+    }
+  }
+
+  bool _deveMostrarBotaoFinal(Map<String, dynamic>? tanque) {
+    if (tanque == null) return false;
+    if (_selectedTanque2 == null) {
+      // Caso com 1 tanque: mostra botão final se tiver inicial e não tiver final
+      return _medicaoInicialSalva != null && _medicaoFinalSalva == null;
+    } else {
+      // Caso com 2 tanques: mostra botão final apenas se tiver as 2 iniciais e a final deste tanque não existir
+      if (_medicaoInicialSalva == null || _medicaoInicialSalva2 == null) {
+        return false;
+      }
+      if (tanque == _selectedTanque) {
+        return _medicaoFinalSalva == null;
+      } else if (tanque == _selectedTanque2) {
+        return _medicaoFinalSalva2 == null;
+      }
+      return false;
+    }
+  }
+
+  bool get _podeMostrarAnalise {
+    // Mostra análise se tiver pelo menos um par completo (inicial+final)
+    return (_medicaoInicialSalva != null && _medicaoFinalSalva != null) ||
+           (_medicaoInicialSalva2 != null && _medicaoFinalSalva2 != null);
+  }
+
+  void _onMedicaoInicialSalva(Map<String, dynamic> map, Map<String, dynamic>? tanque) {
+    setState(() {
+      if (tanque == _selectedTanque || tanque == null) {
+        _medicaoInicialSalva = map;
+        _bombeioLocal!['medicao_inicial_id'] = map['id'];
+        _bombeioLocal!['medicao_inicial'] = map;
+      } else if (tanque == _selectedTanque2) {
+        _medicaoInicialSalva2 = map;
+        _bombeioLocal!['medicao_inicial_id_2'] = map['id'];
+        _bombeioLocal!['medicao_inicial_2'] = map;
+      }
+      _atualizarCalculos();
+    });
+  }
+
+  void _onMedicaoFinalSalva(Map<String, dynamic> map, Map<String, dynamic>? tanque) {
+    setState(() {
+      if (tanque == _selectedTanque || tanque == null) {
+        _medicaoFinalSalva = map;
+        _bombeioLocal!['medicao_final_id'] = map['id'];
+        _bombeioLocal!['medicao_final'] = map;
+      } else if (tanque == _selectedTanque2) {
+        _medicaoFinalSalva2 = map;
+        _bombeioLocal!['medicao_final_id_2'] = map['id'];
+        _bombeioLocal!['medicao_final_2'] = map;
+      }
+      _atualizarCalculos();
+    });
   }
 
   Future<void> _fetchDistribuidoras() async {
@@ -455,6 +593,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
   Future<void> _excluirMedicao(
     Map<String, dynamic> medicao,
     bool isFinal,
+    Map<String, dynamic>? tanque,
   ) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -541,9 +680,17 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
       setState(() {
         if (isFinal) {
-          _medicaoFinalSalva = null;
+          if (tanque == _selectedTanque || tanque == null) {
+            _medicaoFinalSalva = null;
+          } else if (tanque == _selectedTanque2) {
+            _medicaoFinalSalva2 = null;
+          }
         } else {
-          _medicaoInicialSalva = null;
+          if (tanque == _selectedTanque || tanque == null) {
+            _medicaoInicialSalva = null;
+          } else if (tanque == _selectedTanque2) {
+            _medicaoInicialSalva2 = null;
+          }
         }
         _atualizarCalculos();
       });
@@ -566,24 +713,18 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     }
   }
 
-  void _abrirDialogOInserirMedicao({bool isFinal = false}) async {
+  void _abrirDialogOInserirMedicao({bool isFinal = false, Map<String, dynamic>? tanque}) async {
     if (_bombeioLocal == null) return;
 
     final supabase = Supabase.instance.client;
     bool usarTabelaAlcool = false;
-    final produtoNome = _produtoCtrl.text;
-    final tanqueRef = _selectedTanque?['referencia'];
-    final produtoId =
-        (_selectedTanque?['produto_id'] ?? _bombeioLocal?['produto_id'])
-            ?.toString();
+    final Map<String, dynamic>? tanqueSel = tanque ?? _selectedTanque;
+    final tanqueRef = tanqueSel?['referencia'];
+    final produtoId = (tanqueSel?['produto_id'] ?? _bombeioLocal?['produto_id'])?.toString();
 
-    if (produtoNome.isNotEmpty) {
+    if (produtoId != null && produtoId.isNotEmpty) {
       try {
-        final prodRes = await supabase
-            .from('produtos')
-            .select('tabela_alcool')
-            .eq('nome', produtoNome)
-            .maybeSingle();
+        final prodRes = await supabase.from('produtos').select('tabela_alcool').eq('id', produtoId).maybeSingle();
         if (prodRes != null && prodRes['tabela_alcool'] == true) {
           usarTabelaAlcool = true;
         }
@@ -592,56 +733,74 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
       }
     }
 
+    String produtoNomeFromTanque(Map<String, dynamic>? t) {
+      var prod = t?['produtos'];
+      if (prod is List) prod = prod.isNotEmpty ? prod[0] : null;
+      if (prod is Map) return (prod['nome_dois'] ?? prod['nome'] ?? '').toString();
+      if (_bombeioLocal != null) {
+        final p = _bombeioLocal?['produto_nome'] ?? _bombeioLocal?['produto'] ?? '';
+        if (p is String && p.isNotEmpty) return p;
+      }
+      return '';
+    }
+
     if (!mounted) return;
 
-    showDialog(
-      context: context,
-      builder: (context) => usarTabelaAlcool
-          ? DialogMedicoesAlcool(
-              produtoNome: produtoNome,
-              produtoId: produtoId,
-              tanqueReferencia: tanqueRef,
-              data: dataCtrl.text,
-              horario: horarioCtrl.text,
-              exibirCamposAgua: false,
-              bombeioId: _bombeioLocal!['id'],
-              bombeioField: isFinal ? 'medicao_final_id' : 'medicao_inicial_id',
-              onSaved: (map) {
-                setState(() {
-                  if (isFinal) {
-                    _medicaoFinalSalva = map;
-                    _bombeioLocal!['medicao_final_id'] = map['id'];
-                  } else {
-                    _medicaoInicialSalva = map;
-                    _bombeioLocal!['medicao_inicial_id'] = map['id'];
-                  }
-                  _atualizarCalculos();
-                });
-              },
-            )
-          : DialogMedicoesGasol(
-              produtoNome: produtoNome,
-              produtoId: produtoId,
-              tanqueReferencia: tanqueRef,
-              data: dataCtrl.text,
-              horario: horarioCtrl.text,
-              exibirCamposAgua: false,
-              bombeioId: _bombeioLocal!['id'],
-              bombeioField: isFinal ? 'medicao_final_id' : 'medicao_inicial_id',
-              onSaved: (map) {
-                setState(() {
-                  if (isFinal) {
-                    _medicaoFinalSalva = map;
-                    _bombeioLocal!['medicao_final_id'] = map['id'];
-                  } else {
-                    _medicaoInicialSalva = map;
-                    _bombeioLocal!['medicao_inicial_id'] = map['id'];
-                  }
-                  _atualizarCalculos();
-                });
-              },
-            ),
-    );
+    if (isFinal) {
+      showDialog(
+        context: context,
+        builder: (context) => usarTabelaAlcool
+            ? DialogMedicoesAlcool(
+                produtoNome: produtoNomeFromTanque(tanqueSel),
+                produtoId: produtoId,
+                tanqueReferencia: tanqueRef,
+                data: dataCtrl.text,
+                horario: horarioCtrl.text,
+                exibirCamposAgua: false,
+                bombeioId: _bombeioLocal!['id'],
+                bombeioField: tanque == _selectedTanque2 ? 'medicao_final_id_2' : 'medicao_final_id',
+                onSaved: (map) => _onMedicaoFinalSalva(map, tanque),
+              )
+            : DialogMedicoesGasol(
+                produtoNome: produtoNomeFromTanque(tanqueSel),
+                produtoId: produtoId,
+                tanqueReferencia: tanqueRef,
+                data: dataCtrl.text,
+                horario: horarioCtrl.text,
+                exibirCamposAgua: false,
+                bombeioId: _bombeioLocal!['id'],
+                bombeioField: tanque == _selectedTanque2 ? 'medicao_final_id_2' : 'medicao_final_id',
+                onSaved: (map) => _onMedicaoFinalSalva(map, tanque),
+              ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (context) => usarTabelaAlcool
+            ? DialogMedicoesAlcool(
+                produtoNome: produtoNomeFromTanque(tanqueSel),
+                produtoId: produtoId,
+                tanqueReferencia: tanqueRef,
+                data: dataCtrl.text,
+                horario: horarioCtrl.text,
+                exibirCamposAgua: false,
+                bombeioId: _bombeioLocal!['id'],
+                bombeioField: tanque == _selectedTanque2 ? 'medicao_inicial_id_2' : 'medicao_inicial_id',
+                onSaved: (map) => _onMedicaoInicialSalva(map, tanque),
+              )
+            : DialogMedicoesGasol(
+                produtoNome: produtoNomeFromTanque(tanqueSel),
+                produtoId: produtoId,
+                tanqueReferencia: tanqueRef,
+                data: dataCtrl.text,
+                horario: horarioCtrl.text,
+                exibirCamposAgua: false,
+                bombeioId: _bombeioLocal!['id'],
+                bombeioField: tanque == _selectedTanque2 ? 'medicao_inicial_id_2' : 'medicao_inicial_id',
+                onSaved: (map) => _onMedicaoInicialSalva(map, tanque),
+              ),
+      );
+    }
   }
 
   @override
@@ -651,7 +810,6 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     _recebidaAmbCtrl.dispose();
     _recebida20Ctrl.dispose();
     _difFaturadoCtrl.dispose();
-    _produtoCtrl.dispose();
     _qtdFaturadaCtrl.dispose();
     _dataFocusNode.dispose();
     for (var c in controllers.values) {
@@ -940,10 +1098,13 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
         'terminal_id': terminalId,
         'empresa_id': empresaId,
         'tanque_id': _selectedTanque!['id'],
+        'tanque_id_2': _selectedTanque2?['id'],
         'data': dataIso.isNotEmpty ? dataIso : null,
         'horario': horarioIso.isNotEmpty ? horarioIso : null,
         'medicao_inicial_id': _medicaoInicialSalva?['id'],
         'medicao_final_id': _medicaoFinalSalva?['id'],
+        'medicao_inicial_id_2': _medicaoInicialSalva2?['id'],
+        'medicao_final_id_2': _medicaoFinalSalva2?['id'],
         'volumes_solicitados': volumes,
         'total_bombeio': total,
         'qtd_total_faturada': qtdFaturadaFinal,
@@ -1466,6 +1627,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
     Map<String, dynamic> medicao,
     Color color, {
     bool isFinal = false,
+    Map<String, dynamic>? tanque,
   }) {
     final bool podeEditar = !_effectiveReadOnly && _bombeioLocal?['qtd_total_faturada'] == null;
 
@@ -1502,7 +1664,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               constraints: const BoxConstraints(),
               onSelected: (val) {
                 if (val == 'delete') {
-                  _excluirMedicao(medicao, isFinal);
+                  _excluirMedicao(medicao, isFinal, tanque);
                 }
               },
               itemBuilder: (context) => [
@@ -1620,7 +1782,7 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
               Row(
                 children: [
                   SizedBox(
-                    width: 125,
+                    width: 145,
                     child: TextField(
                       controller: dataCtrl,
                       focusNode: _dataFocusNode,
@@ -1720,26 +1882,30 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    flex: 2,
+                    flex: 1,
                     child: DropdownButtonFormField<Map<String, dynamic>>(
                       value: _selectedTanque,
                       isExpanded: true,
                       // limita a altura do menu para permitir rolagem quando muitos itens
                       menuMaxHeight: 300,
-                      decoration: const InputDecoration(
-                        labelText: 'Tanque',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: 'Tanque 1',
+                        border: const OutlineInputBorder(),
                         isDense: true,
                         floatingLabelBehavior: FloatingLabelBehavior.always,
-                        contentPadding: EdgeInsets.symmetric(
+                        contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
                         ),
+                        errorText: _mesmoTanque
+                            ? 'Mesmo tanque'
+                            : (_produtosDiferentes ? 'Produtos diferentes' : null),
                       ),
                       items: _tanques.map((t) {
                         var prod = t['produtos'];
-                        if (prod is List)
+                        if (prod is List) {
                           prod = prod.isNotEmpty ? prod[0] : null;
+                        }
                         final prodName = (prod is Map)
                             ? (prod['nome_dois'] ?? prod['nome'] ?? '')
                             : '';
@@ -1759,40 +1925,67 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                           : (val) {
                               setState(() {
                                 _selectedTanque = val;
-                                var prod = val?['produtos'];
-                                if (prod is List)
-                                  prod = prod.isNotEmpty ? prod[0] : null;
-                                _produtoNome = (prod is Map)
-                                    ? (prod['nome_dois'] ??
-                                          prod['nome'] ??
-                                          'Sem produto')
-                                    : 'Sem produto';
-                                _produtoCtrl.text = _produtoNome;
                               });
                             },
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    flex: 3,
-                    child: TextField(
-                      controller: _produtoCtrl,
-                      readOnly: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Produto',
-                        border: OutlineInputBorder(),
+                    flex: 1,
+                    child: DropdownButtonFormField<Map<String, dynamic>>(
+                      value: _selectedTanque2,
+                      isExpanded: true,
+                      menuMaxHeight: 300,
+                      decoration: InputDecoration(
+                        labelText: 'Tanque 2',
+                        filled: true,
+                        fillColor: _selectedTanque2 == null ? Colors.grey[200] : null,
+                        border: const OutlineInputBorder(),
                         isDense: true,
                         floatingLabelBehavior: FloatingLabelBehavior.always,
-                        contentPadding: EdgeInsets.symmetric(
+                        contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12,
                           vertical: 12,
                         ),
+                        errorText: _mesmoTanque
+                            ? 'Mesmo tanque'
+                            : (_produtosDiferentes ? 'Produtos diferentes' : null),
                       ),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1),
-                      ),
+                      items: <DropdownMenuItem<Map<String, dynamic>>>[
+                        DropdownMenuItem<Map<String, dynamic>>(
+                          value: null,
+                          child: const Text(
+                            'Nenhum',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        ..._tanques.map((t) {
+                        var prod = t['produtos'];
+                        if (prod is List) {
+                          prod = prod.isNotEmpty ? prod[0] : null;
+                        }
+                        final prodName = (prod is Map)
+                            ? (prod['nome_dois'] ?? prod['nome'] ?? '')
+                            : '';
+                        final display =
+                            '${t['referencia'] ?? ''}${prodName.isNotEmpty ? ' - $prodName' : ''}';
+                        return DropdownMenuItem<Map<String, dynamic>>(
+                          value: t,
+                          child: Text(
+                            display,
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                        }).toList(),
+                      ],
+                      onChanged: (_temMedicoes || _effectiveReadOnly)
+                          ? null
+                          : (val) {
+                              setState(() {
+                                _selectedTanque2 = val;
+                              });
+                            },
                     ),
                   ),
                 ],
@@ -2045,13 +2238,14 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                 const SizedBox(height: 8),
                 const Divider(height: 1, color: Color(0xFFBDBDBD)),
                 const SizedBox(height: 16),
-                if (_medicaoInicialSalva == null)
+                // Botões de medição inicial
+                if (_deveMostrarBotaoInicial(_selectedTanque)) ...[
                   ElevatedButton.icon(
                     onPressed: (_temQuantidadesSalvas && !_effectiveReadOnly)
-                        ? () => _abrirDialogOInserirMedicao(isFinal: false)
+                        ? () => _abrirDialogOInserirMedicao(isFinal: false, tanque: _selectedTanque)
                         : null,
                     icon: const Icon(Icons.straighten, size: 18),
-                    label: const Text('Inserir medição inicial'),
+                    label: Text('Inserir medição inicial - ${_selectedTanque?['referencia'] ?? ''}'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: (_effectiveReadOnly || !_temQuantidadesSalvas)
                           ? Colors.grey[300]
@@ -2074,9 +2268,62 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                       ),
                     ),
                   ),
+                ],
+                if (_selectedTanque2 != null && _deveMostrarBotaoInicial(_selectedTanque2)) ...[
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: (_temQuantidadesSalvas && !_effectiveReadOnly)
+                        ? () {
+                            if (_bombeioLocal == null) {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: const Text('Ação indisponível'),
+                                  content: const Text(
+                                      'Salve o bombeio antes de inserir medições para este tanque.'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.of(ctx).pop(),
+                                      child: const Text('OK'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              return;
+                            }
+                            _abrirDialogOInserirMedicao(isFinal: false, tanque: _selectedTanque2);
+                          }
+                        : null,
+                    icon: const Icon(Icons.straighten, size: 18),
+                    label: Text('Inserir medição inicial - ${_selectedTanque2?['referencia'] ?? ''}'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: (_effectiveReadOnly || !_temQuantidadesSalvas)
+                          ? Colors.grey[300]
+                          : Colors.grey[200],
+                      foregroundColor: (_effectiveReadOnly || !_temQuantidadesSalvas)
+                          ? Colors.grey[600]
+                          : const Color(0xFF0D47A1),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: (_effectiveReadOnly || !_temQuantidadesSalvas)
+                              ? Colors.grey[400]!
+                              : const Color(0xFF0D47A1),
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
+                // Cards de medições iniciais
                 if (_medicaoInicialSalva != null) ...[
+                  const SizedBox(height: 8),
                   const Text(
-                    'MEDIÇÃO INICIAL',
+                    'MEDIÇÃO INICIAL - TANQUE 1',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -2089,43 +2336,96 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     _medicaoInicialSalva!,
                     const Color(0xFF0D47A1),
                     isFinal: false,
+                    tanque: _selectedTanque,
                   ),
-                  if (_medicaoFinalSalva == null) ...[
-                    const SizedBox(height: 16),
-                    ElevatedButton.icon(
-                      onPressed: _effectiveReadOnly
-                          ? null
-                          : () => _abrirDialogOInserirMedicao(isFinal: true),
-                      icon: const Icon(Icons.straighten, size: 18),
-                      label: const Text('Inserir medição final'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _effectiveReadOnly
-                            ? Colors.grey[300]
-                            : Colors.orange[50],
-                        foregroundColor: _effectiveReadOnly
-                            ? Colors.grey[600]
-                            : Colors.orange[900],
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(
-                            color: _effectiveReadOnly
-                                ? Colors.grey[400]!
-                                : Colors.orange[900]!,
-                          ),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                ],
+                if (_medicaoInicialSalva2 != null) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'MEDIÇÃO INICIAL - TANQUE 2',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0D47A1),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildMedicaoDisplay(
+                    _medicaoInicialSalva2!,
+                    const Color(0xFF0D47A1),
+                    isFinal: false,
+                    tanque: _selectedTanque2,
+                  ),
+                ],
+                // Botões de medição final (aparecem individualmente para cada tanque)
+                if (_deveMostrarBotaoFinal(_selectedTanque)) ...[
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: _effectiveReadOnly
+                        ? null
+                        : () => _abrirDialogOInserirMedicao(isFinal: true, tanque: _selectedTanque),
+                    icon: const Icon(Icons.straighten, size: 18),
+                    label: Text('Inserir medição final - ${_selectedTanque?['referencia'] ?? ''}'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _effectiveReadOnly
+                          ? Colors.grey[300]
+                          : Colors.orange[50],
+                      foregroundColor: _effectiveReadOnly
+                          ? Colors.grey[600]
+                          : Colors.orange[900],
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: _effectiveReadOnly
+                              ? Colors.grey[400]!
+                              : Colors.orange[900]!,
                         ),
                       ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
-                  ],
+                  ),
                 ],
+                if (_selectedTanque2 != null && _deveMostrarBotaoFinal(_selectedTanque2)) ...[
+                  const SizedBox(height: 8),
+                  ElevatedButton.icon(
+                    onPressed: _effectiveReadOnly
+                        ? null
+                        : () => _abrirDialogOInserirMedicao(isFinal: true, tanque: _selectedTanque2),
+                    icon: const Icon(Icons.straighten, size: 18),
+                    label: Text('Inserir medição final - ${_selectedTanque2?['referencia'] ?? ''}'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _effectiveReadOnly
+                          ? Colors.grey[300]
+                          : Colors.orange[50],
+                      foregroundColor: _effectiveReadOnly
+                          ? Colors.grey[600]
+                          : Colors.orange[900],
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        side: BorderSide(
+                          color: _effectiveReadOnly
+                              ? Colors.grey[400]!
+                              : Colors.orange[900]!,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
+                // Cards de medições finais
                 if (_medicaoFinalSalva != null) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   const Text(
-                    'MEDIÇÃO FINAL',
+                    'MEDIÇÃO FINAL - TANQUE 1',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -2138,7 +2438,30 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
                     _medicaoFinalSalva!,
                     Colors.orange[900]!,
                     isFinal: true,
+                    tanque: _selectedTanque,
                   ),
+                ],
+                if (_medicaoFinalSalva2 != null) ...[
+                  const SizedBox(height: 8),
+                  const Text(
+                    'MEDIÇÃO FINAL - TANQUE 2',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE65100),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _buildMedicaoDisplay(
+                    _medicaoFinalSalva2!,
+                    Colors.orange[900]!,
+                    isFinal: true,
+                    tanque: _selectedTanque2,
+                  ),
+                ],
+                // Análise de recebimento (mostra apenas se tiver pelo menos um par completo)
+                if (_podeMostrarAnalise) ...[
                   const SizedBox(height: 12),
                   const Divider(height: 1, color: Color(0xFFBDBDBD)),
                   const SizedBox(height: 12),

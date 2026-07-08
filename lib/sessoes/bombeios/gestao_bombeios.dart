@@ -479,57 +479,92 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
   Future<void> _abrirDetalhesPorId(dynamic id) async {
     if (id == null) return;
     try {
-        final resp = await _supabase
-            .from('bombeios')
-            .select('''
-        id,
-        rateio,
-        num_controle,
-        data,
-        horario,
-        medicao_inicial_id,
-        medicao_final_id,
-        volumes_solicitados,
-        total_bombeio,
+      final resp = await _supabase
+          .from('bombeios')
+          .select('''
+          id,
+          rateio,
+          num_controle,
+          data,
+          horario,
+          medicao_inicial_id,
+          medicao_final_id,
+          medicao_inicial_id_2,
+          medicao_final_id_2,
+          tanque_id_2,
+          volumes_solicitados,
+          total_bombeio,
           quantidades_faturadas,
-        tanque_id,
-        qtd_total_faturada,
-        tanques!bombeios_tanque_id_fkey (
-          referencia,
-          produto_id,
-          produtos (
-            nome
+          tanque_id,
+          qtd_total_faturada,
+          tanques!bombeios_tanque_id_fkey (
+            referencia,
+            produto_id,
+            produtos (
+              nome
+            )
+          ),
+          tanque2:tanques!bombeios_tanque_id_2_fkey (
+            referencia,
+            produto_id,
+            produtos (
+              nome
+            )
+          ),
+          medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
+            id,
+            num_controle,
+            data,
+            horario,
+            volume_ambiente,
+            volume_20
+          ),
+          medicao_final:medicoes!bombeios_medicao_final_id_fkey (
+            id,
+            num_controle,
+            data,
+            horario,
+            volume_ambiente,
+            volume_20
+          ),
+          medicao_inicial_2:medicoes!bombeios_medicao_inicial_id_2_fkey (
+            id,
+            num_controle,
+            data,
+            horario,
+            volume_ambiente,
+            volume_20
+          ),
+          medicao_final_2:medicoes!bombeios_medicao_final_id_2_fkey (
+            id,
+            num_controle,
+            data,
+            horario,
+            volume_ambiente,
+            volume_20
           )
-        ),
-        medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
-          id,
-          num_controle,
-          data,
-          horario,
-          volume_ambiente,
-          volume_20
-        ),
-        medicao_final:medicoes!bombeios_medicao_final_id_fkey (
-          id,
-          num_controle,
-          data,
-          horario,
-          volume_ambiente,
-          volume_20
-        )
-      ''')
+        ''')
           .eq('id', id)
           .maybeSingle();
 
       if (resp == null) return;
       final item = resp;
-      final tanquesArr =
-          item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
+      
+      // Tanque 1
+      final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
       final tanques = tanquesArr is List
           ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null)
           : tanquesArr;
       final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
       final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
+      
+      // Tanque 2
+      final tanque2Arr = item['tanque2'] ?? item['tanques!bombeios_tanque_id_2_fkey'];
+      final tanque2 = tanque2Arr is List
+          ? (tanque2Arr.isNotEmpty ? tanque2Arr[0] : null)
+          : tanque2Arr;
+      final produto2 = tanque2?['produtos']?['nome'] ?? '';
+      final tanqueNome2 = tanque2?['referencia'] ?? '';
 
       double totalSolicitado = 0;
       List<Map<String, dynamic>> participantes = [];
@@ -556,12 +591,12 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
         }
       }
 
+      // Medições do tanque 1
       final medFinalArr = item['medicao_final'];
       final medFinal = medFinalArr is List
           ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null)
           : medFinalArr;
-      final hFinal =
-          medFinal?['horario']?.toString().substring(0, 5) ?? '--:--';
+      final hFinal = medFinal?['horario']?.toString().substring(0, 5) ?? '--:--';
 
       final medIniArr = item['medicao_inicial'];
       final medIni = medIniArr is List
@@ -580,21 +615,35 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
       double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
       double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
 
+      // Medições do tanque 2
+      final medFinal2Arr = item['medicao_final_2'];
+      final medFinal2 = medFinal2Arr is List
+          ? (medFinal2Arr.isNotEmpty ? medFinal2Arr[0] : null)
+          : medFinal2Arr;
+      final hFinal2 = medFinal2?['horario']?.toString().substring(0, 5) ?? '--:--';
+
+      final medIni2Arr = item['medicao_inicial_2'];
+      final medIni2 = medIni2Arr is List
+          ? (medIni2Arr.isNotEmpty ? medIni2Arr[0] : null)
+          : medIni2Arr;
+
       final Map<String, dynamic> bombeioParaDetalhes = {
         'id': item['id'],
         'bombeio_id': item['id'],
         'rateio': item['rateio'],
         'tanque_id': item['tanque_id'],
+        'tanque_id_2': item['tanque_id_2'],
         'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
         'produto': produto,
+        'produto_2': produto2,
         'tanque': tanqueNome,
-        'horario_inicial':
-            item['horario']?.toString().substring(0, 5) ?? '--:--',
+        'tanque_2': tanqueNome2,
+        'horario_inicial': item['horario']?.toString().substring(0, 5) ?? '--:--',
         'horario_final': hFinal,
+        'horario_final_2': hFinal2,
         'numero_controle': item['num_controle'] ?? 'S/N',
         'status': '',
-        'volume_total':
-            double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
+        'volume_total': double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
         'volume_solicitado': totalSolicitado,
         'participantes': participantes,
         'recebido_amb': recebidoAmb,
@@ -603,6 +652,12 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
         'qtd_total_faturada': item['qtd_total_faturada'],
         'medicao_inicial': medIni,
         'medicao_final': medFinal,
+        'medicao_inicial_2': medIni2,
+        'medicao_final_2': medFinal2,
+        'medicao_inicial_id': item['medicao_inicial_id'],
+        'medicao_final_id': item['medicao_final_id'],
+        'medicao_inicial_id_2': item['medicao_inicial_id_2'],
+        'medicao_final_id_2': item['medicao_final_id_2'],
       };
 
       // parse quantidades_faturadas if present
@@ -932,13 +987,16 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
               final fmt = NumberFormat.decimalPattern('pt_BR');
               return InkWell(
                 onTap: () async {
-                  if (_podeAbrirDetalhes(item)) {
-                              // prefetch full bombeio (incluindo quantidades_faturadas) before showing detalhes
-                              await _abrirDetalhesPorId(item['id']);
+                  // Busca os dados completos do bombeio antes de abrir o diálogo
+                  final bombeioCompleto = await _buscarBombeioCompleto(item['id']);
+                  if (bombeioCompleto == null) return;
+                  
+                  if (_podeAbrirDetalhes(bombeioCompleto)) {
+                    await _abrirDetalhesPorId(item['id']);
                   } else {
                     final result = await DialogInserirBombeio.show(
                       context,
-                      bombeio: item,
+                      bombeio: bombeioCompleto,
                     );
                     if (result is Map<String, dynamic> &&
                         result['abrirDetalhes'] == true) {
@@ -1127,6 +1185,196 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
         _buildPaginacao(),
       ],
     );
+  }
+
+  Future<Map<String, dynamic>?> _buscarBombeioCompleto(dynamic id) async {
+    if (id == null) return null;
+    try {
+      final resp = await _supabase
+          .from('bombeios')
+          .select('''
+            id,
+            rateio,
+            num_controle,
+            data,
+            horario,
+            medicao_inicial_id,
+            medicao_final_id,
+            medicao_inicial_id_2,
+            medicao_final_id_2,
+            tanque_id_2,
+            volumes_solicitados,
+            total_bombeio,
+            quantidades_faturadas,
+            tanque_id,
+            qtd_total_faturada,
+            tanques!bombeios_tanque_id_fkey (
+              referencia,
+              produto_id,
+              produtos (
+                nome
+              )
+            ),
+            tanque2:tanques!bombeios_tanque_id_2_fkey (
+              referencia,
+              produto_id,
+              produtos (
+                nome
+              )
+            ),
+            medicao_inicial:medicoes!bombeios_medicao_inicial_id_fkey (
+              id,
+              num_controle,
+              data,
+              horario,
+              volume_ambiente,
+              volume_20
+            ),
+            medicao_final:medicoes!bombeios_medicao_final_id_fkey (
+              id,
+              num_controle,
+              data,
+              horario,
+              volume_ambiente,
+              volume_20
+            ),
+            medicao_inicial_2:medicoes!bombeios_medicao_inicial_id_2_fkey (
+              id,
+              num_controle,
+              data,
+              horario,
+              volume_ambiente,
+              volume_20
+            ),
+            medicao_final_2:medicoes!bombeios_medicao_final_id_2_fkey (
+              id,
+              num_controle,
+              data,
+              horario,
+              volume_ambiente,
+              volume_20
+            )
+          ''')
+          .eq('id', id)
+          .maybeSingle();
+
+      if (resp == null) return null;
+      
+      final item = resp;
+      
+      // Tanque 1
+      final tanquesArr = item['tanques!bombeios_tanque_id_fkey'] ?? item['tanques'];
+      final tanques = tanquesArr is List
+          ? (tanquesArr.isNotEmpty ? tanquesArr[0] : null)
+          : tanquesArr;
+      final produto = tanques?['produtos']?['nome'] ?? 'S/ Produto';
+      final tanqueNome = tanques?['referencia'] ?? 'S/ Tanque';
+      
+      // Tanque 2
+      final tanque2Arr = item['tanque2'] ?? item['tanques!bombeios_tanque_id_2_fkey'];
+      final tanque2 = tanque2Arr is List
+          ? (tanque2Arr.isNotEmpty ? tanque2Arr[0] : null)
+          : tanque2Arr;
+      final produto2 = tanque2?['produtos']?['nome'] ?? '';
+      final tanqueNome2 = tanque2?['referencia'] ?? '';
+
+      double totalSolicitado = 0;
+      List<Map<String, dynamic>> participantes = [];
+      final rawVols = item['volumes_solicitados'];
+      if (rawVols != null) {
+        if (rawVols is Map) {
+          rawVols.forEach((key, value) {
+            double sol = double.tryParse(value.toString()) ?? 0;
+            totalSolicitado += sol;
+            participantes.add({
+              'nome': key?.toString() ?? '',
+              'solicitado': sol,
+            });
+          });
+        } else if (rawVols is List) {
+          for (var v in rawVols) {
+            if (v is Map) {
+              double sol =
+                  double.tryParse(v['solicitado']?.toString() ?? '0') ?? 0;
+              participantes.add({'nome': v['nome'] ?? '', 'solicitado': sol});
+              totalSolicitado += sol;
+            }
+          }
+        }
+      }
+
+      // Medições do tanque 1
+      final medFinalArr = item['medicao_final'];
+      final medFinal = medFinalArr is List
+          ? (medFinalArr.isNotEmpty ? medFinalArr[0] : null)
+          : medFinalArr;
+      final hFinal = medFinal?['horario']?.toString().substring(0, 5) ?? '--:--';
+
+      final medIniArr = item['medicao_inicial'];
+      final medIni = medIniArr is List
+          ? (medIniArr.isNotEmpty ? medIniArr[0] : null)
+          : medIniArr;
+
+      double volAmbIni =
+          double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Ini =
+          double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbFin =
+          double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Fin =
+          double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
+
+      double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
+      double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
+
+      // Medições do tanque 2
+      final medFinal2Arr = item['medicao_final_2'];
+      final medFinal2 = medFinal2Arr is List
+          ? (medFinal2Arr.isNotEmpty ? medFinal2Arr[0] : null)
+          : medFinal2Arr;
+      final hFinal2 = medFinal2?['horario']?.toString().substring(0, 5) ?? '--:--';
+
+      final medIni2Arr = item['medicao_inicial_2'];
+      final medIni2 = medIni2Arr is List
+          ? (medIni2Arr.isNotEmpty ? medIni2Arr[0] : null)
+          : medIni2Arr;
+
+      return {
+        'id': item['id'],
+        'bombeio_id': item['id'],
+        'rateio': item['rateio'],
+        'tanque_id': item['tanque_id'],
+        'tanque_id_2': item['tanque_id_2'],
+        'data': DateTime.tryParse(item['data'] ?? '') ?? DateTime.now(),
+        'produto': produto,
+        'produto_2': produto2,
+        'tanque': tanqueNome,
+        'tanque_2': tanqueNome2,
+        'horario_inicial': item['horario']?.toString().substring(0, 5) ?? '--:--',
+        'horario_final': hFinal,
+        'horario_final_2': hFinal2,
+        'numero_controle': item['num_controle'] ?? 'S/N',
+        'status': '',
+        'volume_total': double.tryParse(item['total_bombeio']?.toString() ?? '0') ?? 0,
+        'volume_solicitado': totalSolicitado,
+        'participantes': participantes,
+        'recebido_amb': recebidoAmb,
+        'recebido_20': recebido20,
+        'quantidades_faturadas': {},
+        'qtd_total_faturada': item['qtd_total_faturada'],
+        'medicao_inicial': medIni,
+        'medicao_final': medFinal,
+        'medicao_inicial_2': medIni2,
+        'medicao_final_2': medFinal2,
+        'medicao_inicial_id': item['medicao_inicial_id'],
+        'medicao_final_id': item['medicao_final_id'],
+        'medicao_inicial_id_2': item['medicao_inicial_id_2'],
+        'medicao_final_id_2': item['medicao_final_id_2'],
+      };
+    } catch (e) {
+      debugPrint('Erro ao buscar bombeio completo: $e');
+      return null;
+    }
   }
 
   Widget _buildCardFiltros() {
