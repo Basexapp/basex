@@ -440,7 +440,7 @@ class _CadastroNovoUsuarioPageState extends State<CadastroNovoUsuarioPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Base-X 2026, All rights reserved.',
+                    'PowerTank 2026, All rights reserved.',
                     style: TextStyle(
                       color: Colors.grey.shade400,
                       fontSize: 13,

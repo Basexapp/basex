@@ -81,7 +81,7 @@ class _SuportePageState extends State<SuportePage> {
   }
 
   Future<void> _launchEmail() async {
-    final url = Uri.parse('mailto:suporte@basexapp.com.br?subject=Suporte Base-X');
+    final url = Uri.parse('mailto:suporte@basexapp.com.br?subject=Suporte PowerTank');
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }

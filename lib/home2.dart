@@ -1718,7 +1718,7 @@ class _HomePageCardsState extends State<HomePageCards>
                         letterSpacing: 0.3,
                       ),
                       children: [
-                        const TextSpan(text: 'Base-x'),
+                        const TextSpan(text: 'PowerTank'),
                         WidgetSpan(
                           child: Transform.translate(
                             offset: const Offset(0, -4),

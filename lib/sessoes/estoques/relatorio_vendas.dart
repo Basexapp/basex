@@ -1261,7 +1261,7 @@ class _RelatorioVendasPageState extends State<RelatorioVendasPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
-            'Base-X 2026, All rights reserved.',
+            'PowerTank 2026, All rights reserved.',
             style: TextStyle(
               fontSize: 11,
               color: Colors.grey[600],

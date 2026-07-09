@@ -182,7 +182,7 @@ class OrdemCarregamentoVendaPDF {
               pw.SizedBox(height: 20),
               pw.Center(
                 child: pw.Text(
-                  'Base-X Management Systems - ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
+                  'PowerTank Management Systems - ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
                   style: pw.TextStyle(fontSize: 7, color: PdfColors.grey600),
                 ),
               ),
