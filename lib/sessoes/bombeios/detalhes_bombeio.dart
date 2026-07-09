@@ -1061,7 +1061,9 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
   @override
   Widget build(BuildContext context) {
     // Extração segura dos valores
-    final double totalSolicitado = _getDoubleSafe(_bombeio, 'volume_solicitado');
+    // Observação: não usar diretamente _bombeio['volume_solicitado'] aqui.
+    // Vamos somar os valores de 'solicitado' em `participantes` para obter
+    // o total efetivo solicitado e distribuir o volume ambiente por esse peso.
 
     // Calcular recebidos somando medições finais e subtraindo iniciais dos dois tanques
     double medIniAmb1 = 0;
@@ -1100,6 +1102,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           (_getDoubleSafe(b, 'solicitado')).compareTo(_getDoubleSafe(a, 'solicitado')),
     );
 
+    // Calcular total solicitado somando a coluna 'solicitado' dos participantes
+    double totalSolicitado = 0;
+    for (var p in participantes) {
+      totalSolicitado += _getDoubleSafe(p, 'solicitado');
+    }
+
+    // Calculados: totais e preparação para exibição (logs removidos em produção)
+
     // compute totals for the table (used by totals row and percent column)
     double totalFaturado = 0;
     final qmapGlobal = _bombeio['quantidades_faturadas'];
@@ -1122,36 +1132,71 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       totalFaturado += faturadoTmp;
     }
 
+    // Totais calculados (sem logs de depuração)
+
     // calcular total de sobra/perda (rec20Part - faturado) por participante
     double totalSobraPerda = 0;
     for (var p in participantes) {
-      final solicitado = _getDoubleSafe(p, 'solicitado');
-      double peso = totalSolicitado > 0 ? (solicitado / totalSolicitado) : 0;
-      double rec20Part = recebido20 * peso;
 
       double faturadoVal = 0;
       final qmap = _bombeio['quantidades_faturadas'];
       final nomeKey = p['nome']?.toString() ?? '';
+      String faturadoResolveMethod = 'nenhum';
       if (qmap is Map) {
+        // direct key
         if (qmap.containsKey(nomeKey)) {
           faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+          faturadoResolveMethod = 'direct_key';
         } else {
+          // exact match among keys
           for (var k in qmap.keys) {
             if (k.toString() == nomeKey) {
               faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+              faturadoResolveMethod = 'exact_key_loop';
               break;
             }
-            if (faturadoVal == 0 && k.toString().toLowerCase() == nomeKey.toLowerCase()) {
-              faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
-              break;
+          }
+          // case-insensitive
+          if (faturadoVal == 0) {
+            for (var k in qmap.keys) {
+              if (k.toString().toLowerCase() == nomeKey.toLowerCase()) {
+                faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                faturadoResolveMethod = 'case_insensitive';
+                break;
+              }
+            }
+          }
+          // try uuid-like keys mapping (company id keys)
+          if (faturadoVal == 0) {
+            for (var k in qmap.keys) {
+              final ks = k.toString();
+              if (ks.length == 36 && ks.contains('-')) {
+                // if key looks like uuid, maybe p['nome'] holds the uuid already
+                if (ks == nomeKey) {
+                  faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                  faturadoResolveMethod = 'uuid_key_match';
+                  break;
+                }
+              }
             }
           }
         }
       }
+      if (faturadoResolveMethod == 'nenhum') faturadoResolveMethod = 'not_found';
+      
+      // Calcular peso usando faturado/totalFaturado (SEM fallback para solicitado)
+      final double pesoFaturado = totalFaturado > 0 ? (faturadoVal / totalFaturado) : 0;
+      final rec20Part = recebido20 * pesoFaturado;
+
       final sobraRaw = rec20Part - faturadoVal;
       final sobra = _round4(sobraRaw);
       if (faturadoVal > 0) totalSobraPerda += sobra;
-    }
+
+        // Detalhes por participante não logados em modo normal
+      }
+
+      // Total sobra/perda calculado
+    
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1348,7 +1393,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                               color: colors[i % colors.length],
                                               value: solicitado,
                                               title:
-                                                  '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((solicitado / totalSolicitado) * 100).toStringAsFixed(0) : '0'}%',
+                                                  '${p['nome'].toString().split(' ')[0]}\n${totalSolicitado > 0 ? ((solicitado / totalSolicitado) * 100).toStringAsFixed(1) : '0.0'}%',
                                               radius: 50,
                                               titleStyle: const TextStyle(
                                                 fontSize: 10,
@@ -1476,10 +1521,35 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                   final index = entry.key;
                                   final p = entry.value;
                                   final solicitado = _getDoubleSafe(p, 'solicitado');
-                                  double peso = totalSolicitado > 0
-                                      ? (solicitado / totalSolicitado)
-                                      : 0;
-                                  double recAmbPart = recebidoAmb * peso;
+                                  
+                                  // Buscar faturadoVal para este participante
+                                  double faturadoVal = 0;
+                                  final qmap = _bombeio['quantidades_faturadas'];
+                                  final nomeKey = p['nome']?.toString() ?? '';
+                                  if (qmap is Map) {
+                                    if (qmap.containsKey(nomeKey)) {
+                                      faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                    } else {
+                                      for (var k in qmap.keys) {
+                                        if (k.toString() == nomeKey) {
+                                          faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                          break;
+                                        }
+                                      }
+                                      if (faturadoVal == 0) {
+                                        for (var k in qmap.keys) {
+                                          if (k.toString().toLowerCase() == nomeKey.toLowerCase()) {
+                                            faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                            break;
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                  
+                                  // Peso baseado no faturado (NUNCA usar solicitado)
+                                  final double pesoFaturado = totalFaturado > 0 ? (faturadoVal / totalFaturado) : 0;
+                                  final double recAmbPart = recebidoAmb * pesoFaturado;
                                   
                                   final colors = [
                                     const Color(0xFF0D47A1),
@@ -1540,7 +1610,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                                                 2,
                                                               ),
                                                           child: LinearProgressIndicator(
-                                                            value: peso,
+                                                            value: pesoFaturado.clamp(0.0, 1.0),
                                                             backgroundColor:
                                                                 Colors.grey[100],
                                                             valueColor:
@@ -1587,37 +1657,24 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             Expanded(
                                               flex: 2,
                                               child: Builder(builder: (context) {
-                                                double faturadoVal = 0;
-                                                final qmap = _bombeio['quantidades_faturadas'];
-                                                final nomeKey = p['nome']?.toString() ?? '';
-                                                // lookup quantidades_faturadas for this participante
-                                                if (qmap is Map) {
-                                                  // direct key
-                                                  if (qmap.containsKey(nomeKey)) {
-                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                double faturadoValLocal = 0;
+                                                final qmapLocal = _bombeio['quantidades_faturadas'];
+                                                final nomeKeyLocal = p['nome']?.toString() ?? '';
+                                                if (qmapLocal is Map) {
+                                                  if (qmapLocal.containsKey(nomeKeyLocal)) {
+                                                    faturadoValLocal = double.tryParse(qmapLocal[nomeKeyLocal]?.toString() ?? '0') ?? 0;
                                                   } else {
-                                                    // try exact string keys
-                                                    for (var k in qmap.keys) {
-                                                        if (k.toString() == nomeKey) {
-                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    for (var k in qmapLocal.keys) {
+                                                        if (k.toString() == nomeKeyLocal) {
+                                                        faturadoValLocal = double.tryParse(qmapLocal[k]?.toString() ?? '0') ?? 0;
                                                         break;
                                                       }
                                                     }
-                                                    // try case-insensitive
-                                                    if (faturadoVal == 0) {
-                                                      for (var k in qmap.keys) {
-                                                        if (k.toString().toLowerCase() == nomeKey.toLowerCase()) {
-                                                          faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    if (faturadoValLocal == 0) {
+                                                      for (var k in qmapLocal.keys) {
+                                                        if (k.toString().toLowerCase() == nomeKeyLocal.toLowerCase()) {
+                                                          faturadoValLocal = double.tryParse(qmapLocal[k]?.toString() ?? '0') ?? 0;
                                                           break;
-                                                        }
-                                                      }
-                                                    }
-                                                    // try numeric keys (id) mapping
-                                                    if (faturadoVal == 0) {
-                                                      for (var k in qmap.keys) {
-                                                        final ks = k.toString();
-                                                        if (ks.length == 36 && ks.contains('-')) {
-                                                          // possible uuid-like key found; value available in qmap[k]
                                                         }
                                                       }
                                                     }
@@ -1625,7 +1682,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                                 }
                                                 
                                                 return Text(
-                                                  faturadoVal > 0 ? '${_fmt.format(faturadoVal.toInt())} L' : '-',
+                                                  faturadoValLocal > 0 ? '${_fmt.format(faturadoValLocal.toInt())} L' : '-',
                                                   textAlign: TextAlign.center,
                                                   style: TextStyle(
                                                     fontSize: 13,
@@ -1639,24 +1696,24 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             Expanded(
                                               flex: 1,
                                               child: Builder(builder: (context) {
-                                                double faturadoVal = 0;
-                                                final qmap = _bombeio['quantidades_faturadas'];
-                                                final nomeKey = p['nome']?.toString() ?? '';
-                                                if (qmap is Map) {
-                                                  if (qmap.containsKey(nomeKey)) {
-                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                double faturadoValLocal = 0;
+                                                final qmapLocal = _bombeio['quantidades_faturadas'];
+                                                final nomeKeyLocal = p['nome']?.toString() ?? '';
+                                                if (qmapLocal is Map) {
+                                                  if (qmapLocal.containsKey(nomeKeyLocal)) {
+                                                    faturadoValLocal = double.tryParse(qmapLocal[nomeKeyLocal]?.toString() ?? '0') ?? 0;
                                                   } else {
-                                                    for (var k in qmap.keys) {
-                                                      if (k.toString() == nomeKey) {
-                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    for (var k in qmapLocal.keys) {
+                                                      if (k.toString() == nomeKeyLocal) {
+                                                        faturadoValLocal = double.tryParse(qmapLocal[k]?.toString() ?? '0') ?? 0;
                                                         break;
                                                       }
                                                     }
                                                   }
                                                 }
-                                                final perc = totalFaturado > 0 ? ((faturadoVal / totalFaturado) * 100) : 0;
+                                                final perc = totalFaturado > 0 ? ((faturadoValLocal / totalFaturado) * 100) : 0;
                                                 return Text(
-                                                  faturadoVal > 0 ? '${perc.toStringAsFixed(1)}%' : '-',
+                                                  faturadoValLocal > 0 ? '${perc.toStringAsFixed(4)}%' : '-',
                                                   textAlign: TextAlign.center,
                                                   style: const TextStyle(
                                                     fontSize: 13,
@@ -1669,29 +1726,28 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             Expanded(
                                               flex: 2,
                                               child: Builder(builder: (context) {
-                                                double faturadoVal = 0;
-                                                final qmap = _bombeio['quantidades_faturadas'];
-                                                final nomeKey = p['nome']?.toString() ?? '';
-                                                if (qmap is Map) {
-                                                  if (qmap.containsKey(nomeKey)) {
-                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                double faturadoValLocal = 0;
+                                                final qmapLocal = _bombeio['quantidades_faturadas'];
+                                                final nomeKeyLocal = p['nome']?.toString() ?? '';
+                                                if (qmapLocal is Map) {
+                                                  if (qmapLocal.containsKey(nomeKeyLocal)) {
+                                                    faturadoValLocal = double.tryParse(qmapLocal[nomeKeyLocal]?.toString() ?? '0') ?? 0;
                                                   } else {
-                                                    for (var k in qmap.keys) {
-                                                      if (k.toString() == nomeKey) {
-                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    for (var k in qmapLocal.keys) {
+                                                      if (k.toString() == nomeKeyLocal) {
+                                                        faturadoValLocal = double.tryParse(qmapLocal[k]?.toString() ?? '0') ?? 0;
                                                         break;
                                                       }
                                                     }
                                                   }
                                                 }
-                                                // nova lógica: sobra total = recebido20 - totalFaturado
+                                                // sobra total = recebido20 - totalFaturado
                                                 final sobraTotal = recebido20 - totalFaturado;
-                                                final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
+                                                final perc = (totalFaturado > 0) ? (faturadoValLocal / totalFaturado) : 0;
                                                 final sobra = (sobraTotal * perc).roundToDouble();
-                                                // Mostrar SOBRA/PERDA em roxo para a coluna (não altera título/total)
                                                 final sobraColor = const Color(0xFF6A1B9A);
                                                 return Text(
-                                                  faturadoVal > 0 ? '${_fmt.format(sobra.toInt())} L' : '-',
+                                                  faturadoValLocal > 0 ? '${_fmt.format(sobra.toInt())} L' : '-',
                                                   textAlign: TextAlign.center,
                                                   style: TextStyle(
                                                     fontSize: 13,
@@ -1704,27 +1760,27 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                             Expanded(
                                               flex: 2,
                                               child: Builder(builder: (context) {
-                                                double faturadoVal = 0;
-                                                final qmap = _bombeio['quantidades_faturadas'];
-                                                final nomeKey = p['nome']?.toString() ?? '';
-                                                if (qmap is Map) {
-                                                  if (qmap.containsKey(nomeKey)) {
-                                                    faturadoVal = double.tryParse(qmap[nomeKey]?.toString() ?? '0') ?? 0;
+                                                double faturadoValLocal = 0;
+                                                final qmapLocal = _bombeio['quantidades_faturadas'];
+                                                final nomeKeyLocal = p['nome']?.toString() ?? '';
+                                                if (qmapLocal is Map) {
+                                                  if (qmapLocal.containsKey(nomeKeyLocal)) {
+                                                    faturadoValLocal = double.tryParse(qmapLocal[nomeKeyLocal]?.toString() ?? '0') ?? 0;
                                                   } else {
-                                                    for (var k in qmap.keys) {
-                                                      if (k.toString() == nomeKey) {
-                                                        faturadoVal = double.tryParse(qmap[k]?.toString() ?? '0') ?? 0;
+                                                    for (var k in qmapLocal.keys) {
+                                                      if (k.toString() == nomeKeyLocal) {
+                                                        faturadoValLocal = double.tryParse(qmapLocal[k]?.toString() ?? '0') ?? 0;
                                                         break;
                                                       }
                                                     }
                                                   }
                                                 }
                                                 final sobraTotal = recebido20 - totalFaturado;
-                                                final perc = (totalFaturado > 0) ? (faturadoVal / totalFaturado) : 0;
+                                                final perc = (totalFaturado > 0) ? (faturadoValLocal / totalFaturado) : 0;
                                                 final sobra = (sobraTotal * perc).roundToDouble();
-                                                final exibido = (faturadoVal + sobra).roundToDouble();
+                                                final exibido = (faturadoValLocal + sobra).roundToDouble();
                                                 return Text(
-                                                  faturadoVal > 0 ? '${_fmt.format(exibido.toInt())} L' : '-',
+                                                  faturadoValLocal > 0 ? '${_fmt.format(exibido.toInt())} L' : '-',
                                                   textAlign: TextAlign.center,
                                                   style: TextStyle(
                                                     fontSize: 13,
