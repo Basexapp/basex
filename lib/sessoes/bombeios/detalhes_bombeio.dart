@@ -1036,7 +1036,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
     Map<String, dynamic> medicao,
     String label,
     Color color,
-  ) {
+    [String tanqueReferencia = '']) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -1072,11 +1072,16 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           Expanded(
             child: Row(
               children: [
+                // Espaço antes da referência do tanque para deslocar todas as colunas
+                const SizedBox(width: 100),
+                // Referência do tanque (primeira posição após a divisória)
                 Expanded(
                   flex: 3,
                   child: _buildInfoColumn(
-                    'Controle',
-                    medicao['num_controle'] ?? '-',
+                    'Tanque',
+                    (tanqueReferencia.isNotEmpty
+                        ? tanqueReferencia
+                        : (medicao['tanque_referencia']?.toString() ?? '-')),
                   ),
                 ),
                 Expanded(
@@ -1105,6 +1110,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                   child: _buildInfoColumn(
                     'Vol. 20ºC',
                     '${_fmt.format((medicao['volume_20'] as num?)?.toInt() ?? 0)} L',
+                  ),
+                ),
+                // Agora Controle fica na última posição
+                Expanded(
+                  flex: 3,
+                  child: _buildInfoColumn(
+                    'Controle',
+                    medicao['num_controle'] ?? '-',
                   ),
                 ),
               ],
@@ -1366,6 +1379,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                           _bombeio['medicao_inicial'],
                           'MEDIÇÃO INICIAL - TANQUE 1',
                           const Color(0xFF0D47A1),
+                          _bombeio['tanque']?.toString() ?? '',
                         ),
                       if (_bombeio['medicao_inicial'] != null)
                         const SizedBox(height: 8),
@@ -1374,6 +1388,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                           _bombeio['medicao_final'],
                           'MEDIÇÃO FINAL - TANQUE 1',
                           Colors.orange[900]!,
+                          _bombeio['tanque']?.toString() ?? '',
                         ),
                       if (_bombeio['medicao_final'] != null)
                         const SizedBox(height: 8),
@@ -1382,6 +1397,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                           _bombeio['medicao_inicial_2'],
                           'MEDIÇÃO INICIAL - TANQUE 2',
                           const Color(0xFF0D47A1),
+                          _bombeio['tanque_2']?.toString() ?? '',
                         ),
                       if (_bombeio['medicao_inicial_2'] != null)
                         const SizedBox(height: 8),
@@ -1390,6 +1406,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                           _bombeio['medicao_final_2'],
                           'MEDIÇÃO FINAL - TANQUE 2',
                           Colors.orange[900]!,
+                          _bombeio['tanque_2']?.toString() ?? '',
                         ),
                       const SizedBox(height: 80),
 
