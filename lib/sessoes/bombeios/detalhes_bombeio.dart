@@ -321,19 +321,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
           ? (medIniArr.isNotEmpty ? medIniArr[0] : null)
           : medIniArr;
 
-      double volAmbIni =
-          double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
-      double vol20Ini =
-          double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
-      double volAmbFin =
-          double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
-      double vol20Fin =
-          double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
-
-      double recebidoAmb = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0;
-      double recebido20 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0;
-
-      // Medições do tanque 2
+      // Medições do tanque 2 (declaradas cedo para evitar uso antes da definição)
       final medFinal2Arr = item['medicao_final_2'];
       final medFinal2 = medFinal2Arr is List
           ? (medFinal2Arr.isNotEmpty ? medFinal2Arr[0] : null)
@@ -344,6 +332,35 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
       final medIni2 = medIni2Arr is List
           ? (medIni2Arr.isNotEmpty ? medIni2Arr[0] : null)
           : medIni2Arr;
+
+      double volAmbIni =
+          double.tryParse(medIni?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Ini =
+          double.tryParse(medIni?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbFin =
+          double.tryParse(medFinal?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Fin =
+          double.tryParse(medFinal?['volume_20']?.toString() ?? '0') ?? 0;
+
+      double volAmbIni2 =
+          double.tryParse(medIni2?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Ini2 =
+          double.tryParse(medIni2?['volume_20']?.toString() ?? '0') ?? 0;
+      double volAmbFin2 =
+          double.tryParse(medFinal2?['volume_ambiente']?.toString() ?? '0') ?? 0;
+      double vol20Fin2 =
+          double.tryParse(medFinal2?['volume_20']?.toString() ?? '0') ?? 0;
+
+      // Somar as diferenças dos dois tanques (se existirem)
+      final deltaAmb1 = (volAmbFin > 0) ? (volAmbFin - volAmbIni) : 0.0;
+      final deltaAmb2 = (volAmbFin2 > 0) ? (volAmbFin2 - volAmbIni2) : 0.0;
+      double recebidoAmb = deltaAmb1 + deltaAmb2;
+
+      final delta20_1 = (vol20Fin > 0) ? (vol20Fin - vol20Ini) : 0.0;
+      final delta20_2 = (vol20Fin2 > 0) ? (vol20Fin2 - vol20Ini2) : 0.0;
+      double recebido20 = delta20_1 + delta20_2;
+
+        // Medições do tanque 2 (declaradas acima)
 
       final Map<String, dynamic> bombeioParaDetalhes = {
         'id': item['id'],
@@ -641,13 +658,53 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         final recebidoAmb = _getDoubleSafe(_bombeio, 'recebido_amb');
         final recebido20 = _getDoubleSafe(_bombeio, 'recebido_20');
 
+        // Debug: detalhar como recebidoAmb/recebido20 foram calculados
+        try {
+          final medIni = _bombeio['medicao_inicial'] as Map<String, dynamic>?;
+          final medFin = _bombeio['medicao_final'] as Map<String, dynamic>?;
+          final medIni2 = _bombeio['medicao_inicial_2'] as Map<String, dynamic>?;
+          final medFin2 = _bombeio['medicao_final_2'] as Map<String, dynamic>?;
+
+          final volAmbIni = medIni != null ? double.tryParse(medIni['volume_ambiente']?.toString() ?? '0') ?? 0 : 0;
+          final volAmbFin = medFin != null ? double.tryParse(medFin['volume_ambiente']?.toString() ?? '0') ?? 0 : 0;
+          final volAmbIni2 = medIni2 != null ? double.tryParse(medIni2['volume_ambiente']?.toString() ?? '0') ?? 0 : 0;
+          final volAmbFin2 = medFin2 != null ? double.tryParse(medFin2['volume_ambiente']?.toString() ?? '0') ?? 0 : 0;
+
+          debugPrint('RateioAuto - origem recebidoAmb detalhado:');
+          debugPrint('  medicao_inicial.volume_ambiente: $volAmbIni');
+          debugPrint('  medicao_final.volume_ambiente:   $volAmbFin');
+          debugPrint('  medicao_inicial_2.volume_ambiente: $volAmbIni2');
+          debugPrint('  medicao_final_2.volume_ambiente:   $volAmbFin2');
+          final calcRecebidoAmb = (volAmbFin - volAmbIni) + (volAmbFin2 - volAmbIni2);
+          debugPrint('  calculado a partir das medições: (fin1-in1)+(fin2-in2) = $calcRecebidoAmb');
+          debugPrint('  valor em _bombeio[\'recebido_amb\']: $recebidoAmb');
+        } catch (e) {
+          debugPrint('RateioAuto - erro ao detalhar origem de recebidoAmb: $e');
+        }
+
         final participantes = (_bombeio['participantes'] is List)
             ? List<Map<String, dynamic>>.from(_bombeio['participantes'])
             : <Map<String, dynamic>>[];
 
-        double totalSolicitado = 0;
+        // Calcular totalFaturado a partir de quantidades_faturadas (mesma lógica da UI)
+        double totalFaturado = 0;
+        final qmapGlobal = _bombeio['quantidades_faturadas'];
         for (var p in participantes) {
-          totalSolicitado += _getDoubleSafe(p, 'solicitado');
+          double faturadoTmp = 0;
+          final nomeKeyTmp = p['nome']?.toString() ?? '';
+          if (qmapGlobal is Map) {
+            if (qmapGlobal.containsKey(nomeKeyTmp)) {
+              faturadoTmp = double.tryParse(qmapGlobal[nomeKeyTmp]?.toString() ?? '0') ?? 0;
+            } else {
+              for (var k in qmapGlobal.keys) {
+                if (k.toString().toLowerCase() == nomeKeyTmp.toLowerCase()) {
+                  faturadoTmp = double.tryParse(qmapGlobal[k]?.toString() ?? '0') ?? 0;
+                  break;
+                }
+              }
+            }
+          }
+          totalFaturado += faturadoTmp;
         }
 
         final usuario = UsuarioAtual.instance;
@@ -658,10 +715,46 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         final List<Map<String, dynamic>> inserts = [];
 
         for (var p in participantes) {
-          final solicit = _getDoubleSafe(p, 'solicitado');
-          final peso = totalSolicitado > 0 ? (solicit / totalSolicitado) : 0;
+          // obter valor faturado do participante usando a mesma heurística da UI
+          double faturadoVal = 0;
+          final nomeKey = p['nome']?.toString() ?? '';
+          if (qmapGlobal is Map) {
+            if (qmapGlobal.containsKey(nomeKey)) {
+              faturadoVal = double.tryParse(qmapGlobal[nomeKey]?.toString() ?? '0') ?? 0;
+            } else {
+              for (var k in qmapGlobal.keys) {
+                if (k.toString() == nomeKey) {
+                  faturadoVal = double.tryParse(qmapGlobal[k]?.toString() ?? '0') ?? 0;
+                  break;
+                }
+              }
+              if (faturadoVal == 0) {
+                for (var k in qmapGlobal.keys) {
+                  if (k.toString().toLowerCase() == nomeKey.toLowerCase()) {
+                    faturadoVal = double.tryParse(qmapGlobal[k]?.toString() ?? '0') ?? 0;
+                    break;
+                  }
+                }
+              }
+              if (faturadoVal == 0) {
+                for (var k in qmapGlobal.keys) {
+                  final ks = k.toString();
+                  if (ks.length == 36 && ks.contains('-')) {
+                    if (ks == nomeKey) {
+                      faturadoVal = double.tryParse(qmapGlobal[k]?.toString() ?? '0') ?? 0;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          final peso = totalFaturado > 0 ? (faturadoVal / totalFaturado) : 0;
           final entradaAmb = (recebidoAmb * peso).round();
           final entradaVinte = (recebido20 * peso).round();
+
+          // debug prints removed: keep only error logs
 
           String? empresaId;
           final nomeRaw = p['nome']?.toString() ?? '';
@@ -697,7 +790,6 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             empresaId: empresaId,
             terminalId: terminalId,
           );
-
           inserts.add(row);
         }
 
@@ -707,13 +799,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
             try {
               final empresaId = row['empresa_id']?.toString();
               final entradaVinte = row['entrada_vinte'] as int? ?? 0;
+              final entradaAmb = row['entrada_amb'] as int? ?? 0;
               bool didUpdate = false;
 
               if (bombeioId?.isNotEmpty == true) {
                 if (empresaId?.isNotEmpty == true) {
                   final resp = await supabase
                       .from('movimentacoes_tanque')
-                      .update({'entrada_vinte': entradaVinte})
+                      .update({'entrada_vinte': entradaVinte, 'entrada_amb': entradaAmb})
                       .eq('bombeio_id', bombeioId!)
                       .eq('empresa_id', empresaId!)
                       .select();
@@ -732,7 +825,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                     final id = found[0]['id'];
                     final resp2 = await supabase
                         .from('movimentacoes_tanque')
-                        .update({'entrada_vinte': entradaVinte})
+                        .update({'entrada_vinte': entradaVinte, 'entrada_amb': entradaAmb})
                         .eq('id', id)
                         .select();
                     if (resp2.isNotEmpty) {
@@ -750,7 +843,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
               debugPrint('Erro ao atualizar movimentacoes_tanque: $e');
             }
           }
-
+            // updatedCount logged only when an error occurs or as part of flow
             if (updatedCount > 0) {
               if (bombeioId?.isNotEmpty == true) {
                 try {
