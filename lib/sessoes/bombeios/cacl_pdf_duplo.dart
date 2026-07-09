@@ -978,7 +978,11 @@ class CaclPdfDuploPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pré-visualizar CACL'),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'PRÉ-VISUALIZAR CACL',
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFF0D47A1),
       ),
       body: PdfPreview(

@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -770,5 +772,34 @@ class CACLPdf {
     if (valorSemUnidade.isEmpty) return "-";
     
     return '$valorSemUnidade°C';
+  }
+}
+
+// Página que exibe a pré-visualização do PDF gerado pelo CACLPdf
+class CaclPdfPage extends StatelessWidget {
+  final Map<String, dynamic> dadosFormulario;
+  const CaclPdfPage({super.key, required this.dadosFormulario});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text(
+          'PRÉ-VISUALIZAR CACL',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF0D47A1),
+      ),
+      body: PdfPreview(
+        maxPageWidth: 900,
+        build: (PdfPageFormat format) async {
+          final doc = await CACLPdf.gerar(dadosFormulario: dadosFormulario);
+          return doc.save();
+        },
+        allowPrinting: true,
+        allowSharing: true,
+      ),
+    );
   }
 }

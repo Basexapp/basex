@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:printing/printing.dart';
 import 'cacl_pdf.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -990,95 +989,30 @@ class CaclBombeioDialog extends StatelessWidget {
         ElevatedButton.icon(
           onPressed: () async {
             try {
-              // Normalizar campos que podem ser mapas para evitar imprimir o map inteiro
               final dadosParaPdf = Map<String, dynamic>.from(dados);
-              // `tanque` no PDF deve ser a referência do tanque, não o objeto inteiro
               dadosParaPdf['tanque'] = tanque ?? dadosParaPdf['tanque']?.toString();
-              // `produto` no PDF deve ser o nome do produto
               dadosParaPdf['produto'] = produto ?? dadosParaPdf['produto']?.toString();
-              // `terminal` no PDF deve ser o nome do terminal (join em terminais.nome)
+
               if (dadosParaPdf['terminal'] is Map) {
                 final t = dadosParaPdf['terminal'] as Map<String, dynamic>;
                 dadosParaPdf['terminal'] = (t['nome'] ?? t['referencia'] ?? t['nome_dois'])?.toString() ?? '';
               } else {
                 dadosParaPdf['terminal'] = dadosParaPdf['terminal']?.toString() ?? '';
               }
-              // Número de controle vem de bombeios.num_controle
               dadosParaPdf['numero_controle'] = dadosParaPdf['num_controle']?.toString() ?? dadosParaPdf['numero_controle']?.toString() ?? '';
 
-              final doc = await CACLPdf.gerar(dadosFormulario: dadosParaPdf);
-              final bytes = await doc.save();
-              await Printing.sharePdf(bytes: bytes, filename: 'cacl_bombeio.pdf');
-
-              // Mostrar diálogo de sucesso
-              if (!context.mounted) {
-                return;
-              }
-              showDialog<void>(
-                context: context,
-                builder: (context) => Dialog(
-                  backgroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    side: const BorderSide(color: Color(0xFF0D47A1), width: 1),
-                  ),
-                  child: SizedBox(
-                    width: 420,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                          decoration: const BoxDecoration(
-                            border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.picture_as_pdf, color: Color(0xFF0D47A1)),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'PDF gerado',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(18.0),
-                          child: Column(
-                            children: [
-                              const Text('PDF do CACL Bombeio gerado com sucesso.'),
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF0D47A1),
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                  ),
-                                  child: const Text('OK'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              // Fecha o diálogo atual e navega para a página de pré-visualização
+              Navigator.of(context).pop();
+              await Future.delayed(Duration.zero);
+              if (!context.mounted) return;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (ctx) => CaclPdfPage(dadosFormulario: dadosParaPdf),
                 ),
               );
             } catch (e) {
-              final errorText = 'Erro ao gerar PDF:\n${e.toString()}';
+              final errorText = 'Erro ao abrir pré-visualização do PDF:\n${e.toString()}';
 
-              // Mostrar diálogo de erro centralizado com texto selecionável e botão de copiar
               if (!context.mounted) {
                 return;
               }
@@ -1093,7 +1027,6 @@ class CaclBombeioDialog extends StatelessWidget {
                     TextButton(
                       onPressed: () async {
                         await Clipboard.setData(ClipboardData(text: errorText));
-                        // confirmação simples
                         if (!context.mounted) {
                           return;
                         }
