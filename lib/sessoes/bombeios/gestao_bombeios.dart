@@ -457,7 +457,9 @@ class _FiltroGestaoBombeiosPageState extends State<FiltroGestaoBombeiosPage>
 
       for (var produto in produtosData) {
         final produtoId = produto['id']?.toString();
-        if (produtoId == null || produtoId.isEmpty) continue;
+        if (produtoId == null || produtoId.isEmpty) {
+          continue;
+        }
 
         final nome = produto['nome_dois'] ?? produto['nome'] ?? 'Sem nome';
         produtosLista.add({'id': produtoId, 'nome': nome.toString()});

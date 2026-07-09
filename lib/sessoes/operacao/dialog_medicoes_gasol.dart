@@ -92,6 +92,10 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
     _mmCtrl.addListener(_onAlturaChanged);
     _aguaCmCtrl.addListener(_onAlturaAguaChanged);
     _aguaMmCtrl.addListener(_onAlturaAguaChanged);
+    // Atualiza o botão de salvar quando o volume a 20ºC for calculado
+    _vol20Ctrl.addListener(() {
+      if (mounted) setState(() {});
+    });
 
     // Adiciona listeners para perda de foco
     _tempTanqueFocus.addListener(_onFocusChanged);
@@ -470,8 +474,9 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
     try {
       // 1. Buscar IDs necessários — usar somente produtoId (UUID)
       final produtoId = widget.produtoId?.trim();
-      if (produtoId == null || produtoId.isEmpty)
+      if (produtoId == null || produtoId.isEmpty) {
         throw 'Produto id não informado.';
+      }
 
       Map<String, dynamic>? prodRes;
       try {
@@ -1653,16 +1658,15 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
         ),
         SizedBox(
           child: ElevatedButton(
-            onPressed: _salvarMedicao,
-            style: ButtonStyle(
-              backgroundColor: WidgetStateProperty.resolveWith<Color?>((
-                states,
-              ) {
-                if (states.contains(WidgetState.hovered)) {
-                  return const Color.fromARGB(255, 65, 54, 49);
-                }
-                return Colors.black;
-              }),
+              onPressed: (_parseNumero(_vol20Ctrl.text) ?? 0) > 0 ? _salvarMedicao : null,
+              style: ButtonStyle(
+                backgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+                  if (states.contains(MaterialState.disabled)) return Colors.grey.shade400;
+                  if (states.contains(MaterialState.hovered)) {
+                    return const Color.fromARGB(255, 65, 54, 49);
+                  }
+                  return Colors.black;
+                }),
               foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
               padding: WidgetStateProperty.all(
                 const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
