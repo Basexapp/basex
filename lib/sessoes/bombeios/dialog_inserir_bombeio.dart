@@ -145,30 +145,37 @@ class _DialogInserirBombeioState extends State<DialogInserirBombeio> {
 
   bool get _podeSalvar {
     // Permite salvar em qualquer situação, exceto quando o diálogo é somente leitura
-    // (usuário com empresaId). Mantemos a proteção contra múltiplos salvamentos
-    // verificando a flag `salvando`.
     if (_effectiveReadOnly) return false;
     if (salvando) return false;
-    // Se o campo 'Faturado' já estiver preenchido, não permitir salvar pelo diálogo
-    if (_faturadoPreenchido) return false;
-    return true;
-  }
-
-  // Detecta se o campo 'Faturado' já tem valor (texto ou valor salvo no bombeio)
-  bool get _faturadoPreenchido {
+    
+    // Obtém o valor atual do campo Faturado
     final current = _qtdFaturadaCtrl.text.trim();
-    // If there was an original saved value and controller still equals it -> treat as filled
-    if (_originalFaturadoStr != null) {
-      if (current != _originalFaturadoStr) return false; // user edited -> allow save
-      final txt = current.replaceAll('.', '').replaceAll(',', '.');
-      final v = double.tryParse(txt) ?? 0;
-      return v > 0;
-    }
-
-    // No original saved value: use controller content
     final txt = current.replaceAll('.', '').replaceAll(',', '.');
-    final v = double.tryParse(txt) ?? 0;
-    return v > 0;
+    final double valorAtual = double.tryParse(txt) ?? 0;
+    
+    // Obtém o valor original salvo (pode ser null ou vazio)
+    final String? original = _originalFaturadoStr;
+    final double valorOriginal = original != null && original.isNotEmpty
+        ? double.tryParse(original.replaceAll('.', '').replaceAll(',', '.')) ?? 0
+        : 0;
+    
+    // ✅ CORREÇÃO: Verifica se o valor foi ALTERADO (incluindo de 0 para >0)
+    // Se não havia valor salvo (original é null ou vazio) E valor atual > 0 → foi alterado
+    // Se havia valor salvo E valor atual é diferente do original → foi alterado
+    bool valorFoiAlterado = false;
+    
+    if (original == null || original.isEmpty) {
+      // Campo estava vazio: foi alterado se valor atual > 0
+      if (valorAtual > 0) valorFoiAlterado = true;
+    } else {
+      // Campo tinha valor salvo: foi alterado se valor atual != valor original
+      if (valorAtual != valorOriginal) valorFoiAlterado = true;
+    }
+    
+    // Se o valor NÃO foi alterado, desabilita o botão
+    if (!valorFoiAlterado) return false;
+    
+    return true;
   }
 
   @override
