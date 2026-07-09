@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_strategy/url_strategy.dart';
 import 'configuracoes/escolher_senha.dart';
 import 'login_page.dart';
-import 'home_router.dart';
+import 'home1.dart';
 import 'configuracoes/esqueci_senha.dart';
 import 'configuracoes/redefinir_senha.dart';
 import 'splash_screen.dart';
@@ -87,7 +87,7 @@ class _MyAppState extends State<MyApp> {
       ),
       home: isRecoveryLink ? const RedefinirSenhaPage() : const SplashScreen(),
       routes: {
-        '/home': (context) => const HomeRouter(),
+        '/home': (context) => const HomePage(),
         '/login': (context) => const LoginPage(),
         '/esqueci-senha': (context) => const EsqueciSenhaPage(),
         '/redefinir-senha': (context) => const RedefinirSenhaPage(),

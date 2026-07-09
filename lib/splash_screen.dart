@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'dart:html' as html;
 import 'login_page.dart';
-import 'home_router.dart';
+import 'home1.dart';
 import 'configuracoes/escolher_senha.dart';
 import 'configuracoes/redefinir_senha.dart';
 
@@ -23,7 +23,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   final supabase = Supabase.instance.client;
   String _statusMessage = 'Verificando atualizações...';
-  String _versaoExibida = '2.2.19';
+  String _versaoExibida = '2.2.21';
   Timer? _timer;
 
   @override
@@ -175,7 +175,7 @@ class _SplashScreenState extends State<SplashScreen> {
           .eq('email', session.user.email ?? '')
           .maybeSingle();
 
-      // Armazena o layout para o HomeRouter usar antes de UsuarioAtual.instance ser populado
+      // Armazena o layout para o HomePage usar antes de UsuarioAtual.instance ser populado
       UsuarioAtual.pendingLayout = int.tryParse(usuario?['layout']?.toString() ?? '1') ?? 1;
 
       if (usuario != null && usuario['senha_temporaria'] == true) {
@@ -188,7 +188,7 @@ class _SplashScreenState extends State<SplashScreen> {
         if (!mounted) return;
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeRouter()),
+          MaterialPageRoute(builder: (_) => const HomePage()),
         );
       }
     } catch (e) {

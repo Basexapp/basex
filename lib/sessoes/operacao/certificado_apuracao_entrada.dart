@@ -266,8 +266,8 @@ class EmitirCertificadoEntrada extends StatefulWidget {
   final String? idMovimentacao;
   final bool modoSomenteVisualizacao;
   final String? idAnaliseExistente;
-  final String terminalId; // Terminal explícito, independente do usuário logado
-  final String dataFiltro; // Data selecionada no filtro de acompanhamento (dd/mm/aaaa)
+  final String terminalId;
+  final String dataFiltro;
 
   const EmitirCertificadoEntrada({
     super.key,
@@ -293,9 +293,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
   final TextEditingController dataCtrl = TextEditingController();
   final TextEditingController horaCtrl = TextEditingController();
   
-  final FocusNode _focusTempAmostra = FocusNode();
-  final FocusNode _focusDensidadeAmostra = FocusNode();
-  final FocusNode _focusTempCT = FocusNode();
+  final FocusNode _focusTempObs = FocusNode();
+  final FocusNode _focusDensidadeObs = FocusNode();
   final FocusNode _focusDestinoAmb = FocusNode();
   final FocusNode _focusDestino20 = FocusNode();
   final FocusNode _focusOrigem20 = FocusNode();
@@ -309,9 +308,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     'placaCavalo': TextEditingController(),
     'carreta1': TextEditingController(),
     'carreta2': TextEditingController(),
-    'tempAmostra': TextEditingController(),
-    'densidadeAmostra': TextEditingController(),
-    'tempCT': TextEditingController(),
+    'tempObs': TextEditingController(),
+    'densidadeObs': TextEditingController(),
     'densidade20': TextEditingController(),
     'fatorCorrecao': TextEditingController(),
     
@@ -331,30 +329,24 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
   String? produtoSelecionado;
   bool carregandoProdutos = true;
 
+  // Variável para controlar se o produto atual é álcool
+  bool _isAlcool = false;
+
   @override
   void initState() {
     super.initState();
     _setarDataHoraAtual();
     _carregarProdutos();
 
-    _focusTempAmostra.addListener(() {
-      if (!_modoVisualizacao && !_focusTempAmostra.hasFocus) {
+    _focusTempObs.addListener(() {
+      if (!_modoVisualizacao && !_focusTempObs.hasFocus) {
         _calcularResultadosObtidos();
-        _calcularDiferenca20C();
       }
     });
 
-    _focusDensidadeAmostra.addListener(() {
-      if (!_modoVisualizacao && !_focusDensidadeAmostra.hasFocus) {
+    _focusDensidadeObs.addListener(() {
+      if (!_modoVisualizacao && !_focusDensidadeObs.hasFocus) {
         _calcularResultadosObtidos();
-        _calcularDiferenca20C();
-      }
-    });
-
-    _focusTempCT.addListener(() {
-      if (!_modoVisualizacao && !_focusTempCT.hasFocus) {
-        _calcularResultadosObtidos();
-        _calcularDiferenca20C();
       }
     });
     
@@ -384,26 +376,18 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
     });
 
-    // NOVA LÓGICA: Considera o modoSomenteVisualizacao
     if (widget.modoSomenteVisualizacao) {
-      // MODO VISUALIZAÇÃO - Forçado pelo parâmetro
       _modoVisualizacao = true;
       
-      // Se tem idAnaliseExistente, carrega diretamente
       if (widget.idAnaliseExistente != null && widget.idAnaliseExistente!.isNotEmpty) {
         _carregarDadosAnaliseExistente(widget.idAnaliseExistente!);
       }
-      // Se não tem idAnaliseExistente mas tem idMovimentacao, tenta buscar
       else if (widget.idMovimentacao != null && widget.idMovimentacao!.isNotEmpty) {
         _buscarAnalisePorMovimentacao(widget.idMovimentacao!);
       }
     } else {
-      // MODO CRIAÇÃO/EDIÇÃO - Lógica original
       if (widget.idMovimentacao != null && widget.idMovimentacao!.isNotEmpty) {
-        // Primeiro carrega dados básicos da movimentação
         _carregarDadosMovimentacao(widget.idMovimentacao!).then((_) {
-          // DEPOIS tenta carregar a ordem de análise completa
-          // (só depois de garantir que os dados da movimentação foram carregados)
           if (mounted) {
             _carregarDadosOrdensAnalises(widget.idMovimentacao!);
           }
@@ -412,7 +396,12 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     }
   }
 
-  // Método para carregar análise existente quando em modo visualização
+  void _verificarSeEAlcool(String produtoNome) {
+    final nomeLower = produtoNome.toLowerCase().trim();
+    _isAlcool = nomeLower.contains('anidro') || nomeLower.contains('hidratado');
+    setState(() {});
+  }
+
   Future<void> _carregarDadosAnaliseExistente(String idAnalise) async {
     try {
       final supabase = Supabase.instance.client;
@@ -428,7 +417,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           .maybeSingle();
           
       if (analise != null) {
-        // Preencher campos com os dados da análise
         campos['numeroControle']!.text = analise['numero_controle']?.toString() ?? '';
         campos['transportadora']!.text = analise['transportadora']?.toString() ?? '';
         campos['motorista']!.text = analise['motorista']?.toString() ?? '';
@@ -442,9 +430,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         campos['carreta1']!.text = analise['carreta1']?.toString() ?? '';
         campos['carreta2']!.text = analise['carreta2']?.toString() ?? '';
         
-        campos['tempAmostra']!.text = _formatarDecimalParaTela(analise['temperatura_amostra']);
-        campos['densidadeAmostra']!.text = _formatarDecimalParaTela(analise['densidade_observada']);
-        campos['tempCT']!.text = _formatarDecimalParaTela(analise['temperatura_ct']);
+        campos['tempObs']!.text = _formatarDecimalParaTela(analise['temperatura_amostra']);
+        campos['densidadeObs']!.text = _formatarDecimalParaTela(analise['densidade_observada']);
         campos['densidade20']!.text = _formatarDecimalParaTela(analise['densidade_20c']);
         campos['fatorCorrecao']!.text = _formatarDecimalParaTela(analise['fator_correcao']);
         
@@ -458,6 +445,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         
         if (analise['produtos'] != null && analise['produtos']['nome'] != null) {
           produtoSelecionado = analise['produtos']['nome'].toString();
+          _verificarSeEAlcool(produtoSelecionado!);
         }
         
         if (analise['data_criacao'] != null) {
@@ -474,7 +462,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     }
   }
 
-  // Método para buscar análise por movimentação (quando em modo visualização)
   Future<void> _buscarAnalisePorMovimentacao(String movimentacaoId) async {
     try {
       final supabase = Supabase.instance.client;
@@ -527,7 +514,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         return;
       }
 
-      // APENAS OS CAMPOS ESPECIFICADOS
       if (movimentacao['qtd_faturada'] != null) {
         campos['qtdFaturada']!.text =
             _formatarInteiroParaTela(movimentacao['qtd_faturada']);
@@ -540,6 +526,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       if (movimentacao['produtos'] != null &&
           movimentacao['produtos']['nome'] != null) {
         produtoSelecionado = movimentacao['produtos']['nome'].toString();
+        _verificarSeEAlcool(produtoSelecionado!);
       }
 
       if (movimentacao['motoristas'] != null &&
@@ -577,7 +564,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         try {
             campos['origem20']!.text =
               _aplicarMascaraMilhar(movimentacao['saida_vinte'].toString());
-            // Campo origem20 editável mesmo vindo da movimentação
         } catch (_) {}
       }
 
@@ -627,44 +613,89 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     if (_modoVisualizacao) return;
     if (produtoSelecionado == null) return;
 
-    final tempAmostra = campos['tempAmostra']!.text;
-    final densObs = campos['densidadeAmostra']!.text;
-    final tempCT = campos['tempCT']!.text;
+    final tempObs = campos['tempObs']!.text;
+    final densObs = campos['densidadeObs']!.text;
 
-    if (tempAmostra.isEmpty || densObs.isEmpty) {
+    // Para álcool, precisamos de temperatura observada e densidade observada
+    if (_isAlcool) {
+      if (tempObs.isEmpty || densObs.isEmpty) {
+        campos['densidade20']!.text = '';
+        campos['fatorCorrecao']!.text = '';
+        campos['destino20']!.text = '';
+        _calcularDiferenca20C();
+        setState(() {});
+        return;
+      }
+
+      final dens20 = await _buscarDensidade20CAlcool(
+        temperaturaAmostra: tempObs,
+        densidadeObservada: densObs,
+      );
+
+      campos['densidade20']!.text = dens20;
+
+      if (dens20 == '-' || dens20.isEmpty) {
+        campos['fatorCorrecao']!.text = '-';
+        campos['destino20']!.text = '';
+        _calcularDiferenca20C();
+        setState(() {});
+        return;
+      }
+
+      // Para álcool, o FCV é calculado usando a temperatura observada (não temperatura do CT)
+      final fcv = await _buscarFCVAlcool(
+        temperaturaObs: tempObs,
+        densidade20C: dens20,
+      );
+
+      if (fcv != '-' && fcv.isNotEmpty) {
+        campos['fatorCorrecao']!.text = fcv;
+        _calcularDestino20CAutomatico();
+      } else {
+        campos['fatorCorrecao']!.text = '-';
+        campos['destino20']!.text = '';
+        _calcularDiferenca20C();
+      }
+
+      setState(() {});
+      return;
+    }
+
+    // Para gasolina/diesel (não álcool) - mantém lógica original
+    if (tempObs.isEmpty || densObs.isEmpty) {
       campos['densidade20']!.text = '';
       campos['fatorCorrecao']!.text = '';
-      campos['destino20']!.text = ''; // Limpa destino20C se dados básicos sumirem
+      campos['destino20']!.text = '';
       _calcularDiferenca20C();
       setState(() {});
       return;
     }
 
     final dens20 = await _buscarDensidade20C(
-      temperaturaAmostra: tempAmostra,
+      temperaturaAmostra: tempObs,
       densidadeObservada: densObs,
       produtoNome: produtoSelecionado!,
     );
 
     campos['densidade20']!.text = dens20;
 
-    if (dens20 == '-' || dens20.isEmpty || tempCT.isEmpty) {
+    if (dens20 == '-' || dens20.isEmpty) {
       campos['fatorCorrecao']!.text = '-';
-      campos['destino20']!.text = ''; // Limpa se FCV não puder ser calculado
+      campos['destino20']!.text = '';
       _calcularDiferenca20C();
       setState(() {});
       return;
     }
 
+    // Para gasolina/diesel, FCV usa temperatura do CT
     final fcv = await _buscarFCV(
-      temperaturaTanque: tempCT,
+      temperaturaTanque: tempObs, // Usa a mesma temperatura observada
       densidade20C: dens20,
       produtoNome: produtoSelecionado!,
     );
 
     if (fcv != '-' && fcv.isNotEmpty) {
       campos['fatorCorrecao']!.text = fcv;
-      // Força o recálculo do volume a 20°C sempre que o FCV for atualizado
       _calcularDestino20CAutomatico();
     } else {
       campos['fatorCorrecao']!.text = '-';
@@ -682,19 +713,16 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
   }
 
   String _aplicarMascaraMilhar(String texto) {
-    // Remove tudo que não é número
     String apenasNumeros = texto.replaceAll(RegExp(r'[^\d]'), '');
     
     if (apenasNumeros.isEmpty || apenasNumeros == '0') {
       return '0';
     }
     
-    // Remove zeros à esquerda
     while (apenasNumeros.length > 1 && apenasNumeros[0] == '0') {
       apenasNumeros = apenasNumeros.substring(1);
     }
     
-    // Aplica máscara de milhar
     String resultado = '';
     for (int i = apenasNumeros.length - 1, count = 0; i >= 0; i--, count++) {
       if (count > 0 && count % 3 == 0) {
@@ -710,7 +738,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     try {
       final fcvText = campos['fatorCorrecao']!.text;
       if (fcvText.isEmpty || fcvText == '-') {
-        // FCV não disponível — sem log em produção
         return;
       }
       
@@ -768,7 +795,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
       setState(() {});
     } catch (e) {
-      // Erro ao calcular diferença ambiente
       campos['difAmb']!.text = '';
       setState(() {});
     }
@@ -800,7 +826,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
       setState(() {});
     } catch (e) {
-      // Erro ao calcular diferença 20°C
       campos['dif20']!.text = '';
       setState(() {});
     }
@@ -1081,70 +1106,88 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                   ]),
                                   const SizedBox(height: 20),
                                   _secao('Coletas na presença do motorista'),
-                                  _linha([
-                                    TextFormField(
-                                      controller: campos['tempAmostra'],
-                                      focusNode: _modoVisualizacao ? null : _focusTempAmostra,
-                                      keyboardType: TextInputType.number,
-                                      enabled: !_modoVisualizacao,
-                                      onChanged: _modoVisualizacao ? null : (value) {
-                                        final masked = _aplicarMascaraTemperatura(value);
-
-                                        if (masked != value) {
-                                          campos['tempAmostra']!.value = TextEditingValue(
-                                            text: masked,
-                                            selection: TextSelection.collapsed(offset: masked.length),
-                                          );
-                                        }
-                                      },
-                                      decoration: _decoration('Temperatura da amostra (°C)').copyWith(
-                                        hintText: '00,0',
-                                        fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
-                                      ),
-                                    ),
-
-                                    TextFormField(
-                                      controller: campos['densidadeAmostra'],
-                                      focusNode: _modoVisualizacao ? null : _focusDensidadeAmostra,
-                                      keyboardType: TextInputType.number,
-                                      enabled: !_modoVisualizacao,
-                                      onChanged: _modoVisualizacao ? null : (value) {
-                                        final masked = _aplicarMascaraDensidade(value);
-
-                                        if (masked != value) {
-                                          campos['densidadeAmostra']!.value = TextEditingValue(
-                                            text: masked,
-                                            selection: TextSelection.collapsed(offset: masked.length),
-                                          );
-                                        }
-                                      },
-                                      decoration: _decoration('Densidade observada').copyWith(
-                                        hintText: '0,0000',
-                                        fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
-                                      ),
-                                    ),
-
-                                    TextFormField(
-                                      controller: campos['tempCT'],
-                                      focusNode: _modoVisualizacao ? null : _focusTempCT,
-                                      keyboardType: TextInputType.number,
-                                      enabled: !_modoVisualizacao,
-                                      onChanged: _modoVisualizacao ? null : (value) {
-                                        final masked = _aplicarMascaraTemperatura(value);
-
-                                        if (masked != value) {
-                                          campos['tempCT']!.value = TextEditingValue(
-                                            text: masked,
-                                            selection: TextSelection.collapsed(offset: masked.length),
-                                          );
-                                        }
-                                      },
-                                      decoration: _decoration('Temperatura do CT (°C)').copyWith(
-                                        hintText: '00,0',
-                                        fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
-                                      ),
-                                    ),
-                                  ]),
+                                  // Exibe apenas 2 campos para álcool, 3 para outros produtos
+                                  _isAlcool
+                                      ? _linha([
+                                          TextFormField(
+                                            controller: campos['tempObs'],
+                                            focusNode: _modoVisualizacao ? null : _focusTempObs,
+                                            keyboardType: TextInputType.number,
+                                            enabled: !_modoVisualizacao,
+                                            onChanged: _modoVisualizacao ? null : (value) {
+                                              final masked = _aplicarMascaraTemperatura(value);
+                                              if (masked != value) {
+                                                campos['tempObs']!.value = TextEditingValue(
+                                                  text: masked,
+                                                  selection: TextSelection.collapsed(offset: masked.length),
+                                                );
+                                              }
+                                            },
+                                            decoration: _decoration('Temperatura observada (°C)').copyWith(
+                                              hintText: '00,0',
+                                              fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
+                                            ),
+                                          ),
+                                          TextFormField(
+                                            controller: campos['densidadeObs'],
+                                            focusNode: _modoVisualizacao ? null : _focusDensidadeObs,
+                                            keyboardType: TextInputType.number,
+                                            enabled: !_modoVisualizacao,
+                                            onChanged: _modoVisualizacao ? null : (value) {
+                                              final masked = _aplicarMascaraDensidade(value);
+                                              if (masked != value) {
+                                                campos['densidadeObs']!.value = TextEditingValue(
+                                                  text: masked,
+                                                  selection: TextSelection.collapsed(offset: masked.length),
+                                                );
+                                              }
+                                            },
+                                            decoration: _decoration('Densidade observada').copyWith(
+                                              hintText: '0,0000',
+                                              fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
+                                            ),
+                                          ),
+                                        ])
+                                      : _linha([
+                                          TextFormField(
+                                            controller: campos['tempObs'],
+                                            focusNode: _modoVisualizacao ? null : _focusTempObs,
+                                            keyboardType: TextInputType.number,
+                                            enabled: !_modoVisualizacao,
+                                            onChanged: _modoVisualizacao ? null : (value) {
+                                              final masked = _aplicarMascaraTemperatura(value);
+                                              if (masked != value) {
+                                                campos['tempObs']!.value = TextEditingValue(
+                                                  text: masked,
+                                                  selection: TextSelection.collapsed(offset: masked.length),
+                                                );
+                                              }
+                                            },
+                                            decoration: _decoration('Temperatura da amostra (°C)').copyWith(
+                                              hintText: '00,0',
+                                              fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
+                                            ),
+                                          ),
+                                          TextFormField(
+                                            controller: campos['densidadeObs'],
+                                            focusNode: _modoVisualizacao ? null : _focusDensidadeObs,
+                                            keyboardType: TextInputType.number,
+                                            enabled: !_modoVisualizacao,
+                                            onChanged: _modoVisualizacao ? null : (value) {
+                                              final masked = _aplicarMascaraDensidade(value);
+                                              if (masked != value) {
+                                                campos['densidadeObs']!.value = TextEditingValue(
+                                                  text: masked,
+                                                  selection: TextSelection.collapsed(offset: masked.length),
+                                                );
+                                              }
+                                            },
+                                            decoration: _decoration('Densidade observada').copyWith(
+                                              hintText: '0,0000',
+                                              fillColor: _modoVisualizacao ? const Color(0xFFF5F5F5) : Colors.white,
+                                            ),
+                                          ),
+                                        ]),
                                   const SizedBox(height: 20),
                                   _secao('Resultados obtidos'),
                                   _linha([
@@ -1265,11 +1308,9 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                             ),
                           ),
                           if (!_carregandoDadosMovimentacao)
-                          // ================= BOTÕES =================
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // 1 - BOTÃO VOLTAR
                               ElevatedButton.icon(
                                 onPressed: _voltar,
                                 icon: const Icon(Icons.arrow_back, size: 24),
@@ -1288,7 +1329,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                               ),
 
                               if (!_modoVisualizacao)
-                                // BOTÃO EMITIR CERTIFICADO (Apenas em modo criação/edição)
                                 ElevatedButton.icon(
                                   onPressed: (_salvandoCertificado || (_converterParaInteiro(campos['destino20']!.text) ?? 0) <= 0)
                                     ? null
@@ -1318,7 +1358,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                   ),
                                 )
                               else ...[
-                                // 2 - BOTÃO GERAR PDF (Apenas em modo visualização)
                                 ElevatedButton.icon(
                                   onPressed: _baixarPDF,
                                   icon: const Icon(Icons.picture_as_pdf, size: 24),
@@ -1336,7 +1375,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
                                   ),
                                 ),
 
-                                // 3 - BOTÃO CANCELAR CERTIFICADO (Apenas em modo visualização)
                                 if (widget.idAnaliseExistente != null)
                                   ElevatedButton.icon(
                                     onPressed: _salvandoCertificado ? null : _cancelarCertificado,
@@ -1437,7 +1475,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         ],
       );
 
-  // ================= CÁLCULOS =================
+  // ================= CÁLCULOS PARA ÁLCOOL =================
+  
   Future<Map<String, dynamic>?> _buscarTabelaAlcool({
     required String temperatura,
     required String densidadeObservada,
@@ -1526,6 +1565,58 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     }
   }
 
+  Future<String> _buscarDensidade20CAlcool({
+    required String temperaturaAmostra,
+    required String densidadeObservada,
+  }) async {
+    try {
+      if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) {
+        return '-';
+      }
+
+      final resultado = await _buscarTabelaAlcool(
+        temperatura: temperaturaAmostra,
+        densidadeObservada: densidadeObservada,
+      );
+
+      if (resultado != null) {
+        final densVinte = (resultado['densid_vinte'] as num).toDouble();
+        final densVinteFormatada = (densVinte / 1000).toStringAsFixed(4).replaceAll('.', ',');
+        return densVinteFormatada;
+      }
+      return '-';
+    } catch (e) {
+      return '-';
+    }
+  }
+
+  Future<String> _buscarFCVAlcool({
+    required String temperaturaObs,
+    required String densidade20C,
+  }) async {
+    try {
+      if (temperaturaObs.isEmpty || densidade20C.isEmpty || densidade20C == '-') {
+        return '-';
+      }
+
+      final resultado = await _buscarTabelaAlcoolPorDensidade20(
+        temperatura: temperaturaObs,
+        densidade20: densidade20C,
+      );
+
+      if (resultado != null) {
+        final fcv = (resultado['fcv'] as num).toDouble();
+        final fcvFormatado = fcv.toStringAsFixed(4).replaceAll('.', ',');
+        return fcvFormatado;
+      }
+      return '-';
+    } catch (e) {
+      return '-';
+    }
+  }
+
+  // ================= CÁLCULOS PARA GASOLINA/DIESEL =================
+  
   Future<String> _buscarDensidade20C({
     required String temperaturaAmostra,
     required String densidadeObservada,
@@ -1535,27 +1626,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     
     try {
       if (temperaturaAmostra.isEmpty || densidadeObservada.isEmpty) {
-        return '-';
-      }
-      
-      final nomeProdutoLower = produtoNome.toLowerCase().trim();
-      final bool ehAlcool = 
-          nomeProdutoLower.contains('anidro') || 
-          nomeProdutoLower.contains('hidratado');
-
-      // Se for álcool, usa a tabela tcv_alcool conforme metodologia do certificado de saída
-      if (ehAlcool) {
-        final resultado = await _buscarTabelaAlcool(
-          temperatura: temperaturaAmostra,
-          densidadeObservada: densidadeObservada,
-        );
-
-        if (resultado != null) {
-          final densVinte = (resultado['densid_vinte'] as num).toDouble();
-          // Converte de kg/m³ para kg/L (ex: 793,5 -> 0,7935)
-          final densVinteFormatada = (densVinte / 1000).toStringAsFixed(4).replaceAll('.', ',');
-          return densVinteFormatada;
-        }
         return '-';
       }
 
@@ -1721,26 +1791,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           temperaturaTanque == '-' ||
           densidade20C.isEmpty ||
           densidade20C == '-') {
-        return '-';
-      }
-
-      final nomeProdutoLower = produtoNome.toLowerCase().trim();
-      final bool ehAlcool = 
-          nomeProdutoLower.contains('anidro') || 
-          nomeProdutoLower.contains('hidratado');
-
-      // Se for álcool, usa a tabela tcv_alcool conforme metodologia do certificado de saída
-      if (ehAlcool) {
-        final resultado = await _buscarTabelaAlcoolPorDensidade20(
-          temperatura: temperaturaTanque,
-          densidade20: densidade20C,
-        );
-
-        if (resultado != null) {
-          final fcv = (resultado['fcv'] as num).toDouble();
-          final fcvFormatado = fcv.toStringAsFixed(4).replaceAll('.', ',');
-          return fcvFormatado;
-        }
         return '-';
       }
 
@@ -1972,9 +2022,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         'carreta1': campos['carreta1']!.text,
         'carreta2': campos['carreta2']!.text,
         'notas': campos['notas']!.text,
-        'tempAmostra': campos['tempAmostra']!.text,
-        'densidadeAmostra': campos['densidadeAmostra']!.text,
-        'tempCT': campos['tempCT']!.text,
+        'tempObs': campos['tempObs']!.text,
+        'densidadeObs': campos['densidadeObs']!.text,
         'densidade20': campos['densidade20']!.text,
         'fatorCorrecao': campos['fatorCorrecao']!.text,
         'origemAmb': campos['origemAmb']!.text,
@@ -2140,7 +2189,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
   void _voltar() {
     FocusScope.of(context).unfocus();
-    // Use the provided callback when embedded; otherwise pop the route
     try {
       widget.onVoltar();
     } catch (_) {
@@ -2148,7 +2196,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     }
   }
 
-  // Método para cancelar o certificado no banco
   Future<void> _cancelarCertificado() async {
     if (!_modoVisualizacao || (widget.idAnaliseExistente == null && campos['numeroControle']!.text.isEmpty)) return;
 
@@ -2271,7 +2318,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     if (confirmacao != true) return;
 
     setState(() {
-      _salvandoCertificado = true; // Reutilizando flag de loading
+      _salvandoCertificado = true;
     });
 
     try {
@@ -2288,7 +2335,7 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Certificado cancelado com sucesso!'), backgroundColor: Colors.green),
           );
-          _voltar(); // Volta para a tela anterior após cancelar
+          _voltar();
         }
       }
     } catch (e) {
@@ -2415,7 +2462,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
       final produtoId = await _resolverProdutoId(produtoSelecionado!);
 
-      // Buscar ordem_id da movimentação
       String? ordemId;
       try {
         if (widget.idMovimentacao != null) {
@@ -2431,7 +2477,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       }
 
       final dadosOrdem = {
-        
         'transportadora': campos['transportadora']!.text,
         'motorista': campos['motorista']!.text,
         'notas_fiscais': campos['notas']!.text,
@@ -2440,9 +2485,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         'carreta2': campos['carreta2']!.text,
         'produto_id': produtoId,
         'produto_nome': produtoSelecionado,
-        'temperatura_amostra': _converterParaDecimal(campos['tempAmostra']!.text),
-        'densidade_observada': _converterParaDecimal(campos['densidadeAmostra']!.text),
-        'temperatura_ct': _converterParaDecimal(campos['tempCT']!.text),
+        'temperatura_amostra': _converterParaDecimal(campos['tempObs']!.text),
+        'densidade_observada': _converterParaDecimal(campos['densidadeObs']!.text),
         'densidade_20c': _converterParaDecimal(campos['densidade20']!.text),
         'fator_correcao': _converterParaDecimal(campos['fatorCorrecao']!.text),
         'origem_ambiente': _converterParaInteiro(campos['origemAmb']!.text),
@@ -2549,8 +2593,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
       final supabase = Supabase.instance.client;
       final timestampBrasilia = _obterTimestampBrasilia();
 
-      // Formatar a data selecionada no campo 'Data' (dd/mm/aaaa -> yyyy-mm-dd)
-      // e combinar com a hora atual para o campo data_descarga
       String dataDescargaFormatada = timestampBrasilia;
       try {
         if (dataCtrl.text.isNotEmpty) {
@@ -2572,7 +2614,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         print('Erro ao formatar data do campo para o banco: $e');
       }
       
-      // 1 - Update na tabela movimentacoes_tanque
       await supabase
           .from('movimentacoes_tanque')
           .update({
@@ -2580,7 +2621,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           })
           .eq('movimentacao_id', movimentacaoId);
 
-      // 2 - Update na tabela movimentacoes
       await supabase
           .from('movimentacoes')
           .update({
@@ -2592,14 +2632,12 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
           })
           .eq('id', movimentacaoId);
           
-      // Movimentação atualizada (registro em banco). No log de debug mantido.
     } catch (e) {
       print('✗ Erro ao atualizar movimentação: $e');
       rethrow;
     }
   }
 
-  // Função auxiliar para obter timestamp no horário de Brasília (UTC-3)
   String _obterTimestampBrasilia() {
     final agora = DateTime.now().toUtc();
     final brasilia = agora.subtract(const Duration(hours: 3));
@@ -2622,9 +2660,8 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
   
   @override
   void dispose() {
-    _focusTempAmostra.dispose();
-    _focusDensidadeAmostra.dispose();
-    _focusTempCT.dispose();
+    _focusTempObs.dispose();
+    _focusDensidadeObs.dispose();
     _focusDestinoAmb.dispose();
     _focusDestino20.dispose();
     _focusOrigem20.dispose();
@@ -2636,7 +2673,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     try {
       final supabase = Supabase.instance.client;
 
-      // Busca a ordem de análise do tipo "destino" relacionada à movimentação
       final ordemAnalise = await supabase
           .from('ordens_analises')
           .select('''
@@ -2645,58 +2681,46 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
             movimentacoes:movimentacao_id(qtd_faturada)
           ''')
           .eq('movimentacao_id', idMovimentacao)
-          .eq('tipo_analise', 'destino')  // Exatamente "destino"
+          .eq('tipo_analise', 'destino')
           .order('data_criacao', ascending: false)
           .limit(1)
           .maybeSingle();
 
       if (ordemAnalise == null) {
-        // Nenhuma ordem de análise do tipo "destino" encontrada
-        return; // Não encontrou, mantém modo criação
+        return;
       }
-
-      // Preencher TODOS os campos da ordem_analises
       
       if (ordemAnalise['movimentacoes'] != null && ordemAnalise['movimentacoes']['qtd_faturada'] != null) {
         campos['qtdFaturada']!.text = _formatarInteiroParaTela(ordemAnalise['movimentacoes']['qtd_faturada']);
       }
       
-      // Cabeçalho
       campos['numeroControle']!.text = ordemAnalise['numero_controle']?.toString() ?? '';
       campos['transportadora']!.text = ordemAnalise['transportadora']?.toString() ?? '';
       campos['motorista']!.text = ordemAnalise['motorista']?.toString() ?? '';
       campos['notas']!.text = ordemAnalise['notas_fiscais']?.toString() ?? '';
       
-      // Placas
       campos['placaCavalo']!.text = ordemAnalise['placa_cavalo']?.toString() ?? '';
       campos['carreta1']!.text = ordemAnalise['carreta1']?.toString() ?? '';
       campos['carreta2']!.text = ordemAnalise['carreta2']?.toString() ?? '';
       
-      // Coletas (formatar com vírgula decimal)
-      campos['tempAmostra']!.text = _formatarDecimalParaTela(ordemAnalise['temperatura_amostra']);
-      campos['densidadeAmostra']!.text = _formatarDecimalParaTela(ordemAnalise['densidade_observada']);
-      campos['tempCT']!.text = _formatarDecimalParaTela(ordemAnalise['temperatura_ct']);
-      
-      // Resultados
+      campos['tempObs']!.text = _formatarDecimalParaTela(ordemAnalise['temperatura_amostra']);
+      campos['densidadeObs']!.text = _formatarDecimalParaTela(ordemAnalise['densidade_observada']);
       campos['densidade20']!.text = _formatarDecimalParaTela(ordemAnalise['densidade_20c']);
       campos['fatorCorrecao']!.text = _formatarDecimalParaTela(ordemAnalise['fator_correcao']);
       
-      // Volumes (formatar com ponto de milhar)
       campos['origemAmb']!.text = _formatarInteiroParaTela(ordemAnalise['origem_ambiente']);
       campos['destinoAmb']!.text = _formatarInteiroParaTela(ordemAnalise['destino_ambiente']);
       campos['origem20']!.text = _formatarInteiroParaTela(ordemAnalise['origem_20c']);
       campos['destino20']!.text = _formatarInteiroParaTela(ordemAnalise['destino_20c']);
       
-      // Calcular diferenças automaticamente
       _calcularDiferencaAmbiente();
       _calcularDiferenca20C();
       
-      // Produto
       if (ordemAnalise['produtos'] != null && ordemAnalise['produtos']['nome'] != null) {
         produtoSelecionado = ordemAnalise['produtos']['nome'].toString();
+        _verificarSeEAlcool(produtoSelecionado!);
       }
       
-      // Data e Hora
       if (ordemAnalise['data_criacao'] != null) {
         dataCtrl.text = _formatarDataParaTela(ordemAnalise['data_criacao'].toString());
       }
@@ -2704,65 +2728,47 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
         horaCtrl.text = ordemAnalise['hora_analise'].toString();
       }
       
-      // Entrar em modo visualização
       setState(() {
         _modoVisualizacao = true;
       });
-      
-      // Dados da ordem de análise carregados (modo visualização)
       
     } catch (e) {
       print('Erro ao carregar dados da ordem de análise: $e');
     }
   }
 
-  // Formata inteiro do banco (999999) para exibição (999.999)
   String _formatarInteiroParaTela(dynamic valorBanco) {
     if (valorBanco == null) return '';
     
     try {
-      // Converte para string
       String valorStr = valorBanco.toString();
-      
-      // Remove quaisquer caracteres não numéricos
       String apenasNumeros = valorStr.replaceAll(RegExp(r'[^\d]'), '');
-      
       if (apenasNumeros.isEmpty) return '';
-      
-      // Aplica máscara de milhar
       return _aplicarMascaraMilhar(apenasNumeros);
     } catch (e) {
       return '';
     }
   }
 
-  // Formata decimal do banco para exibição com vírgula
   String _formatarDecimalParaTela(dynamic valorBanco) {
     if (valorBanco == null) return '';
     
     try {
-      // Converte para string
       String valorStr = valorBanco.toString();
-      
-      // Substitui ponto por vírgula (banco usa ponto como separador decimal)
       valorStr = valorStr.replaceAll('.', ',');
       
-      // Para densidade (formato 0,0000)
       if (valorStr.contains(',')) {
         final partes = valorStr.split(',');
         if (partes.length == 2) {
           String parteInteira = partes[0];
           String parteDecimal = partes[1];
           
-          // Garante 4 casas decimais para densidade
           if (valorBanco is num && valorBanco < 1) {
-            // É uma densidade (ex: 0.7456)
             parteDecimal = parteDecimal.padRight(4, '0');
             if (parteDecimal.length > 4) {
               parteDecimal = parteDecimal.substring(0, 4);
             }
           } else if (valorBanco is num && valorBanco > 1 && valorBanco < 10) {
-            // É temperatura (ex: 15.5)
             parteDecimal = parteDecimal.padRight(1, '0');
             if (parteDecimal.length > 1) {
               parteDecimal = parteDecimal.substring(0, 1);
@@ -2779,7 +2785,6 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     }
   }
 
-  // Formata data do banco (YYYY-MM-DD) para DD/MM/YYYY
   String _formatarDataParaTela(String dataBanco) {
     if (dataBanco.isEmpty) return '';
     
