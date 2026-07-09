@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:printing/printing.dart';
@@ -120,6 +121,34 @@ class CaclBombeioDialog extends StatelessWidget {
         medicoes['massaFinal'] = medFin['massa'];
       }
       combined['medicoes'] = medicoes;
+
+      // Garantir que exista um campo 'qtd_faturada' — some quantidades_faturadas se necessário
+      double totalFaturadoSum = 0.0;
+      final rawFaturado = b['quantidades_faturadas'];
+      if (rawFaturado != null) {
+        try {
+          if (rawFaturado is Map) {
+            rawFaturado.forEach((k, v) {
+              totalFaturadoSum += double.tryParse(v?.toString() ?? '0') ?? 0.0;
+            });
+          } else if (rawFaturado is String) {
+            final parsed = jsonDecode(rawFaturado);
+            if (parsed is Map) {
+              parsed.forEach((k, v) {
+                totalFaturadoSum += double.tryParse(v?.toString() ?? '0') ?? 0.0;
+              });
+            }
+          } else if (rawFaturado is List) {
+            for (var v in rawFaturado) {
+              if (v is Map) {
+                final double val = double.tryParse(v['faturado']?.toString() ?? v['quantidade']?.toString() ?? '0') ?? 0;
+                totalFaturadoSum += val;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+      combined['qtd_faturada'] = b['qtd_total_faturada'] ?? totalFaturadoSum;
 
       // 6) Finalmente abre o diálogo com dados completos
       if (!context.mounted) {

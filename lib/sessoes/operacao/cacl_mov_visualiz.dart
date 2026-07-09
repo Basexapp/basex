@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'cacl_pdf.dart';
+import '../bombeios/cacl_pdf.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:convert' show base64Encode;
 import 'dart:js' as js;

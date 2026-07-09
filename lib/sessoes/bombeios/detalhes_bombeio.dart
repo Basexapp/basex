@@ -7,7 +7,8 @@ import '../../main.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dialog_inserir_bombeio.dart';
 import '../operacao/rateio_payload.dart';
-import '../operacao/cacl_bombeio.dart';
+import 'cacl_bombeio.dart' as cacl_single;
+import 'cacl_bombeio_duplo.dart' as cacl_duplo;
 
 class DetalhesBombeioPage extends StatefulWidget {
   final Map<String, dynamic> bombeio;
@@ -362,6 +363,14 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
 
         // Medições do tanque 2 (declaradas acima)
 
+      // Calcular total faturado somando os valores em `quantidadesFaturadasMap`
+      double totalFaturadoSum = 0.0;
+      // `quantidadesFaturadasMap` já contém valores numéricos (double),
+      // então somamos diretamente suas values.
+      for (final v in quantidadesFaturadasMap.values) {
+        totalFaturadoSum += v;
+      }
+
       final Map<String, dynamic> bombeioParaDetalhes = {
         'id': item['id'],
         'bombeio_id': item['id'],
@@ -385,6 +394,7 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
         'recebido_amb': recebidoAmb,
         'recebido_20': recebido20,
         'qtd_total_faturada': item['qtd_total_faturada'],
+        'qtd_faturada': item['qtd_total_faturada'] ?? totalFaturadoSum,
         'medicao_inicial': medIni,
         'medicao_final': medFinal,
         'medicao_inicial_2': medIni2,
@@ -2023,9 +2033,15 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         height: 40,
                                         child: ElevatedButton.icon(
                                           onPressed: () async {
+                                            // Se houver segundo tanque, abrir versão dupla
+                                            final tanque2 = _bombeio['tanque_id_2'];
                                             final id = _bombeio['id']?.toString();
                                             if (id == null || id.isEmpty) return;
-                                            await CaclBombeioDialog.showById(context, id);
+                                            if (tanque2 != null) {
+                                              await cacl_duplo.CaclBombeioDialog.showById(context, id);
+                                            } else {
+                                              await cacl_single.CaclBombeioDialog.showById(context, id);
+                                            }
                                           },
                                           icon: const Icon(Icons.calculate, size: 18),
                                           label: const Text('CACL'),
@@ -2257,9 +2273,15 @@ class _DetalhesBombeioPageState extends State<DetalhesBombeioPage>
                                         height: 40,
                                         child: ElevatedButton.icon(
                                           onPressed: () async {
+                                            // Se houver segundo tanque, abrir versão dupla
+                                            final tanque2 = _bombeio['tanque_id_2'];
                                             final id = _bombeio['id']?.toString();
                                             if (id == null || id.isEmpty) return;
-                                            await CaclBombeioDialog.showById(context, id);
+                                            if (tanque2 != null) {
+                                              await cacl_duplo.CaclBombeioDialog.showById(context, id);
+                                            } else {
+                                              await cacl_single.CaclBombeioDialog.showById(context, id);
+                                            }
                                           },
                                           icon: const Icon(Icons.calculate, size: 18),
                                           label: const Text('CACL'),
