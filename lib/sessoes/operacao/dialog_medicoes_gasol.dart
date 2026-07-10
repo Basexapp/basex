@@ -989,7 +989,7 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
         linha = await supabase
             .from('tcd_gasolina_diesel')
             .select('*')
-            .eq('temperatura_obs', t)
+            .eq('"Temp.Obs."', t)
             .maybeSingle();
         if (linha != null) {
           break;
@@ -1004,15 +1004,26 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
       dynamic melhorValor;
       String? melhorColuna;
       for (final entry in linha.entries) {
-        if (!entry.key.startsWith('d_')) continue;
-        final cod = int.tryParse(entry.key.replaceFirst('d_', ''));
-        if (cod == null) continue;
+        // No novo esquema as colunas são identificadas por códigos numéricos (ex: '7000')
+        final key = entry.key;
+        int? cod = int.tryParse(key);
+        if (cod == null) {
+          // Tenta converter formatos decimais como '0,8280' ou '0.8280' para código inteiro
+          final maybeDouble = double.tryParse(key.replaceAll(',', '.'));
+          if (maybeDouble != null) {
+            cod = (maybeDouble * 1000).round();
+          } else {
+            continue;
+          }
+        }
         final valor = entry.value;
-        if (valor == null || valor.toString().trim().isEmpty) continue;
+        if (valor == null || valor.toString().trim().isEmpty) {
+          continue;
+        }
         final delta = (cod - alvo).abs();
         if (melhorDelta == null || delta < melhorDelta) {
           melhorDelta = delta;
-          melhorColuna = entry.key;
+          melhorColuna = key;
           melhorValor = valor;
         }
       }
@@ -1030,8 +1041,7 @@ class _DialogMedicoesGasolState extends State<DialogMedicoesGasol> {
 
       String fcdValue = '-';
       if (melhorColuna != null) {
-        final fcdNumStr = melhorColuna.replaceFirst('d_', '');
-        fcdValue = '0,$fcdNumStr';
+        fcdValue = '0,$melhorColuna';
       }
 
       return {'valor': '${partes[0]},$parteDecimal', 'fcd': fcdValue};
