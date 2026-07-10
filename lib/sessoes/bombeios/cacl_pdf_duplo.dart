@@ -89,6 +89,7 @@ class CACLPdf {
                       ),
                     ),
                     pw.Divider(color: azulPrincipal, height: 6),
+                    pw.SizedBox(height: 10),
                     pw.Row(
                       children: [
                         pw.Expanded(
@@ -103,7 +104,7 @@ class CACLPdf {
                         pw.Expanded(
                           child: _infoLinhaPDFMuitoCompacta(
                             'Data:',
-                            _obterApenasData(data),
+                            _obterApenasData(data), 
                           ),
                         ),
                         pw.SizedBox(width: 8),
@@ -119,18 +120,18 @@ class CACLPdf {
                             }(),
                           ),
                         ),
-                      ],
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Row(
-                      children: [
+                        pw.SizedBox(width: 8),
                         pw.Expanded(
                           child: _infoLinhaPDFMuitoCompacta(
-                            'Produto 1:',
-                            dadosFormulario['produto']?.toString() ?? "",
+                            'Operação:',
+                            dadosFormulario['operacao']?.toString() ?? 'Bombeio',
                           ),
                         ),
-                        pw.SizedBox(width: 8),
+                      ],
+                    ),
+                    pw.SizedBox(height: 18),
+                    pw.Row(
+                      children: [
                         pw.Expanded(
                           child: _infoLinhaPDFMuitoCompacta(
                             'Tanque 1:',
@@ -138,18 +139,25 @@ class CACLPdf {
                           ),
                         ),
                         pw.SizedBox(width: 8),
+                        pw.Expanded(
+                          child: _infoLinhaPDFMuitoCompacta(
+                            'Produto 1:',
+                            dadosFormulario['produto']?.toString() ?? "",
+                          ),
+                        ),
+                        pw.SizedBox(width: 8),
                         if (temTanque2) ...[
                           pw.Expanded(
                             child: _infoLinhaPDFMuitoCompacta(
-                              'Produto 2:',
-                              dadosFormulario['produto_2']?.toString() ?? "",
+                              'Tanque 2:',
+                              dadosFormulario['tanque_2']?.toString() ?? "",
                             ),
                           ),
                           pw.SizedBox(width: 8),
                           pw.Expanded(
                             child: _infoLinhaPDFMuitoCompacta(
-                              'Tanque 2:',
-                              dadosFormulario['tanque_2']?.toString() ?? "",
+                              'Produto 2:',
+                              dadosFormulario['produto_2']?.toString() ?? "",
                             ),
                           ),
                         ],
