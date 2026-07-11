@@ -340,12 +340,14 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
 
     _focusTempObs.addListener(() {
       if (!_modoVisualizacao && !_focusTempObs.hasFocus) {
+        _reiniciarCalculos();
         _calcularResultadosObtidos();
       }
     });
 
     _focusDensidadeObs.addListener(() {
       if (!_modoVisualizacao && !_focusDensidadeObs.hasFocus) {
+        _reiniciarCalculos();
         _calcularResultadosObtidos();
       }
     });
@@ -704,6 +706,19 @@ class _EmitirCertificadoEntradaState extends State<EmitirCertificadoEntrada> {
     }
 
     setState(() {});
+  }
+
+  void _reiniciarCalculos() {
+    try {
+      campos['densidade20']!.text = '';
+      campos['fatorCorrecao']!.text = '';
+      campos['destino20']!.text = '';
+      campos['dif20']!.text = '';
+      // Mantém origem/destino ambiente; apenas limpa os resultados derivados
+      setState(() {});
+    } catch (e) {
+      // não faz nada se ocorrer erro ao reiniciar
+    }
   }
 
   String _formatarNumeroParaCampo(double valor) {
