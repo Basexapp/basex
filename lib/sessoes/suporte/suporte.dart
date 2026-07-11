@@ -202,7 +202,7 @@ class _SuportePageState extends State<SuportePage> {
           child: _buildContatoCardSlim(
             icon: FontAwesomeIcons.whatsapp,
             title: 'WhatsApp',
-            subtitle: 'Atendimento em alguns minutos',
+            subtitle: 'Atendimento 24 horas',
             color: const Color(0xFF25D366),
             onTap: _launchWhatsApp,
             isFa: true,
@@ -213,7 +213,7 @@ class _SuportePageState extends State<SuportePage> {
           child: _buildContatoCardSlim(
             icon: Icons.email,
             title: 'E-mail',
-            subtitle: 'suporte@basexapp.com.br',
+            subtitle: 'suporte@powertankapp.com.br',
             color: const Color(0xFFEA4335),
             onTap: _launchEmail,
           ),

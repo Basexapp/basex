@@ -6,7 +6,7 @@ import 'dart:async';
 import 'dart:js_interop';
 import 'dart:html' as html;
 import 'login_page.dart';
-import 'home1.dart';
+import 'home.dart';
 import 'configuracoes/escolher_senha.dart';
 import 'configuracoes/redefinir_senha.dart';
 
@@ -171,12 +171,11 @@ class _SplashScreenState extends State<SplashScreen> {
       // 🔐 Verifica se o usuário ainda tem senha provisória
       final usuario = await supabase
           .from('usuarios')
-          .select('senha_temporaria, layout')
+          .select('senha_temporaria')
           .eq('email', session.user.email ?? '')
           .maybeSingle();
 
-      // Armazena o layout para o HomePage usar antes de UsuarioAtual.instance ser populado
-      UsuarioAtual.pendingLayout = int.tryParse(usuario?['layout']?.toString() ?? '1') ?? 1;
+        // Não usamos mais o campo 'layout' — todos usam HomePage por padrão.
 
       if (usuario != null && usuario['senha_temporaria'] == true) {
         if (!mounted) return;

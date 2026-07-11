@@ -7,8 +7,7 @@ import 'configuracoes/esqueci_senha.dart';
 
 class UsuarioAtual {
   static UsuarioAtual? instance;
-  static int pendingLayout = 1; // Used during session restore before instance is populated
-
+  
   final String id;
   final String nome;
   final int nivel;
@@ -19,7 +18,6 @@ class UsuarioAtual {
   final String? terminalNome;
   final List<String> cardsPermitidosIds;
   final bool senhaTemporaria;
-  final int layout;
 
   UsuarioAtual({
     required this.id,
@@ -32,7 +30,6 @@ class UsuarioAtual {
     required this.terminalNome,
     required this.cardsPermitidosIds,
     required this.senhaTemporaria,
-    this.layout = 1,
   });
 
   bool podeAcessarCard(String cardId) {
@@ -95,8 +92,7 @@ class _LoginPageState extends State<LoginPage> {
             empresa_id,
             empresas ( nome_dois ),
             terminal_id,
-            senha_temporaria,
-            layout
+            senha_temporaria
           ''')
           .eq('id', userId)
           .maybeSingle();
@@ -169,7 +165,6 @@ class _LoginPageState extends State<LoginPage> {
 
   Future<void> _processarLogin(Map<String, dynamic> usuarioData) async {
     final int nivel = usuarioData['nivel'] as int;
-    final int layout = int.tryParse(usuarioData['layout']?.toString() ?? '1') ?? 1;
     final String? empresaId = usuarioData['empresa_id']?.toString();
     
     final String? empresaNome = (usuarioData['empresas'] as Map?)?['nome_dois']?.toString();
@@ -207,9 +202,7 @@ class _LoginPageState extends State<LoginPage> {
       terminalNome: terminalNome,
       cardsPermitidosIds: cardsPermitidosIds,
       senhaTemporaria: usuarioData['senha_temporaria'] == true,
-      layout: layout,
     );
-    UsuarioAtual.pendingLayout = layout;
 
     if (mounted) {
       if (UsuarioAtual.instance!.precisaTrocarSenha) {
@@ -261,8 +254,7 @@ class _LoginPageState extends State<LoginPage> {
             empresa_id,
             empresas ( nome_dois ),
             terminal_id,
-            senha_temporaria,
-            layout
+            senha_temporaria
           ''')
           .eq('id', user.id)
           .maybeSingle();
