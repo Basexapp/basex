@@ -60,7 +60,7 @@ class EstoquePorTanquePage extends StatefulWidget {
 }
 
 class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
-  with RouteAware {
+    with RouteAware {
   List<DadosTanque> tanques = [];
   bool _carregando = true;
   int tanqueSelecionadoIndex = -1; // -1 significa "Todos"
@@ -100,14 +100,12 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
 
   @override
   void didPush() {
-    // Página foi empurrada para a pilha — atualizar sempre ao abrir
     _carregarDadosTanques();
     _carregarNomeTerminal();
   }
 
   @override
   void didPopNext() {
-    // Voltou para esta página a partir de outra — atualizar incondicionalmente
     _carregarDadosTanques();
     _carregarNomeTerminal();
   }
@@ -174,25 +172,22 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
             params: params,
           );
 
-            // Robust parsing: RPC can return Map, List, num or string
-            if (rpc is Map && rpc.containsKey('estoque_inicial')) {
-              estoqueInicial = (rpc['estoque_inicial'] ?? 0).toDouble();
-            } else if (rpc is List && rpc.isNotEmpty) {
-              final first = rpc.first;
-              if (first is Map && first.containsKey('estoque_inicial')) {
-                estoqueInicial = (first['estoque_inicial'] ?? 0).toDouble();
-              } else if (first is num) {
-                estoqueInicial = first.toDouble();
-              } else {
-                estoqueInicial = double.tryParse(first.toString()) ?? 0.0;
-              }
-            } else if (rpc is num) {
-              estoqueInicial = rpc.toDouble();
+          if (rpc is Map && rpc.containsKey('estoque_inicial')) {
+            estoqueInicial = (rpc['estoque_inicial'] ?? 0).toDouble();
+          } else if (rpc is List && rpc.isNotEmpty) {
+            final first = rpc.first;
+            if (first is Map && first.containsKey('estoque_inicial')) {
+              estoqueInicial = (first['estoque_inicial'] ?? 0).toDouble();
+            } else if (first is num) {
+              estoqueInicial = first.toDouble();
             } else {
-              estoqueInicial = double.tryParse(rpc.toString()) ?? 0.0;
+              estoqueInicial = double.tryParse(first.toString()) ?? 0.0;
             }
-
-            
+          } else if (rpc is num) {
+            estoqueInicial = rpc.toDouble();
+          } else {
+            estoqueInicial = double.tryParse(rpc.toString()) ?? 0.0;
+          }
         } catch (e) {
           estoqueInicial = 0.0;
         }
@@ -200,10 +195,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
         double estoqueAtual = estoqueInicial;
 
         try {
-          // Log tanque raw data for debugging
-
-          // Busca todas as colunas relevantes de movimentações e calcula
-          // conforme o modo atual (Atual vs Previsto).
           final movs = await supabase
               .from('movimentacoes_tanque')
               .select('entrada_vinte, saida_vinte, entrada_amb, saida_amb')
@@ -211,7 +202,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
               .gte('data_mov', '$dataStr 00:00:00')
               .lte('data_mov', '$dataStr 23:59:59');
 
-          // Helper local para converter valores robustamente
           num parseNum(dynamic v) {
             if (v == null) return 0;
             if (v is num) return v;
@@ -240,20 +230,14 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
             debugPrint('📚 Stack: $stackTrace');
           }
 
-          // Totais calculados (logging removido)
-
           if (!_mostrarPrevisto) {
-            // Modo atual: considera entradas/saídas por vinte
             estoqueAtual += (totalEntradaVinte - totalSaidaVinte);
           } else {
-            // Modo previsto: considera entradas/saídas por ambiente (AMB)
-            // Usa tanto entrada_amb quanto saida_amb
             estoqueAtual += (totalEntradaAmb - totalSaidaAmb);
           }
         } catch (e, stackTrace) {
           debugPrint('❌ Erro ao calcular estoque do tanque $id: $e');
           debugPrint('📚 Stack: $stackTrace');
-          // mantém estoqueAtual = estoqueInicial em caso de erro
         }
 
         final detalhes = [
@@ -278,7 +262,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
         );
       }
 
-      // Decide qual índice selecionar após recarregar
       int selectedIndexToSet = -1;
       if (preserveSelection) {
         if (prevSelectedTanqueId != null) {
@@ -296,7 +279,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
           selectedIndexToSet = -1;
         }
       } else {
-        selectedIndexToSet = -1; // padrão: mostrar todos
+        selectedIndexToSet = -1;
       }
 
       setState(() {
@@ -403,7 +386,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Row(
                     children: [
-                      // Adicionando o botão "Todos" na primeira posição
                       Padding(
                         padding: const EdgeInsets.only(right: 12, left: 4),
                         child: MouseRegion(
@@ -428,13 +410,13 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                               height: 70,
                               width: 110,
                               child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              curve: Curves.easeOut,
-                              alignment: Alignment.center,
-                              transform:
-                                _hoverIndex == -1 && tanqueSelecionadoIndex != -1
-                                ? Matrix4.diagonal3Values(1.0, 1.08, 1.0)
-                                : Matrix4.identity(),
+                                duration: const Duration(milliseconds: 180),
+                                curve: Curves.easeOut,
+                                alignment: Alignment.center,
+                                transform:
+                                    _hoverIndex == -1 && tanqueSelecionadoIndex != -1
+                                        ? Matrix4.diagonal3Values(1.0, 1.08, 1.0)
+                                        : Matrix4.identity(),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 6,
@@ -509,17 +491,17 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                 });
                               },
                               child: SizedBox(
-                                height: 70, // Aumentado para acomodar quebras de linha
-                                width: 110, // Aumentado levemente para dar mais espaço lateral
+                                height: 70,
+                                width: 110,
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 180),
                                   curve: Curves.easeOut,
-                                  alignment: Alignment.center, // Centraliza o conteúdo internally
+                                  alignment: Alignment.center,
                                   transform: isHovered && !isSelected
                                       ? Matrix4.diagonal3Values(1.0, 1.08, 1.0)
                                       : Matrix4.identity(),
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, // Reduzido o padding horizontal para favorecer o texto
+                                    horizontal: 8,
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
@@ -554,7 +536,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                     children: [
                                       Text(
                                         tanque.nome.split(' - ').first,
-                                        textAlign: TextAlign.center, // Centraliza o texto
+                                        textAlign: TextAlign.center,
                                         style: TextStyle(
                                           color: isSelected
                                               ? const Color(0xFFF8F9FA)
@@ -567,8 +549,8 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                         const SizedBox(height: 2),
                                         Text(
                                           tanque.nome.split(' - ').last,
-                                          textAlign: TextAlign.center, // Alinhamento central para quebra de linha
-                                          maxLines: 2, // Permite quebra em até 2 linhas para o nome do produto
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             color: isSelected
@@ -649,21 +631,16 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                     final terminalId = widget.terminalSelecionadoId ?? '';
                     final nomeTerminal = _nomeTerminal ?? '';
 
-                    showModalBottomSheet(
+                    showDialog(
                       context: context,
-                      isScrollControlled: true,
-                      isDismissible: true,
-                      enableDrag: true,
-                      backgroundColor: Colors.transparent,
+                      barrierDismissible: true,
                       builder: (context) =>
-                          _SelecaoTipoVisualizacaoEstoqueBottomSheet(
+                          _SelecaoTipoVisualizacaoEstoqueDialog(
                             tanqueId: tanque.id,
                             referenciaTanque: tanque.nome.split(' - ').first,
                             terminalId: terminalId,
                             nomeTerminal: nomeTerminal,
-                            onVoltar: () {
-                              // Não recarrega tudo se apenas fechou o modal
-                            },
+                            onVoltar: () {},
                           ),
                     );
                   },
@@ -692,7 +669,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
   Widget _construirVisualizacaoTodosTanques() {
     return Column(
       children: [
-        // Linha de switches posicionada imediatamente abaixo da divisória
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Align(
@@ -702,7 +678,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
               runSpacing: 8,
               alignment: WrapAlignment.end,
               children: [
-                // Switch de Estoque Previsto / Atual
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) =>
@@ -743,7 +718,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                     ),
                   ),
                 ),
-                // Switch de Unidade (m³ / L)
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
                   onEnter: (_) => setState(() => _hoverUnitOption = 'unit'),
@@ -783,13 +757,12 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
             ),
           ),
         ),
-        // Conteúdo rolável para os tanques
         Expanded(
           child: SingleChildScrollView(
             child: Center(
               child: Column(
                 children: [
-                  const SizedBox(height: 60), // Aumentado de 12 para 60 para afastar os tanques (aprox. 50px extras)
+                  const SizedBox(height: 60),
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final int totalTanques = tanques.length;
@@ -800,7 +773,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                               ? totalTanques
                               : tanksPerRow;
 
-                      // Calcula o tamanho base para que caibam até 6 por linha.
                       const double spacing = 16.0;
                       double dynamicBaseWidth = (((availableWidth -
                                       (spacing * (tanksInThisCalculation - 1))) /
@@ -979,7 +951,6 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
     return '${formatNumber(valor)} L';
   }
 
-  // Novo widget com tanque ilustrativo
   Widget _construirIndicadorNivelIlustrativo(
     DadosTanque tanque,
     double percentual,
@@ -1014,7 +985,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                 child: Padding(
                   padding: const EdgeInsets.only(
                     top: 6,
-                  ), // Alinhamento com o topo do primeiro switch
+                  ),
                   child: RichText(
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -1034,19 +1005,19 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
               ),
               const SizedBox(width: 8),
               SizedBox(
-                width: 170, // Largura fixa para ambos os switches
+                width: 170,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     MouseRegion(
                       cursor: SystemMouseCursors.click,
                       child: GestureDetector(
-                          onTap: () async {
-                            setState(() {
-                              _mostrarPrevisto = !_mostrarPrevisto;
-                            });
-                            await _carregarDadosTanques(preserveSelection: true);
-                          },
+                        onTap: () async {
+                          setState(() {
+                            _mostrarPrevisto = !_mostrarPrevisto;
+                          });
+                          await _carregarDadosTanques(preserveSelection: true);
+                        },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 4,
@@ -1066,7 +1037,7 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                                   ),
                                   onExit: (_) =>
                                       setState(() => _hoverSwitchOption = null),
-                                    child: GestureDetector(
+                                  child: GestureDetector(
                                     onTap: () async {
                                       setState(() => _mostrarPrevisto = false);
                                       await _carregarDadosTanques(preserveSelection: true);
@@ -1176,11 +1147,9 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
           ),
           const SizedBox(height: 16),
 
-          // Tanque ilustrativo com informações ao lado
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Legenda de cores à esquerda
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1197,8 +1166,8 @@ class _EstoquePorTanquePageState extends State<EstoquePorTanquePage>
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
-                      maxWidth: 200, // Reduzido bruscamente (era 400)
-                      maxHeight: 220, // Reduzido bruscamente (era 450)
+                      maxWidth: 200,
+                      maxHeight: 220,
                       minWidth: 100,
                       minHeight: 120,
                     ),
@@ -1356,7 +1325,6 @@ final NumberFormat _fmtUmaCasa = NumberFormat('#,##0.0', 'pt_BR');
 String formatNumber(num value) => _fmtInteiro.format(value);
 String formatPercent(double value) => _fmtUmaCasa.format(value);
 
-// Widget do Tanque Ilustrativo
 class TankIllustration extends StatefulWidget {
   final double percentual;
   final double lastroPercentual;
@@ -1436,12 +1404,10 @@ class _TankIllustrationState extends State<TankIllustration>
             final double maxWidth = constraints.maxWidth;
             final double maxHeight = constraints.maxHeight;
 
-            // Define um tamanho base padrão se não houver restrições
             final double sizeFactorWidth = maxWidth.isFinite ? maxWidth : 280.0;
             final double sizeFactorHeight =
                 maxHeight.isFinite ? maxHeight : 320.0;
 
-            // Mantém a proporção aproximada de 280/320 (0.875)
             double finalWidth = sizeFactorWidth;
             double finalHeight = sizeFactorHeight;
 
@@ -1451,7 +1417,6 @@ class _TankIllustrationState extends State<TankIllustration>
               finalHeight = finalWidth / 0.875;
             }
 
-            // O scale agora é dinâmico baseado no tamanho final vs base
             final double dynamicScale = (finalWidth / 280.0).clamp(0.1, 5.0);
 
             return CustomPaint(
@@ -1497,16 +1462,13 @@ class TankPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Proporções para um tanque cilíndrico vertical (atmosférico)
     final tankWidth = size.width * 0.55;
     final tankHeight = size.height * 0.8;
     final tankX = (size.width - tankWidth) / 2;
     final tankY = (size.height - tankHeight) / 2;
 
-    // 1. Corpo cilíndrico (com base plana)
     final tankRect = Rect.fromLTWH(tankX, tankY, tankWidth, tankHeight);
 
-    // Gradiente metálico horizontal para simular volume cilíndrico
     final bodyGradient = LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
@@ -1525,10 +1487,8 @@ class TankPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0 * scale;
 
-    // Desenha o retângulo do corpo (cilindro visto de frente)
     canvas.drawRect(tankRect, bodyPaint);
 
-    // 2. Teto cônico (leve inclinação comum em tanques atmosféricos)
     final roofPath = Path()
       ..moveTo(tankX - 2 * scale, tankY)
       ..lineTo(tankX + tankWidth / 2, tankY - 15 * scale)
@@ -1542,7 +1502,6 @@ class TankPainter extends CustomPainter {
     canvas.drawPath(roofPath, roofPaint);
     canvas.drawPath(roofPath, borderPaint);
 
-    // 3. Nível do líquido
     if (percentual > 0) {
       final liquidHeight = tankHeight * percentual;
       final liquidRect = Rect.fromLTWH(
@@ -1566,7 +1525,6 @@ class TankPainter extends CustomPainter {
 
       canvas.drawRect(liquidRect, liquidPaint);
 
-      // Linha superior do líquido
       final surfacePaint = Paint()
         ..color = Colors.white.withOpacity(0.3)
         ..style = PaintingStyle.stroke
@@ -1578,10 +1536,8 @@ class TankPainter extends CustomPainter {
       );
     }
 
-    // Bordas laterais e base plana
     canvas.drawRect(tankRect, borderPaint);
 
-    // 4. Detalhes Técnicos: Escada lateral
     final detailPaint = Paint()
       ..color = Colors.grey.shade700
       ..style = PaintingStyle.stroke
@@ -1607,7 +1563,6 @@ class TankPainter extends CustomPainter {
       );
     }
 
-    // Boca de visita (base)
     canvas.drawRect(
       Rect.fromLTWH(
         tankX + 15 * scale,
@@ -1618,7 +1573,6 @@ class TankPainter extends CustomPainter {
       Paint()..color = Colors.grey.shade600,
     );
 
-    // 5. Linha do Lastro
     if (lastroPercentual > 0 && lastroPercentual < 1) {
       final lastroY = tankY + tankHeight - (tankHeight * lastroPercentual);
       final lastroPaint = Paint()
@@ -1634,7 +1588,6 @@ class TankPainter extends CustomPainter {
       );
     }
 
-    // 6. Indicadores e Textos
     if (!hideDetails) {
       _drawFloatingPercent(
         canvas,
@@ -1664,7 +1617,7 @@ class TankPainter extends CustomPainter {
     final liquidY = tankY + tankHeight - (tankHeight * percentual);
     final percentText = '${(percentual * 100).toInt()}%';
     final textStyle = TextStyle(
-      fontSize: 12.0, // Reduzido de 16.0 para 14.0 para diminuir levemente
+      fontSize: 12.0,
       fontWeight: FontWeight.bold,
       color: _getLiquidColor(percentual),
     );
@@ -1679,7 +1632,7 @@ class TankPainter extends CustomPainter {
     textPainter.paint(
       canvas,
       Offset(
-        tankX + tankWidth + 6, // Reduzido de 12 para 6 para aproximar levemente do tanque
+        tankX + tankWidth + 6,
         liquidY - (textPainter.height / 2),
       ),
     );
@@ -1703,14 +1656,14 @@ class TankPainter extends CustomPainter {
   }
 }
 
-class _SelecaoTipoVisualizacaoEstoqueBottomSheet extends StatefulWidget {
+class _SelecaoTipoVisualizacaoEstoqueDialog extends StatefulWidget {
   final String tanqueId;
   final String referenciaTanque;
   final String terminalId;
   final String nomeTerminal;
   final VoidCallback onVoltar;
 
-  const _SelecaoTipoVisualizacaoEstoqueBottomSheet({
+  const _SelecaoTipoVisualizacaoEstoqueDialog({
     required this.tanqueId,
     required this.referenciaTanque,
     required this.terminalId,
@@ -1719,12 +1672,12 @@ class _SelecaoTipoVisualizacaoEstoqueBottomSheet extends StatefulWidget {
   });
 
   @override
-  State<_SelecaoTipoVisualizacaoEstoqueBottomSheet> createState() =>
-      _SelecaoTipoVisualizacaoEstoqueBottomSheetState();
+  State<_SelecaoTipoVisualizacaoEstoqueDialog> createState() =>
+      _SelecaoTipoVisualizacaoEstoqueDialogState();
 }
 
-class _SelecaoTipoVisualizacaoEstoqueBottomSheetState
-    extends State<_SelecaoTipoVisualizacaoEstoqueBottomSheet> {
+class _SelecaoTipoVisualizacaoEstoqueDialogState
+    extends State<_SelecaoTipoVisualizacaoEstoqueDialog> {
   bool _tipoDataEspecifica = true;
   bool _tipoMensal = false;
   bool _mostrarDetalhado = true;
@@ -2264,218 +2217,231 @@ class _SelecaoTipoVisualizacaoEstoqueBottomSheetState
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.pop(context),
-      behavior: HitTestBehavior.opaque,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: GestureDetector(
-          onTap: () {},
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(20),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      elevation: 8,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 400),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0D47A1).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.history,
+                    color: Color(0xFF0D47A1),
+                    size: 24,
+                  ),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Selecionar Período',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0D47A1),
+                    ),
                   ),
-                ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            InkWell(
+              onTap: _selecionarData,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _tipoDataEspecifica
+                        ? const Color(0xFF0D47A1)
+                        : Colors.grey.shade300,
+                    width: _tipoDataEspecifica ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  color: _tipoDataEspecifica
+                      ? const Color(0xFF0D47A1).withOpacity(0.05)
+                      : Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    Radio<bool>(
+                      value: true,
+                      groupValue: _tipoDataEspecifica,
+                      onChanged: (value) {
+                        setState(() {
+                          _tipoDataEspecifica = true;
+                          _tipoMensal = false;
+                        });
+                      },
+                      activeColor: const Color(0xFF0D47A1),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Data específica',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        _dataController.text,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Center(
-                    child: Text(
-                      'Selecionar Período',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1),
+            ),
+
+            const SizedBox(height: 12),
+
+            InkWell(
+              onTap: _selecionarMesAno,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: _tipoMensal
+                        ? const Color(0xFF0D47A1)
+                        : Colors.grey.shade300,
+                    width: _tipoMensal ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  color: _tipoMensal
+                      ? const Color(0xFF0D47A1).withOpacity(0.05)
+                      : Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    Radio<bool>(
+                      value: true,
+                      groupValue: _tipoMensal,
+                      onChanged: (value) {
+                        setState(() {
+                          _tipoMensal = true;
+                          _tipoDataEspecifica = false;
+                        });
+                      },
+                      activeColor: const Color(0xFF0D47A1),
+                    ),
+                    const Expanded(
+                      child: Text(
+                        'Estoque mensal',
+                        style: TextStyle(fontSize: 16),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  InkWell(
-                    onTap: _selecionarData,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
-                        border: Border.all(
-                          color: _tipoDataEspecifica
-                              ? const Color(0xFF0D47A1)
-                              : Colors.grey.shade300,
-                          width: _tipoDataEspecifica ? 2 : 1,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        color: _tipoDataEspecifica
-                            ? const Color(0xFF0D47A1).withOpacity(0.05)
-                            : Colors.white,
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Row(
-                        children: [
-                          Radio<bool>(
-                            value: true,
-                            groupValue: _tipoDataEspecifica,
-                            onChanged: (value) {
-                              setState(() {
-                                _tipoDataEspecifica = true;
-                                _tipoMensal = false;
-                              });
-                            },
-                            activeColor: const Color(0xFF0D47A1),
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'Data específica',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              _dataController.text,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
+                      child: Text(
+                        _mesAnoController.text,
+                        style: const TextStyle(fontSize: 14),
                       ),
                     ),
-                  ),
+                  ],
+                ),
+              ),
+            ),
 
-                  const SizedBox(height: 12),
-
-                  InkWell(
-                    onTap: _selecionarMesAno,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: _tipoMensal
-                              ? const Color(0xFF0D47A1)
-                              : Colors.grey.shade300,
-                          width: _tipoMensal ? 2 : 1,
-                        ),
-                        borderRadius: BorderRadius.circular(8),
-                        color: _tipoMensal
-                            ? const Color(0xFF0D47A1).withOpacity(0.05)
-                            : Colors.white,
-                      ),
-                      child: Row(
-                        children: [
-                          Radio<bool>(
-                            value: true,
-                            groupValue: _tipoMensal,
-                            onChanged: (value) {
-                              setState(() {
-                                _tipoMensal = true;
-                                _tipoDataEspecifica = false;
-                              });
-                            },
-                            activeColor: const Color(0xFF0D47A1),
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'Estoque mensal',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              _mesAnoController.text,
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  if (_tipoMensal)
-                    InkWell(
-                      onTap: () => setState(
-                        () => _mostrarDetalhado = !_mostrarDetalhado,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 10, left: 4),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: _mostrarDetalhado,
-                              onChanged: (val) => setState(
-                                () => _mostrarDetalhado = val ?? true,
-                              ),
-                              activeColor: const Color(0xFF0D47A1),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            const Text(
-                              'Mostrar detalhado',
-                              style: TextStyle(fontSize: 14),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(height: 24),
-
-                  Row(
+            if (_tipoMensal)
+              InkWell(
+                onTap: () => setState(
+                  () => _mostrarDetalhado = !_mostrarDetalhado,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 10, left: 4),
+                  child: Row(
                     children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: const BorderSide(color: Color(0xFF0D47A1)),
-                            foregroundColor: const Color(0xFF0D47A1),
-                          ),
-                          child: const Text('Voltar'),
+                      Checkbox(
+                        value: _mostrarDetalhado,
+                        onChanged: (val) => setState(
+                          () => _mostrarDetalhado = val ?? true,
                         ),
+                        activeColor: const Color(0xFF0D47A1),
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _visualizar,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: const Color(0xFF0D47A1),
-                            foregroundColor: Colors.white,
-                          ),
-                          child: const Text('Visualizar'),
-                        ),
+                      const Text(
+                        'Mostrar detalhado',
+                        style: TextStyle(fontSize: 14),
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 10),
-                ],
+                ),
               ),
+
+            const SizedBox(height: 24),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: Color(0xFF0D47A1)),
+                      foregroundColor: const Color(0xFF0D47A1),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('Voltar'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _visualizar,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: const Color(0xFF0D47A1),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text('Visualizar'),
+                  ),
+                ),
+              ],
             ),
-          ),
+          ],
         ),
       ),
     );
