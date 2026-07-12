@@ -245,6 +245,8 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           .gte('data_mov', _inicioMes.toIso8601String())
           .lte('data_mov', _fimMes.toIso8601String());
 
+      // inspeção removida: manter apenas mensagens de erro em blocos catch
+
       _totalSaidas = 0;
       _totalSaidasAmb = 0;
 
@@ -306,6 +308,10 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
             entrada_vinte,
             saida_amb,
             saida_vinte,
+            empresa_id,
+            empresas(
+              nome_dois
+            ),
             movimentacoes(
               data_descarga,
               empresa_id,
@@ -317,6 +323,8 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
           .eq('tanque_id', widget.tanqueId)
           .gte('data_mov', _inicioMes.toIso8601String())
           .lte('data_mov', _fimMes.toIso8601String());
+
+      // inspeção removida: manter apenas mensagens de erro em blocos catch
 
       final List<Map<String, dynamic>> listaOrdenadaParaUI =
           List<Map<String, dynamic>>.from(dados);
@@ -397,14 +405,28 @@ class _EstoqueTanqueMensalPageState extends State<EstoqueTanqueMensalPage> {
               clienteLower.contains('sobra') || clienteLower.contains('perda')));
 
         String empresaNome = '-';
+        // verificações de debug removidas
 
         if (!isSobraPerda) {
-          final movData = m['movimentacoes'];
-          if (movData is Map) {
-            final empresaData = movData['empresas'];
-            if (empresaData is Map) {
-              empresaNome = empresaData['nome_dois']?.toString() ?? '-';
+          // Tentativas de extrair o nome da empresa por múltiplos caminhos possíveis
+          try {
+            // 1) campo direto em movimentacoes_tanque
+            if (m['empresa_id'] != null && m['empresas'] is Map) {
+              empresaNome = (m['empresas']['nome_dois'] ?? '-')?.toString() ?? '-';
+            } else {
+              // 2) via relacionamento nested em movimentacoes
+              final movData = m['movimentacoes'];
+              if (movData is Map) {
+                if (movData['empresas'] is Map) {
+                  empresaNome = (movData['empresas']['nome_dois'] ?? '-')?.toString() ?? '-';
+                } else if (movData['empresa_id'] != null) {
+                  empresaNome = movData['empresa_id']?.toString() ?? '-';
+                }
+              }
             }
+            // 3) fallback: manter '-' se não encontrado
+          } catch (e) {
+            debugPrint('DEBUG: erro extraindo empresaNome: $e');
           }
         }
 
