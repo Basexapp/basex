@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:js_interop';
+// Usamos chamadas dinâmicas ao `window` para invocar funções JS quando necessário.
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'sessoes/operacao/tabelas_de_conversao/tabelasdeconversao.dart';
 import 'configuracoes/controle_acesso_usuarios.dart';
@@ -57,8 +57,8 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-@JS()
-external JSFunction? atualizarApp;
+// A função JS `atualizarApp` está definida em `web/index.html`.
+// Para invocá-la, use acesso dinâmico: `(html.window as dynamic).atualizarApp()`.
 
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {

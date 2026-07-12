@@ -3,15 +3,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'dart:js_interop';
 import 'dart:html' as html;
 import 'login_page.dart';
 import 'home.dart';
 import 'configuracoes/escolher_senha.dart';
 import 'configuracoes/redefinir_senha.dart';
 
-@JS()
-external JSFunction? atualizarApp;
+// A chamada para a função JS `atualizarApp` será feita dinamicamente
+// via `html.window` para evitar problemas de binding entre Dart e JS.
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,7 +22,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   final supabase = Supabase.instance.client;
   String _statusMessage = 'Verificando atualizações...';
-  String _versaoExibida = '2.2.23';
+  String _versaoExibida = '2.2.24';
   Timer? _timer;
 
   @override
@@ -108,24 +107,32 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   String _getVersaoAtual() {
-    return '2.2.20';
+    return _versaoExibida;
   }  
 
   void _recarregarApp() {
     // Marca que já tentamos atualizar (previne loop infinito)
     html.window.sessionStorage['app_atualizado'] = 'true';
-    
-    // Chama a função JS que limpa service workers + caches e recarrega
-    if (atualizarApp != null) {
-      atualizarApp!.callAsFunction();
-    } else {
-      // Fallback: navega com cache-bust
-      final uri = Uri.base.replace(queryParameters: {
-        ...Uri.base.queryParameters,
-        'cache_bust': DateTime.now().millisecondsSinceEpoch.toString(),
-      });
-      html.window.location.replace(uri.toString());
+    // Tenta chamar a função JS global `atualizarApp` definida em
+    // web/index.html. Usamos acesso dinâmico ao `window` para
+    // manter compatibilidade com a interoperabilidade.
+    try {
+      final win = html.window;
+      final dynamic fn = (win as dynamic).atualizarApp;
+      if (fn != null) {
+        fn();
+        return;
+      }
+    } catch (e) {
+      // Ignora e segue para fallback
     }
+
+    // Fallback: navega com cache-bust
+    final uri = Uri.base.replace(queryParameters: {
+      ...Uri.base.queryParameters,
+      'cache_bust': DateTime.now().millisecondsSinceEpoch.toString(),
+    });
+    html.window.location.replace(uri.toString());
   }
 
   Future<void> _verificarSessao() async {
