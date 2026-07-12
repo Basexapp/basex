@@ -30,8 +30,30 @@ class OrdemCarregamentoVendaPDF {
     }
     
     final uf = dados['uf']?.toString() ?? '---';
-    final produtoNome = dados['produto_nome']?.toString() ?? '---';
-    final quantidade = dados['saida_amb']?.toString() ?? '0';
+    // Preparar lista de itens (cada item representa um compartimento / produto)
+    List<Map<String, dynamic>> itens = [];
+    final rawItens = dados['itens'];
+    if (rawItens is List) {
+      for (var it in rawItens) {
+        if (it is Map<String, dynamic>) {
+          itens.add(it);
+        } else if (it is Map) {
+          itens.add(Map<String, dynamic>.from(it));
+        }
+      }
+    } else {
+      // Fallback para compatibilidade com chamada antiga
+      itens = [Map<String, dynamic>.from(dados)];
+    }
+
+    bool _isTruthy(dynamic v) {
+      if (v == null) return false;
+      if (v is bool) return v;
+      final s = v.toString().toLowerCase();
+      return s == '1' || s == 'true' || s == 't' || s == 'yes';
+    }
+
+    final bool isParcial = _isTruthy(dados['veic_parcial']) || _isTruthy(dados['veic_parcial_ordem']);
 
     pdf.addPage(
       pw.Page(
@@ -112,6 +134,8 @@ class OrdemCarregamentoVendaPDF {
               _bloco(
                 titulo: 'PRODUTOS PROGRAMADOS',
                 azul: azul,
+                subtitle: isParcial ? '(carregamento parcial)' : null,
+                subtitleColor: PdfColors.red,
                 child: pw.Table(
                   border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
                   children: [
@@ -123,12 +147,22 @@ class OrdemCarregamentoVendaPDF {
                         _header('Quantidade'),
                       ],
                     ),
-                    pw.TableRow(
-                      children: [
-                        _celula(produtoNome),
-                        _celula('1', center: true),
-                        _celula('$quantidade L', center: true),
-                      ],
+                    ...List<pw.TableRow>.generate(
+                      itens.length,
+                      (i) {
+                        final it = itens[i];
+                        final produtoNome = (it['produto_nome'] ?? (it['produtos'] is Map ? it['produtos']['nome'] : null) ?? it['produto_nome'])?.toString() ?? '---';
+                        final qtdRaw = it['saida_amb'] ?? it['qtd_faturada'] ?? it['qtd'] ?? it['quantidade'] ?? 0;
+                        final quantidade = _formatQuantidade(qtdRaw);
+                        final compartimento = (it['compartimento']?.toString() ?? (i + 1).toString());
+                        return pw.TableRow(
+                          children: [
+                            _celula(produtoNome),
+                            _celula(compartimento, center: true),
+                            _celula('$quantidade L', center: true),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -195,7 +229,7 @@ class OrdemCarregamentoVendaPDF {
     return pdf;
   }
 
-  static pw.Widget _bloco({required String titulo, required PdfColor azul, required pw.Widget child}) {
+  static pw.Widget _bloco({required String titulo, required PdfColor azul, required pw.Widget child, String? subtitle, PdfColor? subtitleColor}) {
     return pw.Container(
       width: double.infinity,
       padding: const pw.EdgeInsets.all(10),
@@ -207,9 +241,25 @@ class OrdemCarregamentoVendaPDF {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text(
-            titulo,
-            style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul),
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  titulo,
+                  style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul),
+                ),
+              ),
+              if (subtitle != null)
+                pw.Text(
+                  ' $subtitle',
+                  style: pw.TextStyle(
+                    fontSize: 9,
+                    fontWeight: pw.FontWeight.bold,
+                    color: subtitleColor ?? PdfColors.red,
+                  ),
+                ),
+            ],
           ),
           pw.Divider(color: azul, thickness: 0.5, height: 10),
           child,
@@ -280,5 +330,29 @@ class OrdemCarregamentoVendaPDF {
         pw.Text(titulo, style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700)),
       ],
     );
+  }
+
+  static String _formatQuantidade(dynamic value) {
+    if (value == null) return '0';
+
+    num numVal;
+    if (value is num) {
+      numVal = value;
+    } else {
+      final s = value.toString().replaceAll(',', '.');
+      numVal = num.tryParse(s) ?? 0;
+    }
+
+    final int intVal = numVal.round();
+    final sInt = intVal.toString();
+
+    if (sInt.length <= 3) return sInt;
+
+    final parts = <String>[];
+    for (int i = sInt.length; i > 0; i -= 3) {
+      final start = i - 3 >= 0 ? i - 3 : 0;
+      parts.insert(0, sInt.substring(start, i));
+    }
+    return parts.join('.');
   }
 }

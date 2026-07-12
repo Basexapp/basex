@@ -25,7 +25,6 @@ import 'sessoes/estoques/compacto_final.dart';
 import 'sessoes/gestao_de_frota/motoristas_page.dart';
 import 'sessoes/gestao_de_frota/veiculos.dart';
 import 'sessoes/gestao_de_frota/transportadoras.dart';
-import 'sessoes/circuito/acompanhamento_ordens.dart';
 import 'sessoes/estoques/transferencias.dart';
 import 'sessoes/operacao/ordens_analises.dart';
 import 'sessoes/laboratorio/temp_dens_media.dart';
@@ -2572,17 +2571,6 @@ class _HomePageState extends State<HomePage>
 
     // SEÇÃO: Circuito
     if (sessaoAtual == 'Circuito') {
-      if (_mostrarAcompanhamentoOrdens) {
-        return AcompanhamentoOrdensPage(
-          key: const ValueKey('acompanhamento-ordens'),
-          onVoltar: () {
-            setState(() {
-              _mostrarAcompanhamentoOrdens = false;
-            });
-          },
-        );
-      }
-      
       if (_mostrarFilhosSessao && _sessaoAtual == 'Circuito') {
         return _buildFilhosSessaoPage();
       }

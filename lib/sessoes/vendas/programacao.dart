@@ -862,7 +862,23 @@ class _ProgramacaoPageState extends State<ProgramacaoPage> {
 
   Future<void> _visualizarOrdem(Map<String, dynamic> movimentacao) async {
     try {
-      final pdf = await OrdemCarregamentoVendaPDF.gerar(dados: movimentacao);
+      // Agregar todas as movimentações pertencentes à mesma ordem
+      final ordemId = movimentacao['ordem_id']?.toString();
+      List<Map<String, dynamic>> itens = [];
+      if (ordemId != null && ordemId.isNotEmpty) {
+        itens = movimentacoes
+            .where((m) => m['ordem_id']?.toString() == ordemId)
+            .map((m) => Map<String, dynamic>.from(m))
+            .toList();
+      } else {
+        itens = [Map<String, dynamic>.from(movimentacao)];
+      }
+
+      // Construir dados consolidados para o PDF
+      final dadosPdf = Map<String, dynamic>.from(movimentacao);
+      dadosPdf['itens'] = itens;
+
+      final pdf = await OrdemCarregamentoVendaPDF.gerar(dados: dadosPdf);
       final pdfBytes = await pdf.save();
 
       if (kIsWeb) {

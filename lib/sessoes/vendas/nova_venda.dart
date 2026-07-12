@@ -1353,7 +1353,7 @@ class _NovaVendaDialogState extends State<NovaVendaDialog> {
                 
                 if (!_modoEdicao)
                   Padding(
-                    padding: const EdgeInsets.only(top: 24),
+                    padding: const EdgeInsets.only(top: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
