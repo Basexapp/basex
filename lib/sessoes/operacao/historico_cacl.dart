@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'cacl_visualizacao.dart';
+import '../../login_page.dart';
 
 class HistoricoCaclPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -100,6 +101,21 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
         return null;
       }
 
+      // Se já existe a instância em memória (login_page.UsuarioAtual), use-a
+      if (UsuarioAtual.instance != null) {
+        final u = UsuarioAtual.instance!;
+        return {
+          'id': u.id,
+          'nome': u.nome,
+          'nivel': u.nivel,
+          'id_filial': u.filialId,
+          'senha_temporaria': u.senhaTemporaria,
+          'Nome_apelido': u.nome,
+          'terminal_id': u.terminalId,
+          'empresa_id': u.empresaId,
+        };
+      }
+
       print('DEBUG: Supabase auth user id: ${user.id}');
 
       final data = await supabase
@@ -107,13 +123,23 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
           .select('id, nome, nivel, id_filial, senha_temporaria, Nome_apelido, terminal_id, empresa_id')
           .eq('id', user.id)
           .maybeSingle();
-      
+
       if (data == null) {
-        print('DEBUG: No user data found in "usuarios" table for id: ${user.id}');
-      } else {
-        print('DEBUG: User data found: $data');
+        // Se não houver registro na tabela `usuarios`, retorna um fallback
+        print('DEBUG: No user data found in "usuarios" table for id: ${user.id}, returning fallback from auth.');
+        return {
+          'id': user.id,
+          'nome': user.email ?? user.id,
+          'nivel': 1,
+          'id_filial': null,
+          'senha_temporaria': false,
+          'Nome_apelido': user.email ?? user.id,
+          'terminal_id': null,
+          'empresa_id': null,
+        };
       }
 
+      print('DEBUG: User data found: $data');
       return data;
     } catch (e) {
       print('DEBUG: Error in _obterDadosUsuario: $e');
@@ -979,7 +1005,8 @@ class _HistoricoCaclPageState extends State<HistoricoCaclPage> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
-    if (_usuarioData == null && !carregando) {
+    final currentUser = Supabase.instance.client.auth.currentUser;
+    if (currentUser == null && !carregando) {
       return Scaffold(
         body: Center(
           child: Column(

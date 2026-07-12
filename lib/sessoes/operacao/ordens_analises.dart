@@ -67,12 +67,38 @@ class _ListarOrdensAnalisesPageState extends State<ListarOrdensAnalisesPage> {
 
       if (user == null) return null;
 
-      return await supabase
+      // Use cached UsuarioAtual if available
+      if (UsuarioAtual.instance != null) {
+        final u = UsuarioAtual.instance!;
+        return {
+          'id': u.id,
+          'nome': u.nome,
+          'nivel': u.nivel,
+          'id_filial': u.filialId,
+          'terminal_id': u.terminalId,
+        };
+      }
+
+      final data = await supabase
           .from('usuarios')
           .select('id, nome, nivel, id_filial, terminal_id')
           .eq('id', user.id)
           .maybeSingle();
-    } catch (_) {
+
+      if (data == null) {
+        // Fallback: retornar dados mínimos baseados na sessão auth
+        return {
+          'id': user.id,
+          'nome': user.email ?? user.id,
+          'nivel': 1,
+          'id_filial': null,
+          'terminal_id': null,
+        };
+      }
+
+      return data;
+    } catch (e) {
+      print('Erro ao obter dados do usuário: $e');
       return null;
     }
   }

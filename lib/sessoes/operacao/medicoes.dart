@@ -195,7 +195,7 @@ class _MedicoesPageState extends State<MedicoesPage> {
                           ),
                         ),
                         const Text(
-                          'Lista de todas as medições realizadas',
+                          'Lista de medições realizadas',
                           style: TextStyle(fontSize: 12, color: Colors.grey),
                         ),
                       ],
