@@ -1,4 +1,4 @@
-import 'package:basex/sessoes/operacao/rateio_payload.dart';
+import 'package:powertank/sessoes/operacao/rateio_payload.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

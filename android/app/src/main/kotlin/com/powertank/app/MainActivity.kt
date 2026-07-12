@@ -1,4 +1,4 @@
-package com.example.cloudtrack
+package com.powertank.app
 
 import io.flutter.embedding.android.FlutterActivity
 

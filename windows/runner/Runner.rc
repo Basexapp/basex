@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "cloudtrack" "\0"
+            VALUE "FileDescription", "PowerTank" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "cloudtrack" "\0"
+            VALUE "InternalName", "powertank" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.example. All rights reserved." "\0"
-            VALUE "OriginalFilename", "cloudtrack.exe" "\0"
-            VALUE "ProductName", "cloudtrack" "\0"
+            VALUE "OriginalFilename", "powertank.exe" "\0"
+            VALUE "ProductName", "PowerTank" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

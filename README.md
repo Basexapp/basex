@@ -1,6 +1,6 @@
-# cloudtrack
+# PowerTank
 
-A new Flutter project.
+App PowerTank — projeto Flutter para gerenciamento logístico.
 
 ## Getting Started
 

@@ -27,7 +27,7 @@ class _EsqueciSenhaPageState extends State<EsqueciSenhaPage> {
       // 1️⃣ Disparar e-mail de redefinição direto pelo Supabase (usa SMTP configurado)
       await supabase.auth.resetPasswordForEmail(
         email,
-        redirectTo: 'https://basexapp.com.br',
+        redirectTo: 'https://powertankapp.com.br',
       );
 
       // 2️⃣ Sucesso
