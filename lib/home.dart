@@ -660,6 +660,7 @@ class _HomePageState extends State<HomePage>
         'tipo': 'veiculos',
         'sessao_pai': 'Gestão de Frota',
       },
+      
       {
         'id': 'fallback-transportadoras',
         'icon': Icons.local_shipping,
@@ -2599,19 +2600,7 @@ class _HomePageState extends State<HomePage>
       }
       
       if (_mostrarDetalhesVeiculo && _veiculoSelecionado != null) {
-        return VeiculoDetalhesPage(
-          key: ValueKey('detalhes-${_veiculoSelecionado!['placa']}'),
-          id: _veiculoSelecionado!['id'] ?? '',
-          placa: _veiculoSelecionado!['placa'] ?? '',
-          tanques: List<int>.from(_veiculoSelecionado!['tanques'] ?? []),
-          transportadora: _veiculoSelecionado!['transportadora'] ?? '--',
-          onVoltar: () {
-            setState(() {
-              _mostrarDetalhesVeiculo = false;
-              _veiculoSelecionado = null;
-            });
-          },
-        );
+        
       }
       
       if (_mostrarMotoristas) {
@@ -3630,6 +3619,8 @@ class _HomePageState extends State<HomePage>
           MaterialPageRoute(builder: (_) => const ControleDocumentosPage()),
         );
         break;
+      case 'veiculos_geral':
+        
     }
   }
 
@@ -4243,6 +4234,7 @@ class _HomePageState extends State<HomePage>
       case 'movimentacao_por_empresa': return _mostrarEstoquePorEmpresa;
       case 'criar_ordem': return _filhoSelecionadoTipo == 'criar_ordem';
       case 'veiculos': return _mostrarVeiculos;
+      case 'veiculos_geral': return false;
       case 'motoristas': return _mostrarMotoristas;
       case 'transportadoras': return _mostrarTransportadoras;
       case 'movimentacoes': return _mostrarFiltroMovimentacoes;

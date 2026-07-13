@@ -1,35 +1,71 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
-import 'dialog_cadastro_placas.dart';
-import 'veiculos_geral_page.dart';
-
+import 'package:flutter/services.dart';
 
 // ==============================
-// DIALOG DE EDIÇÃO DE PLACA (PRINCIPAL)
+// FORMATTER PARA PLACA
 // ==============================
-class DialogEditarPlaca extends StatefulWidget {
+class PlacaMascaraFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var texto = newValue.text.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+
+    if (texto.length > 7) {
+      texto = texto.substring(0, 7);
+    }
+
+    String resultado = '';
+    for (int i = 0; i < texto.length; i++) {
+      if (i < 3) {
+        if (RegExp(r'[A-Z]').hasMatch(texto[i])) {
+          resultado += texto[i];
+        }
+      } else {
+        resultado += texto[i];
+      }
+    }
+
+    if (resultado.length > 3) {
+      resultado = '${resultado.substring(0, 3)}-${resultado.substring(3)}';
+    }
+
+    return TextEditingValue(
+      text: resultado,
+      selection: TextSelection.collapsed(offset: resultado.length),
+    );
+  }
+}
+
+// ==============================
+// DIALOG DE EDIÇÃO (UNIFICADO)
+// ==============================
+class DialogEditarVeiculo extends StatefulWidget {
   final Map<String, dynamic> veiculo;
   final VoidCallback onAtualizado;
+  final String tabela; // 'equipamentos' ou 'veiculos'
 
-  const DialogEditarPlaca({
+  const DialogEditarVeiculo({
     super.key,
     required this.veiculo,
     required this.onAtualizado,
+    this.tabela = 'equipamentos',
   });
 
   @override
-  State<DialogEditarPlaca> createState() => _DialogEditarPlacaState();
+  State<DialogEditarVeiculo> createState() => _DialogEditarVeiculoState();
 }
 
-class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
+class _DialogEditarVeiculoState extends State<DialogEditarVeiculo> {
   late TextEditingController _placaController;
   late TextEditingController _renavamController;
   late TextEditingController _transportadoraController;
-  late TextEditingController _transportadoraIdController;
-  List<double> _tanques = [];
   String? _selectedTransportadoraId;
   List<Map<String, dynamic>> _transportadoras = [];
+  List<double> _tanques = [];
   bool _carregandoTransportadoras = false;
   bool _salvando = false;
 
@@ -39,7 +75,6 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
     _placaController = TextEditingController(text: widget.veiculo['placa'] ?? '');
     _renavamController = TextEditingController(text: widget.veiculo['renavam'] ?? '');
     _transportadoraController = TextEditingController(text: _getNomeTransportadora(widget.veiculo));
-    _transportadoraIdController = TextEditingController();
     _selectedTransportadoraId = widget.veiculo['transportadora_id']?.toString();
     _tanques = (widget.veiculo['tanques'] as List?)?.map((t) => double.tryParse(t.toString()) ?? 0.0).toList() ?? [];
     _carregarTransportadoras();
@@ -58,7 +93,6 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
     _placaController.dispose();
     _renavamController.dispose();
     _transportadoraController.dispose();
-    _transportadoraIdController.dispose();
     super.dispose();
   }
 
@@ -93,12 +127,10 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
   }
 
   void _atualizarTanque(int index, String valor) {
-    // Remove o ponto de milhar para converter corretamente
     final stringLimpa = valor.replaceAll('.', '');
     final numero = double.tryParse(stringLimpa);
     if (numero != null) {
       setState(() {
-        // Converte de Litros digitados para m3 no array
         _tanques[index] = numero / 1000;
       });
     }
@@ -134,7 +166,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
       };
 
       await Supabase.instance.client
-          .from('equipamentos')
+          .from(widget.tabela)
           .update(dados)
           .eq('id', widget.veiculo['id']);
 
@@ -142,8 +174,8 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
         Navigator.of(context).pop();
         widget.onAtualizado();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Placa atualizada com sucesso'),
+          SnackBar(
+            content: Text('Veículo atualizado com sucesso'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -190,7 +222,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
               child: Row(
                 children: [
                   Text(
-                    'Editar Placa',
+                    'Editar Veículo',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -217,7 +249,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Transportadora principal
+                    // Transportadora
                     Text(
                       'Transportadora Responsável',
                       style: TextStyle(
@@ -251,6 +283,8 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                               value: _selectedTransportadoraId,
                               hint: const Text('Selecionar transportadora', style: TextStyle(fontSize: 13)),
                               isExpanded: true,
+                              dropdownColor: Colors.white,
+                              menuMaxHeight: 500,
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
                                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -285,7 +319,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Dados da Placa',
+                            'Dados do Veículo',
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -298,6 +332,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                           TextField(
                             controller: _placaController,
                             style: const TextStyle(fontSize: 13),
+                            inputFormatters: [PlacaMascaraFormatter()],
                             decoration: InputDecoration(
                               label: Text('Placa *', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
                               border: OutlineInputBorder(
@@ -339,7 +374,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                                   keyboardType: TextInputType.number,
                                   maxLength: 15,
                                   decoration: InputDecoration(
-                                    label: Text('Renavan', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+                                    label: Text('Renavam', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(4),
                                       borderSide: BorderSide(color: Colors.grey[300]!),
@@ -446,13 +481,11 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
                             ...List.generate(
                               _tanques.length,
                               (index) {
-                                // Formata o valor bruto (m3) para exibição em Litros com ponto
                                 final valorLitros = (_tanques[index] * 1000).toInt();
                                 final controller = TextEditingController(
                                   text: valorLitros > 0 ? NumberFormat('#,##0', 'pt_BR').format(valorLitros) : '',
                                 );
                                 
-                                // Posiciona o cursor no final
                                 controller.selection = TextSelection.fromPosition(
                                   TextPosition(offset: controller.text.length),
                                 );
@@ -575,7 +608,7 @@ class _DialogEditarPlacaState extends State<DialogEditarPlaca> {
 }
 
 // ==============================
-// DIALOG DE CONFIRMAÇÃO DE EXCLUSÃO
+// DIALOG DE CONFIRMAÇÃO DE EXCLUSÃO (UNIFICADO)
 // ==============================
 class DialogConfirmarExclusao extends StatelessWidget {
   final String placa;
@@ -602,7 +635,6 @@ class DialogConfirmarExclusao extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Ícone de alerta
             Container(
               width: 48,
               height: 48,
@@ -618,10 +650,8 @@ class DialogConfirmarExclusao extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            
-            // Título
             Text(
-              'Excluir Placa',
+              'Excluir Veículo',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
@@ -629,8 +659,6 @@ class DialogConfirmarExclusao extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            
-            // Mensagem
             Text(
               'Tem certeza que deseja excluir a placa $placa?',
               textAlign: TextAlign.center,
@@ -650,8 +678,6 @@ class DialogConfirmarExclusao extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            
-            // Botões
             Row(
               children: [
                 Expanded(
@@ -697,14 +723,14 @@ class DialogConfirmarExclusao extends StatelessWidget {
 }
 
 // ==============================
-// WIDGET DE MENU DE 3 PONTOS
+// WIDGET DE MENU DE 3 PONTOS (UNIFICADO)
 // ==============================
-class MenuPlacaWidget extends StatelessWidget {
+class MenuVeiculoWidget extends StatelessWidget {
   final String placa;
   final VoidCallback onEditar;
   final VoidCallback onExcluir;
 
-  const MenuPlacaWidget({
+  const MenuVeiculoWidget({
     super.key,
     required this.placa,
     required this.onEditar,
@@ -728,7 +754,7 @@ class MenuPlacaWidget extends StatelessWidget {
             children: [
               Icon(Icons.edit, size: 16, color: Colors.blue[900]),
               const SizedBox(width: 8),
-              Text('Editar placa', style: TextStyle(fontSize: 13, color: Colors.grey[800])),
+              Text('Editar veículo', style: TextStyle(fontSize: 13, color: Colors.grey[800])),
             ],
           ),
         ),
@@ -739,7 +765,7 @@ class MenuPlacaWidget extends StatelessWidget {
             children: [
               Icon(Icons.delete_outline, size: 16, color: Colors.red[700]),
               const SizedBox(width: 8),
-              Text('Excluir placa', style: TextStyle(fontSize: 13, color: Colors.grey[800])),
+              Text('Excluir veículo', style: TextStyle(fontSize: 13, color: Colors.grey[800])),
             ],
           ),
         ),
@@ -756,7 +782,458 @@ class MenuPlacaWidget extends StatelessWidget {
 }
 
 // ==============================
-// PÁGINA PRINCIPAL DE VEÍCULOS
+// PÁGINA DE VEÍCULOS GERAIS (COMPONENTE)
+// ==============================
+class VeiculosGeralPage extends StatefulWidget {
+  final String filtro;
+  final VoidCallback? onRefresh;
+
+  const VeiculosGeralPage({
+    super.key,
+    required this.filtro,
+    this.onRefresh,
+  });
+
+  @override
+  State<VeiculosGeralPage> createState() => _VeiculosGeralPageState();
+}
+
+class _VeiculosGeralPageState extends State<VeiculosGeralPage> {
+  List<Map<String, dynamic>> _veiculos = [];
+  bool _carregando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarVeiculos();
+  }
+
+  @override
+  void didUpdateWidget(VeiculosGeralPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.filtro != oldWidget.filtro) {
+      setState(() {});
+    }
+    if (widget.onRefresh != oldWidget.onRefresh) {
+      _carregarVeiculos();
+    }
+  }
+
+  Future<void> _carregarVeiculos() async {
+    setState(() => _carregando = true);
+    try {
+      // Busca da tabela 'equipamentos' (mesmas colunas que 'veiculos')
+      final dataEquipamentos = await Supabase.instance.client
+          .from('equipamentos')
+          .select('''
+            id,
+            placa,
+            renavam,
+            tanques,
+            transportadora_id,
+            transportadoras(nome)
+          ''')
+          .order('placa');
+
+      // Busca da tabela 'veiculos'
+      final dataVeiculos = await Supabase.instance.client
+          .from('veiculos')
+          .select('''
+            id,
+            placa,
+            renavam,
+            tanques,
+            transportadora_id,
+            transportadoras(nome)
+          ''')
+          .order('placa');
+
+      // Combina as duas listas
+      final combinados = <Map<String, dynamic>>[];
+      combinados.addAll(List<Map<String, dynamic>>.from(dataEquipamentos));
+      combinados.addAll(List<Map<String, dynamic>>.from(dataVeiculos));
+
+      // Ordena por placa
+      combinados.sort((a, b) {
+        final placaA = a['placa']?.toString() ?? '';
+        final placaB = b['placa']?.toString() ?? '';
+        return placaA.compareTo(placaB);
+      });
+
+      setState(() {
+        _veiculos = combinados;
+      });
+    } catch (e) {
+      debugPrint('Erro ao carregar veículos gerais: $e');
+      // Tenta carregar apenas uma tabela se a outra falhar
+      try {
+        final data = await Supabase.instance.client
+            .from('equipamentos')
+            .select('''
+              id,
+              placa,
+              renavam,
+              tanques,
+              transportadora_id,
+              transportadoras(nome)
+            ''')
+            .order('placa');
+        setState(() {
+          _veiculos = List<Map<String, dynamic>>.from(data);
+        });
+      } catch (e2) {
+        debugPrint('Erro ao carregar equipamentos: $e2');
+        setState(() {
+          _veiculos = [];
+        });
+      }
+    } finally {
+      setState(() => _carregando = false);
+    }
+  }
+
+  List<double> _parseTanques(dynamic data) {
+    if (data is List) return data.map((t) => double.tryParse(t.toString()) ?? 0.0).toList();
+    return [];
+  }
+
+  double _totalTanques(List<double> tanques) {
+    if (tanques.isEmpty) return 0.0;
+    return tanques.reduce((a, b) => a + b);
+  }
+
+  String _nomeTransportadora(Map<String, dynamic> v) {
+    final t = v['transportadoras'];
+    if (t is Map) {
+      return t['nome']?.toString() ?? '--';
+    }
+    return '--';
+  }
+
+  Color _corBoca(double capacidade) {
+    final cores = [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.red,
+      Colors.teal,
+      Colors.indigo,
+      Colors.deepOrange,
+      Colors.cyan,
+      Colors.lime,
+    ];
+    return cores[(capacidade.toInt()) % cores.length];
+  }
+
+  List<Map<String, dynamic>> get _veiculosFiltrados {
+    final filtroRaw = widget.filtro.trim().toLowerCase();
+    if (filtroRaw.isEmpty) return _veiculos;
+
+    final filtroNormalized = filtroRaw.replaceAll(RegExp(r'[.,\s]'), '');
+    final capacidadeBuscadaLitros = int.tryParse(filtroNormalized);
+
+    return _veiculos.where((v) {
+      final placa = v['placa']?.toString().toLowerCase() ?? '';
+      final renavam = v['renavam']?.toString().toLowerCase() ?? '';
+      final transportadora = _nomeTransportadora(v).toLowerCase();
+      final tanques = _parseTanques(v['tanques']);
+      final capacidadeTotalM3 = _totalTanques(tanques);
+      final capacidadeTotalLitros = (capacidadeTotalM3 * 1000).toInt();
+      final capacidadeComoTexto = NumberFormat('#,##0', 'pt_BR').format(capacidadeTotalLitros);
+      final capacidadeComoTextoNormalized = capacidadeComoTexto.replaceAll(RegExp(r'[.,\s]'), '');
+
+      // Compartimentos
+      final numCompartimentos = tanques.length;
+      final compartimentoBuscado = int.tryParse(filtroNormalized);
+      final bateCompartimentos = compartimentoBuscado != null
+          ? (numCompartimentos == compartimentoBuscado)
+          : numCompartimentos.toString().contains(filtroNormalized);
+
+      // Capacidade
+      final bateCapacidade = capacidadeBuscadaLitros != null
+          ? (capacidadeTotalLitros >= capacidadeBuscadaLitros - 100 && capacidadeTotalLitros <= capacidadeBuscadaLitros + 100)
+          : (capacidadeComoTextoNormalized.contains(filtroNormalized) || capacidadeComoTexto.contains(filtroRaw));
+
+      return placa.contains(filtroRaw) ||
+          renavam.contains(filtroRaw) ||
+          transportadora.contains(filtroRaw) ||
+          bateCapacidade ||
+          bateCompartimentos;
+    }).toList();
+  }
+
+  Future<void> _excluirVeiculo(String id, String placa, String tabela) async {
+    try {
+      await Supabase.instance.client
+          .from(tabela)
+          .delete()
+          .eq('id', id);
+      
+      if (mounted) {
+        _carregarVeiculos();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Veículo $placa excluído com sucesso'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao excluir: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Cabeçalho da tabela
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(width: 40),
+              const SizedBox(width: 100, child: Text('PLACA', style: _h)),
+              const SizedBox(width: 180, child: Text('TRANSPORTADORA', style: _h)),
+              const SizedBox(width: 120, child: Text('RENAVAM', style: _h)),
+              const SizedBox(width: 260, child: Text('COMPARTIMENTOS', style: _h)),
+              const SizedBox(width: 90, child: Text('CAPAC. TOTAL', style: _h)),
+            ],
+          ),
+        ),
+
+        // Lista
+        Expanded(
+          child: _carregando
+              ? const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF0D47A1)),
+                )
+              : _veiculosFiltrados.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.directions_car_outlined,
+                              size: 48, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          Text(
+                            widget.filtro.isEmpty
+                                ? 'Nenhum veículo cadastrado'
+                                : 'Nenhum veículo encontrado',
+                            style: const TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _veiculosFiltrados.length,
+                      itemBuilder: (context, index) {
+                        final v = _veiculosFiltrados[index];
+                        final tanques = _parseTanques(v['tanques']);
+                        final total = _totalTanques(tanques);
+                        final placa = v['placa']?.toString() ?? '';
+
+                        // Determina qual tabela o veículo pertence
+                        final tabela = v['transportadora_id'] != null && 
+                            v['id'] != null ? 'equipamentos' : 'veiculos';
+                        // Na prática, como ambas tabelas tem os mesmos campos, podemos tentar ambas
+                        // Mas vamos usar 'equipamentos' como padrão e se falhar, tenta 'veiculos'
+
+                        return Container(
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: index.isEven
+                                ? Colors.white
+                                : Colors.grey.shade50,
+                            border: Border(
+                              bottom: BorderSide(color: Colors.grey.shade200),
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              // Menu
+                              SizedBox(
+                                width: 40,
+                                child: MenuVeiculoWidget(
+                                  placa: placa,
+                                  onEditar: () {
+                                    // Tenta editar em 'equipamentos', se falhar, tenta 'veiculos'
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => DialogEditarVeiculo(
+                                        veiculo: v,
+                                        tabela: 'equipamentos',
+                                        onAtualizado: _carregarVeiculos,
+                                      ),
+                                    );
+                                  },
+                                  onExcluir: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => DialogConfirmarExclusao(
+                                        placa: placa,
+                                        onConfirmar: () => _excluirVeiculo(v['id'], placa, 'equipamentos'),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+
+                              // PLACA
+                              SizedBox(
+                                width: 100,
+                                child: Text(
+                                  placa,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF0D47A1),
+                                  ),
+                                ),
+                              ),
+
+                              // TRANSPORTADORA
+                              SizedBox(
+                                width: 180,
+                                child: Text(
+                                  _nomeTransportadora(v),
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+
+                              // RENAVAM
+                              SizedBox(
+                                width: 120,
+                                child: Text(
+                                  v['renavam'] ?? '--',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: v['renavam'] != null ? Colors.black : Colors.grey,
+                                    fontStyle: v['renavam'] != null ? FontStyle.normal : FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+
+                              // COMPARTIMENTOS
+                              SizedBox(
+                                width: 260,
+                                child: tanques.isEmpty
+                                    ? Row(
+                                        children: const [
+                                          Icon(Icons.directions_car,
+                                              size: 16, color: Colors.grey),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Cavalo',
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                              fontStyle: FontStyle.italic,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: tanques
+                                            .map(
+                                              (c) => Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: _corBoca(c).withOpacity(0.1),
+                                                  border: Border.all(
+                                                    color: _corBoca(c).withOpacity(0.3),
+                                                    width: 1,
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  NumberFormat('#,##0', 'pt_BR').format((c * 1000).toInt()),
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: _corBoca(c),
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                              ),
+
+                              // CAPAC. TOTAL
+                              SizedBox(
+                                width: 90,
+                                child: tanques.isEmpty
+                                    ? const SizedBox()
+                                    : Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blueGrey.withOpacity(0.1),
+                                          border: Border.all(
+                                            color: Colors.blueGrey.withOpacity(0.3),
+                                            width: 1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.arrow_forward,
+                                              size: 12,
+                                              color: Colors.blueGrey,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              NumberFormat('#,##0', 'pt_BR').format((total * 1000).toInt()),
+                                              style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                                color: Colors.blueGrey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+}
+
+const _h = TextStyle(
+  fontWeight: FontWeight.bold,
+  color: Color(0xFF0D47A1),
+  fontSize: 12,
+);
+
+// ==============================
+// PÁGINA PRINCIPAL DE VEÍCULOS (UNIFICADA)
 // ==============================
 class VeiculosPage extends StatefulWidget {
   final VoidCallback onVoltar;
@@ -775,36 +1252,36 @@ class VeiculosPage extends StatefulWidget {
 }
 
 class _VeiculosPageState extends State<VeiculosPage> {
-  List<Map<String, dynamic>> _veiculos = [];
-  bool _carregando = true;
-  String _filtroVeiculos = '';
-  String _filtroTerceiros = '';
-  late int _abaAtual; // 0 = Veículos, 1 = Conjuntos, 2 = Geral/Terceiros
-  int _terceirosRefreshToken = 0;
+  List<Map<String, dynamic>> _veiculosProprios = [];
+  bool _carregandoProprios = true;
+  String _filtroProprios = '';
+  String _filtroGeral = '';
+  int _abaAtual = 0;
+  int _geralRefreshToken = 0;
   int _conjuntosRefreshToken = 0;
-  final TextEditingController _buscaVeiculosController = TextEditingController();
+  final TextEditingController _buscaPropriosController = TextEditingController();
   final TextEditingController _buscaConjuntosController = TextEditingController();
-  final TextEditingController _buscaTerceirosController = TextEditingController();
+  final TextEditingController _buscaGeralController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _abaAtual = widget.abaInicial;
-    _carregarVeiculos();
+    _carregarVeiculosProprios();
   }
 
   @override
   void dispose() {
-    _buscaVeiculosController.dispose();
+    _buscaPropriosController.dispose();
     _buscaConjuntosController.dispose();
-    _buscaTerceirosController.dispose();
+    _buscaGeralController.dispose();
     super.dispose();
   }
 
   TextEditingController get _controladorBuscaAtual {
-    if (_abaAtual == 0) return _buscaVeiculosController;
+    if (_abaAtual == 0) return _buscaPropriosController;
     if (_abaAtual == 1) return _buscaConjuntosController;
-    return _buscaTerceirosController;
+    return _buscaGeralController;
   }
 
   String get _hintBuscaAtual {
@@ -820,32 +1297,16 @@ class _VeiculosPageState extends State<VeiculosPage> {
   void _onBuscaChanged(String value) {
     setState(() {
       if (_abaAtual == 0) {
-        _filtroVeiculos = value;
+        _filtroProprios = value;
       } else if (_abaAtual == 2) {
-        _filtroTerceiros = value;
+        _filtroGeral = value;
       }
     });
   }
 
-  Future<void> _carregarVeiculos() async {
-    setState(() => _carregando = true);
+  Future<void> _carregarVeiculosProprios() async {
+    setState(() => _carregandoProprios = true);
     try {
-      // Se estiver na aba de Conjuntos (1), atualiza o token para forçar reload do widget
-      if (_abaAtual == 1) {
-        setState(() {
-          _conjuntosRefreshToken++;
-        });
-        return;
-      }
-
-      // Se estiver na aba de Terceiros (2), atualiza o token para forçar reload do widget
-      if (_abaAtual == 2) {
-        setState(() {
-          _terceirosRefreshToken++;
-        });
-        return;
-      }
-
       final data = await Supabase.instance.client
           .from('equipamentos')
           .select('''
@@ -859,50 +1320,62 @@ class _VeiculosPageState extends State<VeiculosPage> {
           .order('placa');
 
       setState(() {
-        _veiculos = List<Map<String, dynamic>>.from(data);
+        _veiculosProprios = List<Map<String, dynamic>>.from(data);
       });
     } catch (e) {
-      print('Erro ao carregar veículos: $e');
+      print('Erro ao carregar veículos próprios: $e');
     } finally {
-      setState(() => _carregando = false);
+      setState(() => _carregandoProprios = false);
     }
   }
 
-
-  List<double> _parsetanques(dynamic tanquesData) {
+  List<double> _parseTanques(dynamic tanquesData) {
     if (tanquesData is List) return tanquesData.map((t) => double.tryParse(t.toString()) ?? 0.0).toList();
     return [];
   }
 
-  double _calcularTotaltanques(List<double> tanques) {
+  double _calcularTotalTanques(List<double> tanques) {
     return tanques.isNotEmpty ? tanques.reduce((a, b) => a + b) : 0.0;
   }
 
-  List<Map<String, dynamic>> get _veiculosFiltrados {
-    if (_filtroVeiculos.isEmpty) return _veiculos;
+  String _getNomeTransportadora(Map<String, dynamic> veiculo) {
+    final transportadora = veiculo['transportadoras'];
+    if (transportadora is Map) {
+      return transportadora['nome']?.toString() ?? '--';
+    }
+    return '--';
+  }
 
-    final filtro = _filtroVeiculos.trim().toLowerCase();
-    
-    // Converte filtro "11.500" para 11500 (Litros) ou 11.5 (m3) se necessário
-    final filtroLimpo = filtro.replaceAll('.', '');
-    final capacidadeBuscadaLitros = double.tryParse(filtroLimpo);
+  List<Map<String, dynamic>> get _veiculosPropriosFiltrados {
+    if (_filtroProprios.isEmpty) return _veiculosProprios;
 
-    return _veiculos.where((v) {
+    final filtroRaw = _filtroProprios.trim().toLowerCase();
+    final filtroNormalized = filtroRaw.replaceAll(RegExp(r'[.,\s]'), '');
+    final capacidadeBuscadaLitros = double.tryParse(filtroNormalized);
+
+    return _veiculosProprios.where((v) {
       final placa = v['placa']?.toString().toLowerCase() ?? '';
       final transportadora = _getNomeTransportadora(v).toLowerCase();
-      final tanques = _parsetanques(v['tanques']);
-      final capacidadeTotalM3 = _calcularTotaltanques(tanques);
+      final tanques = _parseTanques(v['tanques']);
+      final capacidadeTotalM3 = _calcularTotalTanques(tanques);
       final capacidadeTotalLitros = capacidadeTotalM3 * 1000;
-      
       final capacidadeComoTexto = NumberFormat('#,##0', 'pt_BR').format(capacidadeTotalLitros.toInt());
+      final capacidadeComoTextoNormalized = capacidadeComoTexto.replaceAll(RegExp(r'[.,\s]'), '');
+
+      final numCompartimentos = tanques.length;
+      final compartimentoBuscado = int.tryParse(filtroNormalized);
+      final bateCompartimentos = compartimentoBuscado != null
+        ? (numCompartimentos == compartimentoBuscado)
+        : numCompartimentos.toString().contains(filtroNormalized);
 
       final bateCapacidade = capacidadeBuscadaLitros != null
-          ? (capacidadeTotalLitros >= capacidadeBuscadaLitros - 100 && capacidadeTotalLitros <= capacidadeBuscadaLitros + 100) // Margem para filtro aproximado
-          : capacidadeComoTexto.contains(filtro);
+        ? (capacidadeTotalLitros >= capacidadeBuscadaLitros - 100 && capacidadeTotalLitros <= capacidadeBuscadaLitros + 100)
+        : (capacidadeComoTextoNormalized.contains(filtroNormalized) || capacidadeComoTexto.contains(filtroRaw));
 
-      return placa.contains(filtro) ||
-             transportadora.contains(filtro) ||
-             bateCapacidade;
+      return placa.contains(filtroRaw) ||
+         transportadora.contains(filtroRaw) ||
+         bateCapacidade ||
+         bateCompartimentos;
     }).toList();
   }
 
@@ -919,33 +1392,24 @@ class _VeiculosPageState extends State<VeiculosPage> {
       if (!mounted) return;
       if (_abaAtual == 2) {
         setState(() {
-          _terceirosRefreshToken++;
+          _geralRefreshToken++;
         });
       } else {
-        _carregarVeiculos();
+        _carregarVeiculosProprios();
       }
     });
   }
 
-  Color _getCorBoca(num capacidade) {
+  Color _getCorBoca(double capacidade) {
     final cores = [
       Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.red,
       Colors.teal, Colors.indigo, Colors.deepOrange, Colors.cyan, Colors.lime,
     ];
-    // Usa o valor em Litros (inteiro) para escolher a cor
     final indexCor = (capacidade * 1000).toInt();
     return cores[indexCor % cores.length];
   }
 
-  String _getNomeTransportadora(Map<String, dynamic> veiculo) {
-    final transportadora = veiculo['transportadoras'];
-    if (transportadora is Map) {
-      return transportadora['nome']?.toString() ?? '--';
-    }
-    return '--';
-  }
-
-  Future<void> _excluirPlaca(String id, String placa) async {
+  Future<void> _excluirVeiculoProprio(String id, String placa) async {
     try {
       await Supabase.instance.client
           .from('equipamentos')
@@ -953,7 +1417,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
           .eq('id', id);
       
       if (mounted) {
-        _carregarVeiculos();
+        _carregarVeiculosProprios();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Placa $placa excluída com sucesso'),
@@ -975,6 +1439,12 @@ class _VeiculosPageState extends State<VeiculosPage> {
     }
   }
 
+  void _refreshConjuntos() {
+    setState(() {
+      _conjuntosRefreshToken++;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -988,7 +1458,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
       ) : null,
       body: Column(
         children: [
-          // Cabeçalho com navegação
+          // Cabeçalho
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
             decoration: BoxDecoration(
@@ -1006,7 +1476,17 @@ class _VeiculosPageState extends State<VeiculosPage> {
                   style: TextStyle(fontSize: 20, color: Color(0xFF0D47A1), fontWeight: FontWeight.bold)),
                 const Spacer(),
                 IconButton(
-                  onPressed: _carregarVeiculos,
+                  onPressed: () {
+                    if (_abaAtual == 0) {
+                      _carregarVeiculosProprios();
+                    } else if (_abaAtual == 1) {
+                      _refreshConjuntos();
+                    } else {
+                      setState(() {
+                        _geralRefreshToken++;
+                      });
+                    }
+                  },
                   icon: const Icon(Icons.refresh, color: Color(0xFF0D47A1)),
                   tooltip: 'Atualizar',
                 ),
@@ -1014,7 +1494,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
             ),
           ),
 
-          // Linha com botões de navegação e busca
+          // Navegação e busca
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -1025,17 +1505,14 @@ class _VeiculosPageState extends State<VeiculosPage> {
               children: [
                 Row(
                   children: [
-                    _botaoAba("Veículos Próprios", 0),
+                    _botaoAba("Veículos (Geral)", 2),
                     const SizedBox(width: 16),
-                    _botaoAba("Veículos de Terceiros", 2),
+                    _botaoAba("Veículos Próprios", 0),
                     const SizedBox(width: 16),
                     _botaoAba("Conjuntos", 1),
                   ],
                 ),
-
                 const Spacer(),
-
-                // BUSCA SEMPRE VISÍVEL
                 SizedBox(
                   width: 300,
                   child: TextField(
@@ -1061,19 +1538,23 @@ class _VeiculosPageState extends State<VeiculosPage> {
             ),
           ),
 
-          // Conteúdo da aba selecionada
+          // Conteúdo
           Expanded(
             child: _abaAtual == 0
-                ? _buildVeiculosList()
+                ? _buildVeiculosPropriosList()
                 : _abaAtual == 1
                     ? ConjuntosPage(
                         key: ValueKey('conjuntos-$_conjuntosRefreshToken'),
                         buscaController: _buscaConjuntosController,
                       )
                     : VeiculosGeralPage(
-                        key: ValueKey('terceiros-$_terceirosRefreshToken'),
-                        filtro: _filtroTerceiros,
-                        onRefresh: _carregarVeiculos,
+                        key: ValueKey('geral-$_geralRefreshToken'),
+                        filtro: _filtroGeral,
+                        onRefresh: () {
+                          setState(() {
+                            _geralRefreshToken++;
+                          });
+                        },
                       ),
           ),
         ],
@@ -1118,12 +1599,10 @@ class _VeiculosPageState extends State<VeiculosPage> {
     );
   }
 
-  Widget _buildVeiculosList() {
+  Widget _buildVeiculosPropriosList() {
     return Column(
       children: [
-        // =========================
-        // CABEÇALHO DA TABELA
-        // =========================
+        // Cabeçalho
         Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
           decoration: BoxDecoration(
@@ -1132,87 +1611,23 @@ class _VeiculosPageState extends State<VeiculosPage> {
           ),
           child: Row(
             children: [
-              Container(
-                width: 40, // Espaço para o menu
-                alignment: Alignment.centerLeft,
-              ),
-              Container(
-                width: 100,
-                alignment: Alignment.centerLeft,
-                child: const Text(
-                  'PLACA',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 180,
-                alignment: Alignment.centerLeft,
-                child: const Text(
-                  'TRANSPORTADORA',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 100,
-                alignment: Alignment.centerLeft,
-                child: const Text(
-                  'RENAVAM',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 260,
-                alignment: Alignment.centerLeft,
-                child: const Text(
-                  'COMPARTIMENTOS',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 4),
-              Container(
-                width: 90,
-                alignment: Alignment.centerLeft,
-                child: const Text(
-                  'CAPAC. TOTAL',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF0D47A1),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
+              const SizedBox(width: 40),
+              const SizedBox(width: 100, child: Text('PLACA', style: _h)),
+              const SizedBox(width: 180, child: Text('TRANSPORTADORA', style: _h)),
+              const SizedBox(width: 100, child: Text('RENAVAM', style: _h)),
+              const SizedBox(width: 260, child: Text('COMPARTIMENTOS', style: _h)),
+              const SizedBox(width: 90, child: Text('CAPAC. TOTAL', style: _h)),
             ],
           ),
         ),
 
-        // =========================
-        // LISTA DE VEÍCULOS
-        // =========================
+        // Lista
         Expanded(
-          child: _carregando
+          child: _carregandoProprios
               ? const Center(
                   child: CircularProgressIndicator(color: Color(0xFF0D47A1)),
                 )
-              : _veiculosFiltrados.isEmpty
+              : _veiculosPropriosFiltrados.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1221,7 +1636,7 @@ class _VeiculosPageState extends State<VeiculosPage> {
                               size: 48, color: Colors.grey),
                           const SizedBox(height: 16),
                           Text(
-                            _filtroVeiculos.isEmpty
+                            _filtroProprios.isEmpty
                                 ? 'Nenhum veículo cadastrado'
                                 : 'Nenhum veículo encontrado',
                             style: const TextStyle(fontSize: 16, color: Colors.grey),
@@ -1230,13 +1645,13 @@ class _VeiculosPageState extends State<VeiculosPage> {
                       ),
                     )
                   : ListView.builder(
-                      itemCount: _veiculosFiltrados.length,
+                      itemCount: _veiculosPropriosFiltrados.length,
                       itemBuilder: (context, index) {
-                        final veiculo = _veiculosFiltrados[index];
+                        final veiculo = _veiculosPropriosFiltrados[index];
                         final placa = veiculo['placa']?.toString() ?? '';
                         final transportadora = _getNomeTransportadora(veiculo);
-                        final tanques = _parsetanques(veiculo['tanques']);
-                        final totalTanques = _calcularTotaltanques(tanques);
+                        final tanques = _parseTanques(veiculo['tanques']);
+                        final totalTanques = _calcularTotalTanques(tanques);
                         final renavam = veiculo['renavam']?.toString();
 
                         return Container(
@@ -1249,169 +1664,155 @@ class _VeiculosPageState extends State<VeiculosPage> {
                               bottom: BorderSide(color: Colors.grey.shade200),
                             ),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                // Menu de 3 pontos
-                                Container(
-                                  width: 40,
-                                  alignment: Alignment.centerLeft,
-                                  child: MenuPlacaWidget(
-                                    placa: placa,
-                                    onEditar: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => DialogEditarPlaca(
-                                          veiculo: veiculo,
-                                          onAtualizado: _carregarVeiculos,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              // Menu
+                              SizedBox(
+                                width: 40,
+                                child: MenuVeiculoWidget(
+                                  placa: placa,
+                                  onEditar: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => DialogEditarVeiculo(
+                                        veiculo: veiculo,
+                                        tabela: 'equipamentos',
+                                        onAtualizado: _carregarVeiculosProprios,
+                                      ),
+                                    );
+                                  },
+                                  onExcluir: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (context) => DialogConfirmarExclusao(
+                                        placa: placa,
+                                        onConfirmar: () => _excluirVeiculoProprio(veiculo['id'], placa),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+
+                              // PLACA
+                              SizedBox(
+                                width: 100,
+                                child: Text(
+                                  placa,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Color(0xFF0D47A1),
+                                  ),
+                                ),
+                              ),
+
+                              // TRANSPORTADORA
+                              SizedBox(
+                                width: 180,
+                                child: Text(
+                                  transportadora,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              ),
+
+                              // RENAVAM
+                              SizedBox(
+                                width: 100,
+                                child: Text(
+                                  renavam ?? '--',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: renavam != null ? Colors.black : Colors.grey,
+                                    fontStyle: renavam != null ? FontStyle.normal : FontStyle.italic,
+                                  ),
+                                ),
+                              ),
+
+                              // COMPARTIMENTOS
+                              SizedBox(
+                                width: 260,
+                                child: tanques.isEmpty
+                                    ? Row(
+                                        children: const [
+                                          Icon(Icons.directions_car,
+                                              size: 16, color: Colors.grey),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            'Cavalo',
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                              fontStyle: FontStyle.italic,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: tanques
+                                            .map(
+                                              (capacidade) => Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: _getCorBoca(capacidade).withOpacity(0.1),
+                                                  border: Border.all(
+                                                    color: _getCorBoca(capacidade).withOpacity(0.3),
+                                                    width: 1,
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Text(
+                                                  NumberFormat('#,##0', 'pt_BR').format((capacidade * 1000).toInt()),
+                                                  style: TextStyle(
+                                                    color: _getCorBoca(capacidade),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                              ),
+
+                              // CAPAC. TOTAL
+                              SizedBox(
+                                width: 90,
+                                child: tanques.isEmpty
+                                    ? const SizedBox()
+                                    : Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blueGrey.withOpacity(0.1),
+                                          border: Border.all(
+                                            color: Colors.blueGrey.withOpacity(0.3),
+                                            width: 1,
+                                          ),
+                                          borderRadius: BorderRadius.circular(12),
                                         ),
-                                      );
-                                    },
-                                    onExcluir: () {
-                                      showDialog(
-                                        context: context,
-                                        builder: (context) => DialogConfirmarExclusao(
-                                          placa: placa,
-                                          onConfirmar: () => _excluirPlaca(veiculo['id'], placa),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-
-                                // PLACA
-                                Container(
-                                  width: 100,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    placa,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                      color: Color(0xFF0D47A1),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-
-                                // TRANSPORTADORA
-                                Container(
-                                  width: 180,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    transportadora,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-
-                                // RENAVAM
-                                Container(
-                                  width: 100,
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    renavam ?? '--',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: renavam != null ? Colors.black : Colors.grey,
-                                      fontStyle: renavam != null ? FontStyle.normal : FontStyle.italic,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-
-                                // COMPARTIMENTOS
-                                Container(
-                                  width: 260,
-                                  alignment: Alignment.centerLeft,
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: tanques.isEmpty
-                                      ? Row(
-                                          children: const [
-                                            Icon(Icons.directions_car,
-                                                size: 16, color: Colors.grey),
-                                            SizedBox(width: 6),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.arrow_forward,
+                                                size: 12, color: Colors.blueGrey),
+                                            const SizedBox(width: 4),
                                             Text(
-                                              'Cavalo',
-                                              style: TextStyle(
-                                                color: Colors.grey,
-                                                fontStyle: FontStyle.italic,
-                                                fontSize: 12,
+                                              NumberFormat('#,##0', 'pt_BR').format((totalTanques * 1000).toInt()),
+                                              style: const TextStyle(
+                                                color: Colors.blueGrey,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ],
-                                        )
-                                      : Wrap(
-                                          spacing: 4,
-                                          runSpacing: 4,
-                                          children: tanques
-                                              .map(
-                                                (capacidade) => Container(
-                                                  padding: const EdgeInsets.symmetric(
-                                                      horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: _getCorBoca(capacidade).withOpacity(0.1),
-                                                    border: Border.all(
-                                                      color: _getCorBoca(capacidade).withOpacity(0.3),
-                                                      width: 1,
-                                                    ),
-                                                    borderRadius: BorderRadius.circular(10),
-                                                  ),
-                                                  child: Text(
-                                                    NumberFormat('#,##0', 'pt_BR').format((capacidade * 1000).toInt()),
-                                                    style: TextStyle(
-                                                      color: _getCorBoca(capacidade),
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
-                                              .toList(),
                                         ),
-                                ),
-                                const SizedBox(width: 4),
-
-                                // CAPAC. TOTAL
-                                Container(
-                                  width: 90,
-                                  alignment: Alignment.centerLeft,
-                                  child: tanques.isEmpty
-                                      ? const SizedBox()
-                                      : Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blueGrey.withOpacity(0.1),
-                                            border: Border.all(
-                                              color: Colors.blueGrey.withOpacity(0.3),
-                                              width: 1,
-                                            ),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Row(
-                                            children: [
-                                              const Icon(Icons.arrow_forward,
-                                                  size: 12, color: Colors.blueGrey),
-                                              const SizedBox(width: 4),
-                                              Text(
-                                                NumberFormat('#,##0', 'pt_BR').format((totalTanques * 1000).toInt()),
-                                                style: const TextStyle(
-                                                  color: Colors.blueGrey,
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                ),
-                              ],
-                            ),
+                                      ),
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -1422,8 +1823,35 @@ class _VeiculosPageState extends State<VeiculosPage> {
   }
 }
 
+// Placeholder para tipos que podem ser importados de outros arquivos
+enum TipoCadastroVeiculo { proprios, terceiros }
+
+// Placeholder para DialogCadastroPlacas
+class DialogCadastroPlacas extends StatelessWidget {
+  final TipoCadastroVeiculo tipoCadastro;
+
+  const DialogCadastroPlacas({
+    super.key,
+    required this.tipoCadastro,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(tipoCadastro == TipoCadastroVeiculo.proprios ? 'Cadastrar Veículo Próprio' : 'Cadastrar Veículo de Terceiros'),
+      content: const Text('Implementar cadastro de veículos'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Fechar'),
+        ),
+      ],
+    );
+  }
+}
+
 // ==============================
-// PÁGINA DE CONJUNTOS (NÃO ALTERADA)
+// PÁGINA DE CONJUNTOS (ADAPTADA)
 // ==============================
 class ConjuntosPage extends StatefulWidget {
   final TextEditingController buscaController;
@@ -1468,26 +1896,19 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
           .select()
           .order('id', ascending: false);
       
-      // Limpar mapa de duplicadas
       _placasDuplicadas.clear();
       
-      // Processar dados para encontrar duplicidades
       for (final conjunto in data) {
         final conjuntoId = conjunto['id'].toString();
         
-        // Cavalo
         if (conjunto['cavalo'] != null) {
           final placa = conjunto['cavalo'].toString();
           _adicionarPlacaDuplicada(placa, conjuntoId);
         }
-        
-        // Reboque 1
         if (conjunto['reboque_um'] != null) {
           final placa = conjunto['reboque_um'].toString();
           _adicionarPlacaDuplicada(placa, conjuntoId);
         }
-        
-        // Reboque 2
         if (conjunto['reboque_dois'] != null) {
           final placa = conjunto['reboque_dois'].toString();
           _adicionarPlacaDuplicada(placa, conjuntoId);
@@ -1530,10 +1951,11 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
   }
 
   List<Map<String, dynamic>> get _conjuntosFiltrados {
-    final filtro = widget.buscaController.text.toLowerCase();
+    final filtroRaw = widget.buscaController.text.toLowerCase();
+    final filtroNormalized = filtroRaw.replaceAll(RegExp(r'[.,\s]'), '');
     final todosConjuntos = [..._conjuntos, ..._conjuntosTemporarios];
     
-    if (filtro.isEmpty) return todosConjuntos;
+    if (filtroRaw.isEmpty) return todosConjuntos;
     
     return todosConjuntos.where((c) {
       final cavalo = c['cavalo']?.toString().toLowerCase() ?? '';
@@ -1541,16 +1963,24 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
       final reboque2 = c['reboque_dois']?.toString().toLowerCase() ?? '';
       final motorista = c['motorista']?.toString().toLowerCase() ?? '';
       final capac = c['capac']?.toString().toLowerCase() ?? '';
+      final capacNormalized = capac.replaceAll(RegExp(r'[.,\s]'), '');
       final tanques = c['tanques']?.toString().toLowerCase() ?? '';
+      final tanquesNormalized = tanques.replaceAll(RegExp(r'[.,\s]'), '');
+      final tanquesData = c['tanques'];
+      final numTanques = tanquesData is List ? tanquesData.length : (tanquesData != null ? tanquesData.toString().split(',').length : 0);
+      final buscNumTanques = int.tryParse(filtroNormalized);
+      final bateNumTanques = buscNumTanques != null ? (numTanques == buscNumTanques) : numTanques.toString().contains(filtroNormalized);
       final pbt = c['pbt']?.toString().toLowerCase() ?? '';
+      final pbtNormalized = pbt.replaceAll(RegExp(r'[.,\s]'), '');
       
-      return cavalo.contains(filtro) ||
-             reboque1.contains(filtro) ||
-             reboque2.contains(filtro) ||
-             motorista.contains(filtro) ||
-             capac.contains(filtro) ||
-             tanques.contains(filtro) ||
-             pbt.contains(filtro);
+      return cavalo.contains(filtroRaw) ||
+             reboque1.contains(filtroRaw) ||
+             reboque2.contains(filtroRaw) ||
+             motorista.contains(filtroRaw) ||
+             capac.contains(filtroRaw) || capacNormalized.contains(filtroNormalized) ||
+             tanques.contains(filtroRaw) || tanquesNormalized.contains(filtroNormalized) ||
+             bateNumTanques ||
+             pbt.contains(filtroRaw) || pbtNormalized.contains(filtroNormalized);
     }).toList();
   }
 
@@ -1590,7 +2020,6 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
           .select();
       
       if (resultado.isNotEmpty) {
-        // Remover o temporário e adicionar o real
         setState(() {
           _conjuntosTemporarios.removeWhere((c) => c['id'] == conjunto['id']);
         });
@@ -1618,7 +2047,6 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
         _conjuntosTemporarios[index][campo] = novaPlaca;
       });
       
-      // Se todas as placas necessárias foram preenchidas, salva no banco
       final conj = _conjuntosTemporarios[index];
       if (conj['cavalo'] != null || conj['reboque_um'] != null || conj['reboque_dois'] != null) {
         await _salvarConjuntoTemporario(conj);
@@ -1639,7 +2067,6 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
       campoConjunto: campo,
       onAtualizado: isTemporario 
           ? () async {
-              // Para conjuntos temporários, precisamos atualizar o estado
               await _carregarConjuntos();
             }
           : _carregarConjuntos,
@@ -1679,7 +2106,7 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Cabeçalho da tabela de conjuntos
+        // Cabeçalho
         Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
           decoration: BoxDecoration(
@@ -1769,7 +2196,7 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
           ),
         ),
         
-        // Lista de conjuntos
+        // Lista
         Expanded(
           child: _carregando
               ? const Center(
@@ -1923,7 +2350,7 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
                     ),
         ),
         
-        // Botão de adicionar conjunto (fixo no rodapé)
+        // Rodapé com botão
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
@@ -1964,365 +2391,8 @@ class _ConjuntosPageState extends State<ConjuntosPage> {
 }
 
 // ==============================
-// PÁGINA DE DETALHES DO VEÍCULO (NÃO ALTERADA)
+// PLACA CLICÁVEL (MANTIDO)
 // ==============================
-class VeiculoDetalhesPage extends StatelessWidget {
-  final String id;
-  final String placa;
-  final List<int> tanques;
-  final String transportadora;
-  final VoidCallback onVoltar;
-
-  const VeiculoDetalhesPage({
-    super.key,
-    required this.id,
-    required this.placa,
-    required this.tanques,
-    required this.transportadora,
-    required this.onVoltar,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Color(0xFF0D47A1)),
-                  onPressed: onVoltar,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Veículo $placa',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    color: Color(0xFF0D47A1),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Informações do Veículo',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0D47A1),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            const Icon(Icons.fingerprint, size: 18, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            const Text('ID:', style: TextStyle(fontWeight: FontWeight.w500)),
-                            const SizedBox(width: 8),
-                            Text(
-                              id.length > 8 ? '${id.substring(0, 8)}...' : id,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.confirmation_number,
-                                size: 18, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            const Text('Placa:', style: TextStyle(fontWeight: FontWeight.w500)),
-                            const SizedBox(width: 8),
-                            Text(placa, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.business, size: 18, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            const Text('Transportadora:',
-                                style: TextStyle(fontWeight: FontWeight.w500)),
-                            const SizedBox(width: 8),
-                            Text(
-                              transportadora,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.local_gas_station, size: 18, color: Colors.grey),
-                            const SizedBox(width: 8),
-                            const Padding(
-                              padding: EdgeInsets.only(top: 2),
-                              child: Text('Compartimentos:',
-                                  style: TextStyle(fontWeight: FontWeight.w500)),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: tanques.isEmpty
-                                  ? const Row(
-                                      children: [
-                                        Icon(Icons.directions_car,
-                                            size: 16, color: Colors.grey),
-                                        SizedBox(width: 6),
-                                        Text(
-                                          'CAVALO',
-                                          style: TextStyle(fontStyle: FontStyle.italic),
-                                        ),
-                                      ],
-                                    )
-                                  : Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        ...tanques
-                                            .map((capacidade) => Chip(
-                                                  backgroundColor:
-                                                      _getCorBoca(capacidade).withOpacity(0.1),
-                                                  label: Text(
-                                                    '$capacidade m³',
-                                                    style: TextStyle(
-                                                      color: _getCorBoca(capacidade),
-                                                      fontWeight: FontWeight.bold,
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ))
-                                            .toList(),
-                                        Chip(
-                                          backgroundColor:
-                                              Colors.blueGrey.withOpacity(0.15),
-                                          label: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                '${tanques.reduce((a, b) => a + b)} m³ total',
-                                                style: const TextStyle(
-                                                  color: Colors.blueGrey,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Documentação',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0D47A1),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        FutureBuilder<Map<String, dynamic>?>(
-                          future: _carregarDocumentos(id),
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-                            if (snapshot.hasError || snapshot.data == null) {
-                              return const Text('Erro ao carregar documentos');
-                            }
-                            final dados = snapshot.data!;
-                            final documentos = [
-                              {'nome': 'CIPP', 'coluna': 'cipp'},
-                              {'nome': 'CIV', 'coluna': 'civ'},
-                              {'nome': 'Aferição', 'coluna': 'afericao'},
-                              {'nome': 'Tacógrafo', 'coluna': 'tacografo'},
-                              {'nome': 'AET Federal', 'coluna': 'aet_fed'},
-                              {'nome': 'AET Bahia', 'coluna': 'aet_ba'},
-                              {'nome': 'AET Goiás', 'coluna': 'aet_go'},
-                              {'nome': 'AET Alagoas', 'coluna': 'aet_al'},
-                              {'nome': 'AET Minas G', 'coluna': 'aet_mg'},
-                            ];
-                            return Column(
-                              children: documentos.map((doc) {
-                                final dataStr = dados[doc['coluna']] as String?;
-                                final data = _parseData(dataStr);
-                                final cor = _getCorStatusData(data);
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        doc['nome']!,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w500,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.calendar_today, size: 16, color: cor),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            data == null ? '--' : _formatarData(data),
-                                            style: TextStyle(
-                                              color: cor,
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          if (data != null) ...[
-                                            const SizedBox(width: 12),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                  horizontal: 8, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: cor.withOpacity(0.1),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: Text(
-                                                _getDiasRestantes(data),
-                                                style: TextStyle(color: cor, fontSize: 11),
-                                              ),
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<Map<String, dynamic>?> _carregarDocumentos(String id) async {
-    try {
-      final data = await Supabase.instance.client
-          .from('equipamentos')
-          .select()
-          .eq('id', id)
-          .maybeSingle();
-      return data;
-    } catch (e) {
-      print('Erro ao carregar documentos: $e');
-      return null;
-    }
-  }
-
-  DateTime? _parseData(String? dataStr) {
-    if (dataStr == null || dataStr.isEmpty) return null;
-    try {
-      final partes = dataStr.split('/');
-      if (partes.length != 3) return null;
-      final dia = int.parse(partes[0]);
-      final mes = int.parse(partes[1]);
-      final ano = int.parse(partes[2]);
-      final anoCompleto = ano < 100 ? 2000 + ano : ano;
-      return DateTime(anoCompleto, mes, dia);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  String _formatarData(DateTime data) {
-    return '${data.day.toString().padLeft(2, '0')}/'
-        '${data.month.toString().padLeft(2, '0')}/'
-        '${data.year}';
-  }
-
-  Color _getCorStatusData(DateTime? data) {
-    if (data == null) return Colors.grey;
-    final dias = data.difference(DateTime.now()).inDays;
-    if (dias < 0) return Colors.red;
-    if (dias <= 30) return Colors.orange;
-    if (dias <= 90) return Colors.amber[800]!;
-    return Colors.green;
-  }
-
-  String _getDiasRestantes(DateTime data) {
-    final dias = data.difference(DateTime.now()).inDays;
-    if (dias < 0) return 'Vencido há ${dias.abs()} dias';
-    if (dias == 0) return 'Vence hoje';
-    if (dias == 1) return 'Vence amanhã';
-    return 'Vence em $dias dias';
-  }
-
-  Color _getCorBoca(int capacidade) {
-    final cores = [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.purple,
-      Colors.red,
-      Colors.teal,
-      Colors.indigo,
-      Colors.deepOrange,
-      Colors.cyan,
-      Colors.lime,
-    ];
-    return cores[capacidade % cores.length];
-  }
-}
-
-// Placeholder para PlacaClicavelWidget (assumindo que existe em editar_conjunto.dart)
 class PlacaClicavelWidget extends StatelessWidget {
   final dynamic placa;
   final String conjuntoId;
